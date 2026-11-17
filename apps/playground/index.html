@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SurgiJS playground</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; color: #1c1f26; }
+      section { margin-bottom: 2rem; }
+      my-counter { display: block; max-width: 16rem; }
+    </style>
+  </head>
+  <body>
+    <h1>SurgiJS playground</h1>
+    <section>
+      <h2>Counter</h2>
+      <my-counter title="Clicks" step="2"></my-counter>
+    </section>
+    <section>
+      <h2>Dropdown</h2>
+      <ui-dropdown
+        placeholder="Choose a language"
+        options='[{"value":"ts","label":"TypeScript"},{"value":"go","label":"Go"},{"value":"rs","label":"Rust"}]'
+      ></ui-dropdown>
+      <p>Picked: <output id="picked">nothing</output></p>
+    </section>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

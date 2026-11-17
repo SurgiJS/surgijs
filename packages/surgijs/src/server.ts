@@ -34,8 +34,9 @@ export function renderToString<P extends Record<string, unknown>>(
   view: (props: { [K in keyof P]: () => P[K] }, host?: unknown) => unknown,
   props: P = {} as P,
 ): string {
-  const bag = {} as { [K in keyof P]: () => P[K] };
-  for (const k in props) bag[k] = () => props[k];
+  const bag = new Proxy({} as { [K in keyof P]: () => P[K] }, {
+    get: (_, k) => () => props[k as keyof P],
+  });
   let html = '';
   createRoot((dispose) => {
     html = '' + (view(bag) ?? '');

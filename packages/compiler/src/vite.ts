@@ -5,6 +5,7 @@ export interface SurgiVitePluginOptions {
   moduleName?: string;
   /** Files to compile. Default: `.jsx`/`.tsx` outside `node_modules`. */
   include?: RegExp | ((id: string) => boolean);
+  /** Output mode. Imports with a `?ssr` query always compile for the server. */
   generate?: 'dom' | 'ssr';
 }
 
@@ -41,10 +42,12 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
     config: () => ({ esbuild: { jsx: 'preserve' } }),
     transform(code, id) {
       if (!matches(id)) return null;
+      const [file, query = ''] = id.split('?') as [string, string?];
+      const generate = /(^|&)ssr(&|=|$)/.test(query) ? 'ssr' : options.generate;
       const result = compile(code, {
-        filename: id.split('?')[0]!,
+        filename: file,
         ...(options.moduleName ? { moduleName: options.moduleName } : {}),
-        ...(options.generate ? { generate: options.generate } : {}),
+        ...(generate ? { generate } : {}),
       });
       if (!result.changed) return null;
       return { code: result.code, map: result.map ? (JSON.parse(result.map) as SourceMapV3) : null };

@@ -44,12 +44,13 @@ export function template(html: string, flags = 0): () => Node {
  */
 export function insert(parent: Node, value: unknown, marker?: Node | null, initial?: unknown): void {
   if (marker !== undefined && initial === undefined) initial = [];
-  if (typeof value !== 'function') {
-    write(parent, value, initial, marker);
-    return;
-  }
-  createRenderEffect((current) => write(parent, (value as () => unknown)(), current, marker), initial);
+  if (typeof value === 'function') createRenderEffect((current) => write(parent, (value as () => unknown)(), current, marker), initial);
+  else if (Array.isArray(value) && dynamic(value)) createRenderEffect((current) => write(parent, value, current, marker), initial);
+  else write(parent, value, initial, marker);
 }
+
+const dynamic = (list: unknown[]): boolean =>
+  list.some((v) => typeof v === 'function' || (Array.isArray(v) && dynamic(v)));
 
 function write(parent: Node, value: unknown, current: unknown, marker: Node | null | undefined): unknown {
   while (typeof current === 'function') current = current();
