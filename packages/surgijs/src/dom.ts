@@ -43,117 +43,73 @@ export function template(html: string, flags = 0): () => Node {
  * Functions become render effects.
  */
 export function insert(parent: Node, value: unknown, marker?: Node | null, initial?: unknown): void {
-  if (marker !== undefined && initial === undefined) initial = [];
-  if (typeof value === 'function') createRenderEffect((current) => write(parent, (value as () => unknown)(), current, marker), initial);
-  else if (Array.isArray(value) && dynamic(value)) createRenderEffect((current) => write(parent, value, current, marker), initial);
-  else write(parent, value, initial, marker);
+  const own = marker === undefined;
+  const at = own ? null : marker;
+  const cur: unknown = initial || [];
+  if (typeof value === 'function') createRenderEffect<unknown>((c) => write(parent, (value as () => unknown)(), c, at, own), cur);
+  else if (Array.isArray(value) && dynamic(value)) createRenderEffect<unknown>((c) => write(parent, value, c, at, own), cur);
+  else write(parent, value, cur, at, own);
 }
 
 const dynamic = (list: unknown[]): boolean =>
   list.some((v) => typeof v === 'function' || (Array.isArray(v) && dynamic(v)));
 
-function write(parent: Node, value: unknown, current: unknown, marker: Node | null | undefined): unknown {
+function write(parent: Node, value: unknown, current: unknown, marker: Node | null, own: boolean): unknown {
   while (typeof current === 'function') current = current();
   if (typeof value === 'function') {
-    let cur = current;
+    let c = current;
     createRenderEffect(() => {
       let v = (value as () => unknown)();
       while (typeof v === 'function') v = v();
-      cur = write(parent, v, cur, marker);
+      c = write(parent, v, c, marker, own);
     });
-    return () => cur;
+    return () => c;
   }
-  const multi = marker !== undefined;
+  const cur = current as Node[];
   const t = typeof value;
   if (t === 'string' || t === 'number' || t === 'bigint') {
     const s = '' + (value as string);
-    if (!multi) {
-      const f = parent.firstChild;
-      if ((typeof current === 'string' || hydrating) && f && f.nodeType === 3 && !f.nextSibling) {
-        if ((f as Text).data !== s) (f as Text).data = s;
-      } else parent.textContent = s;
-      return s;
-    }
-    const cur = current as Node[];
-    if (cur.length === 1 && cur[0]!.nodeType === 3) {
-      if ((cur[0] as Text).data !== s) (cur[0] as Text).data = s;
+    const first = cur[0] as Text | undefined;
+    if (cur.length === 1 && first!.nodeType === 3) {
+      if (first!.data !== s) first!.data = s;
       return cur;
     }
     if (hydrating && !cur.length) {
-      const prev = marker ? marker.previousSibling : parent.lastChild;
-      if (prev && prev.nodeType === 3 && (prev as Text).data === s) return [prev];
-    }
-    const node = document.createTextNode(s);
-    replace(parent, cur, [node], marker);
-    return [node];
-  }
-  if (value == null || t === 'boolean') {
-    if (!multi) {
-      if (current) parent.textContent = '';
-      return '';
-    }
-    replace(parent, current as Node[], [], marker);
-    return [];
-  }
-  if ((value as Node).nodeType && (value as Node).nodeType !== 11) {
-    const node = value as Node;
-    if (!multi) {
-      if (current === node || (hydrating && node.parentNode === parent)) return node;
-      if (current && (current as Node).nodeType && (current as Node).parentNode === parent) parent.replaceChild(node, current as Node);
-      else {
-        if (current) parent.textContent = '';
-        parent.appendChild(node);
+      const prev = (marker ? marker.previousSibling : parent.lastChild) as Text | null;
+      if (prev && prev.nodeType === 3 && (own || prev.data === s)) {
+        if (prev.data !== s) prev.data = s;
+        return [prev];
       }
-      return node;
     }
-    const cur = current as Node[];
-    if (cur.length === 1 && cur[0] === node) return cur;
-    if (hydrating && !cur.length && node.parentNode === parent) return [node];
-    replace(parent, cur, [node], marker);
-    return [node];
+    value = document.createTextNode(s);
   }
   const nodes: Node[] = [];
-  normalize(nodes, (value as Node).nodeType === 11 ? Array.from((value as Node).childNodes) : (value as unknown[]), Array.isArray(current) ? current : null);
-  if (!multi) {
-    if (!nodes.length) {
-      if (current) parent.textContent = '';
-      return nodes;
-    }
-    if (Array.isArray(current) && current.length) diff(parent, current, nodes);
-    else {
-      if (current && !hydrating) parent.textContent = '';
-      for (let i = 0; i < nodes.length; i++) if (!hydrating || nodes[i]!.parentNode !== parent) parent.appendChild(nodes[i]!);
-    }
-    return nodes;
-  }
-  const cur = current as Node[];
-  if (!nodes.length) replace(parent, cur, nodes, marker);
-  else if (cur.length) diff(parent, cur, nodes);
-  else for (let i = 0; i < nodes.length; i++) if (!hydrating || nodes[i]!.parentNode !== parent) parent.insertBefore(nodes[i]!, marker!);
+  if (value == null || t === 'boolean') {
+    /* renders nothing */
+  } else if ((value as Node).nodeType === 11) normalize(nodes, [...(value as Node).childNodes], cur);
+  else if ((value as Node).nodeType) nodes.push(value as Node);
+  else normalize(nodes, value as unknown[], cur);
+  if (!cur.length) {
+    for (const n of nodes) if (!hydrating || n.parentNode !== parent) parent.insertBefore(n, marker);
+  } else if (!nodes.length) {
+    if (own) parent.textContent = '';
+    else for (const n of cur) if (n.parentNode === parent) parent.removeChild(n);
+  } else diff(parent, cur, nodes);
   return nodes;
 }
 
-function normalize(out: Node[], value: unknown[], prev: Node[] | null): void {
-  for (let i = 0; i < value.length; i++) {
-    let v = value[i];
+function normalize(out: Node[], value: unknown[], prev: Node[]): void {
+  for (let v of value) {
     while (typeof v === 'function') v = v();
     if (v == null || typeof v === 'boolean') continue;
     if (Array.isArray(v)) normalize(out, v, prev);
     else if ((v as Node).nodeType) out.push(v as Node);
     else {
       const s = '' + (v as string);
-      const p = prev && prev[out.length];
+      const p = prev[out.length];
       out.push(p && p.nodeType === 3 && (p as Text).data === s ? p : document.createTextNode(s));
     }
   }
-}
-
-function replace(parent: Node, current: Node[], nodes: Node[], marker: Node | null | undefined): void {
-  for (let i = 0; i < current.length; i++) {
-    const n = current[i]!;
-    if (n.parentNode === parent && !nodes.includes(n)) parent.removeChild(n);
-  }
-  for (let i = 0; i < nodes.length; i++) parent.insertBefore(nodes[i]!, marker || null);
 }
 
 /** Moves the DOM from node list `a` to node list `b` with few operations (udomdiff). */
@@ -221,7 +177,7 @@ export function toNodes(value: unknown, out: Node[] = []): Node[] {
   while (typeof value === 'function') value = untrack(value as () => unknown);
   if (value == null || typeof value === 'boolean') return out;
   if (Array.isArray(value)) for (let i = 0; i < value.length; i++) toNodes(value[i], out);
-  else if ((value as Node).nodeType === 11) out.push(...Array.from((value as Node).childNodes));
+  else if ((value as Node).nodeType === 11) out.push(...(value as Node).childNodes);
   else if ((value as Node).nodeType) out.push(value as Node);
   else out.push(document.createTextNode('' + (value as string)));
   return out;
@@ -322,11 +278,30 @@ export function undelegateRoot(root: Node): void {
   for (const name of delegated) root.removeEventListener(name, dispatch);
 }
 
-const DELEGATED = new Set(
-  'click dblclick auxclick contextmenu input beforeinput keydown keyup focusin focusout pointerdown pointerup pointermove pointerover pointerout pointerenter pointerleave pointercancel mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave touchstart touchend touchmove touchcancel'.split(
-    ' ',
-  ),
-);
+const DELEGATED = /* @__PURE__ */ new Set([
+  'click',
+  'dblclick',
+  'contextmenu',
+  'input',
+  'beforeinput',
+  'keydown',
+  'keyup',
+  'focusin',
+  'focusout',
+  'pointerdown',
+  'pointerup',
+  'pointermove',
+  'pointerover',
+  'pointerout',
+  'mousedown',
+  'mouseup',
+  'mousemove',
+  'mouseover',
+  'mouseout',
+  'touchstart',
+  'touchend',
+  'touchmove',
+]);
 
 /** Sets one property or attribute the way the compiler would for a known name. */
 export function setProp(el: Element, k: string, v: unknown): void {
@@ -341,13 +316,13 @@ export function setProp(el: Element, k: string, v: unknown): void {
 }
 
 function listen(el: Element, k: string, v: unknown): boolean {
-  if (k.charCodeAt(0) !== 111 || k.charCodeAt(1) !== 110) return false;
+  if (k[0] !== 'o' || k[1] !== 'n') return false;
   if (k[2] === ':') {
     el.addEventListener(k.slice(3), v as EventListener);
     return true;
   }
-  const c = k.charCodeAt(2);
-  if (c < 65 || c > 90) return false;
+  const c = k[2]!;
+  if (c < 'A' || c > 'Z') return false;
   const name = k.slice(2).toLowerCase();
   if (DELEGATED.has(name)) {
     (el as unknown as Record<string, unknown>)['$$' + name] = v;

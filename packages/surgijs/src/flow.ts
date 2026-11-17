@@ -102,8 +102,7 @@ export function Portal(props: PortalProps): JSX.Element {
   });
   onCleanup(() => {
     for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i]!;
-      if (n.parentNode) n.parentNode.removeChild(n);
+      nodes[i]!.parentNode?.removeChild(nodes[i]!);
     }
   });
   return marker;

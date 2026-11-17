@@ -174,7 +174,7 @@ describe('defineComponent', () => {
     const el = document.createElement('x-field') as FormHost & { value?: string };
     el.setAttribute('value', 'a');
     document.body.appendChild(el);
-    const internals = el.internals as unknown as FakeInternals;
+    const internals = (el as unknown as { __i: FakeInternals }).__i;
     const input = el.shadowRoot!.querySelector('input')!;
     expect(input.value).toBe('a');
     el.value = 'b';

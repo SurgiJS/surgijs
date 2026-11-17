@@ -26,7 +26,7 @@ const isJsx = (n: ts.Node): n is Jsx => ts.isJsxElement(n) || ts.isJsxSelfClosin
 const VOID = new Set('area base br col embed hr img input link meta param source track wbr'.split(' '));
 
 const DELEGATED = new Set(
-  'click dblclick auxclick contextmenu input beforeinput keydown keyup focusin focusout pointerdown pointerup pointermove pointerover pointerout pointerenter pointerleave pointercancel mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave touchstart touchend touchmove touchcancel'.split(
+  'click dblclick contextmenu input beforeinput keydown keyup focusin focusout pointerdown pointerup pointermove pointerover pointerout mousedown mouseup mousemove mouseover mouseout touchstart touchend touchmove'.split(
     ' ',
   ),
 );

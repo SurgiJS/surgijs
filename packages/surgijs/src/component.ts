@@ -23,7 +23,6 @@ export interface ComponentOptions {
 }
 
 export interface FormHost extends HTMLElement {
-  readonly internals: ElementInternals;
   setFormValue(value: File | string | FormData | null): void;
   setFormValidity(flags?: ValidityStateFlags, message?: string, anchor?: HTMLElement): void;
   formDisabled: Accessor<boolean>;
@@ -48,7 +47,7 @@ function coerce(type: PropType | undefined, v: string | null): unknown {
   if (type === Boolean) return v !== null && v !== 'false';
   if (v === null) return undefined;
   if (type === Number) return +v;
-  if (type === Object || type === Array) {
+  if (type && type !== String) {
     try {
       return JSON.parse(v);
     } catch {
@@ -91,8 +90,9 @@ export function defineComponent<P extends object = {}>(
   const attrs = keys.map(kebab);
   const byAttr: Record<string, string> = {};
   keys.forEach((k, i) => (byAttr[attrs[i]!] = k));
-  const shadow = options.shadow === undefined || options.shadow === true ? { mode: 'open' as const } : options.shadow;
-  const closed = !!shadow && shadow.mode === 'closed';
+  const opt = options.shadow ?? true;
+  const shadow = opt === true ? { mode: 'open' as const } : opt;
+  const closed = shadow && shadow.mode === 'closed';
   const form = !!options.form;
   const light = !shadow && !('children' in types);
 
@@ -111,10 +111,6 @@ export function defineComponent<P extends object = {}>(
         self.__i = this.attachInternals();
         [self.formDisabled, self.__f] = createSignal(false);
       }
-    }
-
-    get internals(): ElementInternals | undefined {
-      return (this as unknown as Host).__i;
     }
 
     attributeChangedCallback(name: string, _old: string | null, value: string | null): void {

@@ -8,10 +8,17 @@ export interface Source {
   o: Observer[] | null;
 }
 
-type Cleanup = (() => void) | Disposable;
-type Disposable = OwnerNode | Computation | Bound;
+/** Queued work. `t` picks the queue: 0 memo, 1 render, 2 user effect. `st`: 0 idle, 1 queued, -1 disposed. */
+interface Observer {
+  st: number;
+  t: number;
+  run(): void;
+  d(): void;
+}
 
-/** Owner: `c` cleanups and owned nodes, `p` parent, `k` context, `e` error handler. */
+type Cleanup = (() => void) | Observer;
+
+/** Owner: `c` cleanups and owned computations, `p` parent, `k` context, `e` error handler. */
 export interface OwnerNode {
   c: Cleanup[] | null;
   p: OwnerNode | null;
@@ -19,51 +26,22 @@ export interface OwnerNode {
   e?: ((err: unknown) => void) | undefined;
 }
 
-/** `t`: 0 memo, 1 render effect, 2 user effect. `st`: 0 clean, 1 check, 2 dirty, -1 disposed. */
-interface Computation extends OwnerNode, Source {
-  st: number;
-  t: 0 | 1 | 2;
-  f: (prev: any) => any;
-  s: Source[] | null;
-}
-
-/** Binding with fixed sources: `n` node, `r` reader, `a` apply, `x` reader arguments. */
-interface Bound {
-  st: number;
-  t: 3;
-  n: unknown;
-  r: (...args: any[]) => unknown;
-  a: (node: any, value: any) => unknown;
-  x: unknown[] | undefined;
-  s: Source | Source[];
-  v: unknown;
-}
-
-type Observer = Computation | Bound;
-
 let Owner: OwnerNode | null = null;
-let Listener: Computation | null = null;
+let Listener: Comp | null = null;
 let Collect: Source[] | null = null;
 let Index = 0;
 let Fresh: Source[] | null = null;
-let Deferred: Computation[] | null = null;
+let Deferred: Comp[] | null = null;
 let scheduled = false;
-let flushing = false;
+let running = false;
 let depth = 0;
-
-const Pure: Observer[] = [];
-const Render: Observer[] = [];
-const Effects: Observer[] = [];
+let Queues: Observer[][] = [[], [], []];
 
 function track(s: Source): void {
   if (Collect) {
     if (Collect[Collect.length - 1] !== s) Collect.push(s);
-    return;
-  }
-  const l = Listener;
-  if (!l) return;
-  if (Fresh) Fresh.push(s);
-  else if (l.s && l.s[Index] === s) Index++;
+  } else if (Fresh) Fresh.push(s);
+  else if (Listener!.s && Listener!.s[Index] === s) Index++;
   else Fresh = [s];
 }
 
@@ -73,67 +51,34 @@ function link(s: Source, o: Observer): void {
 }
 
 function unlink(s: Source, o: Observer): void {
-  const list = s.o;
-  if (!list) return;
+  const list = s.o!;
   const i = list.lastIndexOf(o);
-  if (i < 0) return;
   const last = list.pop()!;
   if (i < list.length) list[i] = last;
 }
 
-function mark(o: Observer, st: number): void {
-  const was = o.st;
-  if (was >= st || was < 0) return;
-  o.st = st;
-  if (was !== 0) return;
-  if (o.t === 0) {
-    Pure.push(o);
-    const list = o.o;
-    if (list) for (let i = 0; i < list.length; i++) mark(list[i]!, 1);
-  } else (o.t === 2 ? Effects : Render).push(o);
-}
-
-function schedule(): void {
-  if (scheduled || flushing) return;
-  scheduled = true;
-  queueMicrotask(flush);
-}
-
-function write(s: Source, v: unknown): void {
-  if (Object.is(s.v, v)) return;
-  s.v = v;
-  const list = s.o;
-  if (!list) return;
-  for (let i = 0; i < list.length; i++) mark(list[i]!, 2);
-  if (!depth) schedule();
+function mark(o: Observer): void {
+  if (o.st) return;
+  o.st = 1;
+  Queues[o.t]!.push(o);
+  if (!scheduled && !running && !depth) {
+    scheduled = true;
+    queueMicrotask(flush);
+  }
 }
 
 function cleanup(o: OwnerNode): void {
   const list = o.c;
   if (!list) return;
   o.c = null;
-  for (let i = list.length - 1; i >= 0; i--) {
+  for (let i = list.length; i--; ) {
     const x = list[i]!;
     if (typeof x === 'function') x();
-    else disposeNode(x);
+    else x.d();
   }
 }
 
-function disposeNode(x: Disposable): void {
-  if ('t' in x) {
-    if (x.st < 0) return;
-    if (x.t === 3) return disposeBound(x);
-    x.st = -1;
-  }
-  cleanup(x);
-  const s = (x as Computation).s;
-  if (s) {
-    for (let i = 0; i < s.length; i++) unlink(s[i]!, x as Computation);
-    (x as Computation).s = null;
-  }
-}
-
-function own(x: Disposable): void {
+function own(x: Observer): void {
   if (Owner) (Owner.c ||= []).push(x);
 }
 
@@ -142,124 +87,140 @@ function recover(o: OwnerNode | null, err: unknown): void {
   throw err;
 }
 
-function update(c: Computation): void {
-  cleanup(c);
-  const prevOwner = Owner;
-  const prevListener = Listener;
-  const prevCollect = Collect;
-  const prevIndex = Index;
-  const prevFresh = Fresh;
-  Owner = Listener = c;
-  Collect = Fresh = null;
-  Index = 0;
-  c.st = 0;
-  let v: unknown;
-  let failed = false;
-  let error: unknown;
-  try {
-    v = c.f(c.v);
-  } catch (err) {
-    failed = true;
-    error = err;
-  }
-  const s = c.s;
-  if (Fresh) {
-    const fresh: Source[] = Fresh;
-    if (s) {
-      for (let i = Index; i < s.length; i++) unlink(s[i]!, c);
-      s.length = Index;
-      for (let i = 0; i < fresh.length; i++) s.push(fresh[i]!);
-    } else c.s = fresh;
-    for (let i = 0; i < fresh.length; i++) link(fresh[i]!, c);
-  } else if (s && Index < s.length) {
-    for (let i = Index; i < s.length; i++) unlink(s[i]!, c);
-    s.length = Index;
-  }
-  Owner = prevOwner;
-  Listener = prevListener;
-  Collect = prevCollect;
-  Index = prevIndex;
-  Fresh = prevFresh;
-  if (failed) return recover(c.p, error);
-  if (c.t === 0) {
-    if (Object.is(v, c.v)) return;
-    c.v = v;
-    const list = c.o;
-    if (list) for (let i = 0; i < list.length; i++) mark(list[i]!, 2);
-  } else c.v = v;
-}
-
-function runBound(b: Bound): void {
-  b.st = 0;
-  const x = b.x;
-  const v = x ? (x.length === 1 ? b.r(x[0]) : x.length === 2 ? b.r(x[0], x[1]) : b.r(...x)) : b.r();
-  if (Object.is(v, b.v)) return;
-  b.v = v;
-  b.a(b.n, v);
-}
-
-function disposeBound(b: Bound): void {
-  b.st = -1;
-  const s = b.s;
-  if (Array.isArray(s)) for (let i = 0; i < s.length; i++) unlink(s[i]!, b);
-  else unlink(s, b);
-}
-
-function stale(s: Source): void {
-  const c = s as Computation;
-  if (c.t === 0 && c.st > 0) refresh(c);
-}
-
-function refresh(o: Observer): void {
-  if (o.st === 1) {
-    const s = o.s;
-    if (Array.isArray(s)) {
-      for (let i = 0; i < s.length && o.st === 1; i++) stale(s[i]!);
-    } else if (s) stale(s);
-    if (o.st === 1) o.st = 0;
-  }
-  if (o.st === 2) {
-    if (o.t === 3) runBound(o);
-    else update(o);
-  }
-}
-
-function drain(q: Observer[]): unknown[] | null {
-  let errors: unknown[] | null = null;
-  for (let i = 0; i < q.length; i++) {
-    try {
-      refresh(q[i]!);
-    } catch (err) {
-      (errors ||= []).push(err);
-    }
-  }
-  q.length = 0;
-  return errors;
-}
-
-/** Runs every pending computation synchronously. Writes schedule this in a microtask. */
+/** Runs every queued computation now: memos first, then render effects, then effects. */
 export function flush(): void {
-  if (flushing) return;
-  flushing = true;
+  if (running) return;
+  running = true;
   scheduled = false;
-  let errors: unknown[] | null = null;
+  let error: [unknown] | undefined;
   try {
-    for (let guard = 0; Pure.length || Render.length || Effects.length; guard++) {
-      if (guard > 100000) throw new Error('SurgiJS: update loop does not settle');
-      const e = drain(Pure.length ? Pure : Render.length ? Render : Effects);
-      if (e) (errors ||= []).push(...e);
+    for (let i = 0; i < 3; ) {
+      const q = Queues[i]!;
+      if (!q.length) {
+        i++;
+        continue;
+      }
+      Queues[i] = [];
+      for (const o of q) {
+        if (o.st > 0) {
+          try {
+            o.run();
+          } catch (err) {
+            error ||= [err];
+          }
+        }
+      }
+      i = 0;
     }
   } finally {
-    flushing = false;
+    running = false;
   }
-  if (errors) throw errors[0];
+  if (error) throw error[0];
 }
 
-function computation(f: (prev: any) => any, v: unknown, t: 0 | 1 | 2): Computation {
-  const c: Computation = { c: null, p: Owner, k: Owner ? Owner.k : null, st: 0, t, f, v, s: null, o: null };
-  own(c);
-  return c;
+class Comp implements OwnerNode, Source, Observer {
+  c: Cleanup[] | null = null;
+  p: OwnerNode | null = Owner;
+  k: Record<symbol, unknown> | null = Owner ? Owner.k : null;
+  st = 0;
+  s: Source[] | null = null;
+  o: Observer[] | null = null;
+  f: (prev: any) => any;
+  v: unknown;
+  t: number;
+
+  constructor(f: (prev: any) => any, v: unknown, t: number) {
+    this.f = f;
+    this.v = v;
+    this.t = t;
+    own(this);
+  }
+
+  run(): void {
+    cleanup(this);
+    const prevOwner = Owner;
+    const prevListener = Listener;
+    const prevCollect = Collect;
+    const prevIndex = Index;
+    const prevFresh = Fresh;
+    Owner = Listener = this;
+    Collect = Fresh = null;
+    Index = 0;
+    this.st = 0;
+    let v: unknown;
+    let error: [unknown] | undefined;
+    try {
+      v = this.f(this.v);
+    } catch (err) {
+      error = [err];
+    }
+    const s = this.s;
+    if (s) {
+      for (let i = Index; i < s.length; i++) unlink(s[i]!, this);
+      s.length = Index;
+    }
+    const fresh = Fresh as typeof prevFresh;
+    if (fresh) {
+      for (const x of fresh) link(x, this);
+      if (s) s.push(...fresh);
+      else this.s = fresh;
+    }
+    Owner = prevOwner;
+    Listener = prevListener;
+    Collect = prevCollect;
+    Index = prevIndex;
+    Fresh = prevFresh;
+    if (error) return recover(this.p, error[0]);
+    if (this.t) this.v = v;
+    else if (!Object.is(v, this.v)) {
+      this.v = v;
+      if (this.o) for (const o of this.o) mark(o);
+    }
+  }
+
+  d(): void {
+    if (this.st < 0) return;
+    this.st = -1;
+    cleanup(this);
+    if (this.s) for (const x of this.s) unlink(x, this);
+    this.s = null;
+  }
 }
+
+/** Binding with fixed sources: `n` node, `r` reader, `a` apply, `x` reader arguments, `s` sources. */
+class Bound implements Observer {
+  declare t: number;
+  st = 0;
+  n: unknown;
+  r: (...args: unknown[]) => unknown;
+  a: (node: unknown, value: unknown) => unknown;
+  x: unknown[] | undefined;
+  s: Source | Source[];
+  v: unknown;
+
+  constructor(n: unknown, r: Bound['r'], a: Bound['a'], x: unknown[] | undefined, s: Source | Source[], v: unknown) {
+    this.n = n;
+    this.r = r;
+    this.a = a;
+    this.x = x;
+    this.s = s;
+    this.v = v;
+  }
+
+  run(): void {
+    this.st = 0;
+    const v = this.x ? this.r(...this.x) : this.r();
+    if (!Object.is(v, this.v)) this.a(this.n, (this.v = v));
+  }
+
+  d(): void {
+    this.st = -1;
+    const s = this.s;
+    if (Array.isArray(s)) for (const x of s) unlink(x, this);
+    else unlink(s, this);
+  }
+}
+Bound.prototype.t = 1;
 
 export function createSignal<T>(): Signal<T | undefined>;
 export function createSignal<T>(value: T): Signal<T>;
@@ -272,39 +233,38 @@ export function createSignal<T>(value?: T): Signal<T | undefined> {
     },
     ((next: unknown) => {
       if (typeof next === 'function') next = (next as (prev: unknown) => unknown)(s.v);
-      write(s, next);
+      if (!Object.is(s.v, next)) {
+        s.v = next;
+        if (s.o) for (const o of s.o) mark(o);
+      }
       return next;
     }) as Setter<T | undefined>,
   ];
 }
 
 export function createMemo<T>(fn: (prev: T | undefined) => T, init?: T): Accessor<T> {
-  const c = computation(fn, init, 0);
-  update(c);
+  const c = new Comp(fn, init, 0);
+  c.run();
   return () => {
-    if (c.st > 0) refresh(c);
+    if (c.st > 0) c.run();
     if (Listener || Collect) track(c);
     return c.v as T;
   };
 }
 
-/** Runs `fn` now and again before paint-phase effects whenever a dependency changes. */
+/** Runs `fn` now and again, before effects, whenever a dependency changes. */
 export function createRenderEffect<T>(fn: (prev: T | undefined) => T, init?: T): void {
-  update(computation(fn, init, 1));
+  new Comp(fn, init, 1).run();
 }
 
 /** Runs `fn` after the current render (or the enclosing `deferMount`) and on every change. */
 export function createEffect<T>(fn: (prev: T | undefined) => T, init?: T): void {
-  const c = computation(fn, init, 2);
-  c.st = 2;
+  const c = new Comp(fn, init, 2);
   if (Deferred) Deferred.push(c);
-  else {
-    Effects.push(c);
-    schedule();
-  }
+  else mark(c);
 }
 
-export const effect = createRenderEffect;
+export { createRenderEffect as effect };
 
 /** Creates a detached owner. `fn` receives the dispose function. */
 export function createRoot<T>(fn: (dispose: () => void) => T, owner: OwnerNode | null = Owner): T {
@@ -313,10 +273,9 @@ export function createRoot<T>(fn: (dispose: () => void) => T, owner: OwnerNode |
   const prevListener = Listener;
   const prevCollect = Collect;
   Owner = root;
-  Listener = null;
-  Collect = null;
+  Listener = Collect = null;
   try {
-    return fn(() => disposeNode(root));
+    return fn(() => cleanup(root));
   } finally {
     Owner = prevOwner;
     Listener = prevListener;
@@ -350,8 +309,7 @@ export function onMount(fn: () => void): void {
 export function untrack<T>(fn: () => T): T {
   const prevListener = Listener;
   const prevCollect = Collect;
-  Listener = null;
-  Collect = null;
+  Listener = Collect = null;
   try {
     return fn();
   } finally {
@@ -366,22 +324,19 @@ export function batch<T>(fn: () => T): T {
   try {
     return fn();
   } finally {
-    if (--depth === 0) flush();
+    if (!--depth) flush();
   }
 }
 
 /** Holds back the first run of effects created inside `fn` until `fn` returns. */
 export function deferMount<T>(fn: () => T): T {
   const prev = Deferred;
-  const list: Computation[] = (Deferred = []);
+  const list: Comp[] = (Deferred = []);
   try {
     return fn();
   } finally {
     Deferred = prev;
-    for (let i = 0; i < list.length; i++) {
-      const c = list[i]!;
-      if (c.st === 2) update(c);
-    }
+    for (const c of list) if (!c.st) c.run();
   }
 }
 
@@ -403,10 +358,9 @@ export function bind<N, V>(node: N, read: (...args: any[]) => V, apply: (node: N
     Listener = prevListener;
   }
   apply(node, v);
-  const n = sources.length;
-  if (!n) return;
-  const b: Bound = { st: 0, t: 3, n: node, r: read, a: apply as Bound['a'], x, s: n === 1 ? sources[0]! : sources, v };
-  for (let i = 0; i < n; i++) link(sources[i]!, b);
+  if (!sources.length) return;
+  const b = new Bound(node, read, apply as Bound['a'], x, sources.length > 1 ? sources : sources[0]!, v);
+  for (const s of sources) link(s, b);
   own(b);
 }
 

@@ -28,7 +28,7 @@ export function useRef<T = Element>(): Ref<T> {
   return { current: null };
 }
 
-export const useMemo: <T>(fn: (prev: T | undefined) => T, init?: T) => Accessor<T> = createMemo;
+export { createMemo as useMemo };
 
 let ids = 0;
 
