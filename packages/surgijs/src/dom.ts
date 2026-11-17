@@ -184,8 +184,7 @@ export function toNodes(value: unknown, out: Node[] = []): Node[] {
 }
 
 export function setText(node: Text, value: unknown): void {
-  const s = value == null || value === false ? '' : '' + (value as string);
-  if (node.data !== s) node.data = s;
+  node.data = value == null || value === false ? '' : '' + (value as string);
 }
 
 export function className(el: Element, value: unknown): void {
