@@ -1,0 +1,24 @@
+{
+  "name": "@surgijs/bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "node run.mjs"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.13",
+    "@microsoft/fast-element": "^3.1.4",
+    "@surgijs/compiler": "workspace:*",
+    "babel-preset-solid": "^1.9.19",
+    "esbuild": "^0.25.12",
+    "inferno": "^10.0.0",
+    "inferno-create-element": "^10.0.0",
+    "lit-html": "^3.3.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "solid-js": "^1.9.19",
+    "surgijs": "workspace:*",
+    "svelte": "^5.57.3",
+    "vue": "^3.5.45"
+  }
+}

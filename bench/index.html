@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SurgiJS bench</title>
+    <style>
+      .row { display: flex; gap: 8px; font: 12px/16px monospace; }
+      .row.on { background: #ffe9a8; }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      import { run } from './harness.js';
+      window.bench = async (id, rows) => {
+        const mod = await import(`./dist/${id}.js`);
+        return run(mod.default, rows);
+      };
+      window.ready = true;
+    </script>
+  </body>
+</html>
