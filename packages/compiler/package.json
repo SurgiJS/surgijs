@@ -21,6 +21,10 @@
     "directory": "packages/compiler"
   },
   "homepage": "https://surgijs.github.io/",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "bugs": "https://github.com/SurgiJS/surgijs/issues",
   "exports": {
     ".": {
