@@ -1,0 +1,62 @@
+{
+  "name": "surgijs",
+  "version": "0.1.0",
+  "description": "Compiled Web Components with JSX/TSX: hoisted templates, fine-grained signals, one DOM write per binding.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "web-components",
+    "custom-elements",
+    "jsx",
+    "signals",
+    "reactivity",
+    "compiler"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SurgiJS/surgijs.git",
+    "directory": "packages/surgijs"
+  },
+  "homepage": "https://surgijs.github.io/",
+  "bugs": "https://github.com/SurgiJS/surgijs/issues",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.js"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-dev-runtime.d.ts",
+      "import": "./dist/jsx-dev-runtime.js"
+    },
+    "./hydrate": {
+      "types": "./dist/hydrate.d.ts",
+      "import": "./dist/hydrate.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "size": "node scripts/size.mjs"
+  },
+  "devDependencies": {
+    "@surgijs/compiler": "workspace:*",
+    "esbuild": "^0.25.12",
+    "happy-dom": "^20.0.10"
+  }
+}
