@@ -1,20 +1,20 @@
 {
   "browser": "Chrome/157.0.8103.50",
   "rows": 10000,
-  "date": "2026-11-17T20:29:06.883Z",
+  "date": "2026-11-18T08:35:29.384Z",
   "libs": {
     "native": {
       "name": "Native",
       "version": "",
       "gzip": 399,
       "time": {
-        "init": 12.11,
-        "init+layout": 111.05,
-        "redrawOne": 0.03,
-        "redrawAll": 3.63,
-        "redrawAll+layout": 57.2,
-        "toggleOne": 0.04,
-        "toggleAll": 2.94
+        "init": 12.1,
+        "init+layout": 106.07,
+        "redrawOne": 0.02,
+        "redrawAll": 3.38,
+        "redrawAll+layout": 54.22,
+        "toggleOne": 0.02,
+        "toggleAll": 2.81
       },
       "memory": {
         "retained": 920020,
@@ -24,19 +24,19 @@
     "surgijs": {
       "name": "SurgiJS",
       "version": "0.1.0",
-      "gzip": 2773,
+      "gzip": 2946,
       "time": {
-        "init": 17.97,
-        "init+layout": 120.96,
-        "redrawOne": 0.09,
-        "redrawAll": 4.42,
-        "redrawAll+layout": 58.3,
+        "init": 14.69,
+        "init+layout": 113.29,
+        "redrawOne": 0.06,
+        "redrawAll": 3.97,
+        "redrawAll+layout": 54.83,
         "toggleOne": 0.06,
-        "toggleAll": 3.08
+        "toggleAll": 2.43
       },
       "memory": {
-        "retained": 3589048,
-        "redrawAll": 1304416
+        "retained": 1870288,
+        "redrawAll": 641172
       }
     },
     "solid": {
@@ -44,17 +44,17 @@
       "version": "1.9.19",
       "gzip": 5523,
       "time": {
-        "init": 14.51,
-        "init+layout": 114.55,
-        "redrawOne": 0.06,
-        "redrawAll": 8.4,
-        "redrawAll+layout": 60.59,
+        "init": 14.42,
+        "init+layout": 109.32,
+        "redrawOne": 0.04,
+        "redrawAll": 6.98,
+        "redrawAll+layout": 58.24,
         "toggleOne": 0.03,
-        "toggleAll": 4.62
+        "toggleAll": 4.56
       },
       "memory": {
         "retained": 7122276,
-        "redrawAll": 2325084
+        "redrawAll": 2327108
       }
     },
     "inferno": {
@@ -62,17 +62,17 @@
       "version": "10.0.0",
       "gzip": 9605,
       "time": {
-        "init": 17.25,
-        "init+layout": 114.46,
+        "init": 16.84,
+        "init+layout": 113.26,
         "redrawOne": 0.63,
-        "redrawAll": 7.4,
-        "redrawAll+layout": 58.36,
-        "toggleOne": 0.67,
-        "toggleAll": 5.3
+        "redrawAll": 7.58,
+        "redrawAll+layout": 58.06,
+        "toggleOne": 0.61,
+        "toggleAll": 5.46
       },
       "memory": {
-        "retained": 4064544,
-        "redrawAll": 6665012
+        "retained": 4064724,
+        "redrawAll": 6665064
       }
     },
     "lit": {
@@ -80,17 +80,17 @@
       "version": "3.3.3",
       "gzip": 4178,
       "time": {
-        "init": 33.5,
-        "init+layout": 133.4,
-        "redrawOne": 0.75,
-        "redrawAll": 5.01,
-        "redrawAll+layout": 58.15,
-        "toggleOne": 0.79,
-        "toggleAll": 3
+        "init": 33.99,
+        "init+layout": 130.39,
+        "redrawOne": 0.72,
+        "redrawAll": 5.02,
+        "redrawAll+layout": 57.13,
+        "toggleOne": 0.74,
+        "toggleAll": 3.14
       },
       "memory": {
-        "retained": 4840956,
-        "redrawAll": 1483008
+        "retained": 4840960,
+        "redrawAll": 1480356
       }
     },
     "fast": {
@@ -98,13 +98,13 @@
       "version": "3.1.4",
       "gzip": 18895,
       "time": {
-        "init": 43.02,
-        "init+layout": 154.17,
-        "redrawOne": 0.06,
-        "redrawAll": 6.74,
-        "redrawAll+layout": 61.89,
-        "toggleOne": 0.06,
-        "toggleAll": 5.62
+        "init": 43.76,
+        "init+layout": 150.36,
+        "redrawOne": 0.04,
+        "redrawAll": 5.67,
+        "redrawAll+layout": 57.5,
+        "toggleOne": 0.04,
+        "toggleAll": 4.39
       },
       "memory": {
         "retained": 520468,
@@ -116,17 +116,17 @@
       "version": "5.57.3",
       "gzip": 19740,
       "time": {
-        "init": 348.03,
-        "init+layout": 463.7,
-        "redrawOne": 0.48,
-        "redrawAll": 17.78,
-        "redrawAll+layout": 80.42,
-        "toggleOne": 0.52,
-        "toggleAll": 17.59
+        "init": 336.88,
+        "init+layout": 431.61,
+        "redrawOne": 0.34,
+        "redrawAll": 14.65,
+        "redrawAll+layout": 66.52,
+        "toggleOne": 0.37,
+        "toggleAll": 12.64
       },
       "memory": {
-        "retained": 11815504,
-        "redrawAll": 6412112
+        "retained": 11782088,
+        "redrawAll": 6412976
       }
     },
     "vue": {
@@ -134,17 +134,17 @@
       "version": "3.5.45",
       "gzip": 22533,
       "time": {
-        "init": 38.4,
-        "init+layout": 162.09,
-        "redrawOne": 0.13,
-        "redrawAll": 57.16,
-        "redrawAll+layout": 123.62,
-        "toggleOne": 0.12,
-        "toggleAll": 36.68
+        "init": 29.6,
+        "init+layout": 127.82,
+        "redrawOne": 0.06,
+        "redrawAll": 30.61,
+        "redrawAll+layout": 85.8,
+        "toggleOne": 0.05,
+        "toggleAll": 25.32
       },
       "memory": {
-        "retained": 21519864,
-        "redrawAll": 7327496
+        "retained": 21507248,
+        "redrawAll": 7319808
       }
     },
     "react": {
@@ -152,17 +152,17 @@
       "version": "19.3.1",
       "gzip": 69045,
       "time": {
-        "init": 206.22,
-        "init+layout": 320.31,
-        "redrawOne": 2.31,
-        "redrawAll": 12.46,
-        "redrawAll+layout": 71.28,
-        "toggleOne": 2.28,
-        "toggleAll": 9.79
+        "init": 204,
+        "init+layout": 299.57,
+        "redrawOne": 1.81,
+        "redrawAll": 11.32,
+        "redrawAll+layout": 62.69,
+        "toggleOne": 1.81,
+        "toggleAll": 9.06
       },
       "memory": {
-        "retained": 7254224,
-        "redrawAll": 9942062
+        "retained": 7252716,
+        "redrawAll": 9920626
       }
     }
   }
