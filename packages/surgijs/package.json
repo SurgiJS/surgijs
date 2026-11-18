@@ -1,6 +1,6 @@
 {
   "name": "surgijs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Compiled Web Components with JSX/TSX: hoisted templates, fine-grained signals, one DOM write per binding.",
   "license": "MIT",
   "type": "module",
