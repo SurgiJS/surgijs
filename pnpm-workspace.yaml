@@ -1,0 +1,11 @@
+packages:
+  - packages/*
+  - apps/*
+  - bench
+
+onlyBuiltDependencies:
+  - esbuild
+
+autoInstallPeers: true
+strictPeerDependencies: false
+linkWorkspacePackages: true

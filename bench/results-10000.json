@@ -1,0 +1,169 @@
+{
+  "browser": "Chrome/157.0.8103.50",
+  "rows": 10000,
+  "date": "2026-11-18T08:35:29.384Z",
+  "libs": {
+    "native": {
+      "name": "Native",
+      "version": "",
+      "gzip": 399,
+      "time": {
+        "init": 12.1,
+        "init+layout": 106.07,
+        "redrawOne": 0.02,
+        "redrawAll": 3.38,
+        "redrawAll+layout": 54.22,
+        "toggleOne": 0.02,
+        "toggleAll": 2.81
+      },
+      "memory": {
+        "retained": 920020,
+        "redrawAll": 516608
+      }
+    },
+    "surgijs": {
+      "name": "SurgiJS",
+      "version": "0.1.0",
+      "gzip": 2946,
+      "time": {
+        "init": 14.69,
+        "init+layout": 113.29,
+        "redrawOne": 0.06,
+        "redrawAll": 3.97,
+        "redrawAll+layout": 54.83,
+        "toggleOne": 0.06,
+        "toggleAll": 2.43
+      },
+      "memory": {
+        "retained": 1870288,
+        "redrawAll": 641172
+      }
+    },
+    "solid": {
+      "name": "Solid",
+      "version": "1.9.19",
+      "gzip": 5523,
+      "time": {
+        "init": 14.42,
+        "init+layout": 109.32,
+        "redrawOne": 0.04,
+        "redrawAll": 6.98,
+        "redrawAll+layout": 58.24,
+        "toggleOne": 0.03,
+        "toggleAll": 4.56
+      },
+      "memory": {
+        "retained": 7122276,
+        "redrawAll": 2327108
+      }
+    },
+    "inferno": {
+      "name": "Inferno",
+      "version": "10.0.0",
+      "gzip": 9605,
+      "time": {
+        "init": 16.84,
+        "init+layout": 113.26,
+        "redrawOne": 0.63,
+        "redrawAll": 7.58,
+        "redrawAll+layout": 58.06,
+        "toggleOne": 0.61,
+        "toggleAll": 5.46
+      },
+      "memory": {
+        "retained": 4064724,
+        "redrawAll": 6665064
+      }
+    },
+    "lit": {
+      "name": "lit-html",
+      "version": "3.3.3",
+      "gzip": 4178,
+      "time": {
+        "init": 33.99,
+        "init+layout": 130.39,
+        "redrawOne": 0.72,
+        "redrawAll": 5.02,
+        "redrawAll+layout": 57.13,
+        "toggleOne": 0.74,
+        "toggleAll": 3.14
+      },
+      "memory": {
+        "retained": 4840960,
+        "redrawAll": 1480356
+      }
+    },
+    "fast": {
+      "name": "FAST Element",
+      "version": "3.1.4",
+      "gzip": 18895,
+      "time": {
+        "init": 43.76,
+        "init+layout": 150.36,
+        "redrawOne": 0.04,
+        "redrawAll": 5.67,
+        "redrawAll+layout": 57.5,
+        "toggleOne": 0.04,
+        "toggleAll": 4.39
+      },
+      "memory": {
+        "retained": 520468,
+        "redrawAll": 637848
+      }
+    },
+    "svelte": {
+      "name": "Svelte",
+      "version": "5.57.3",
+      "gzip": 19740,
+      "time": {
+        "init": 336.88,
+        "init+layout": 431.61,
+        "redrawOne": 0.34,
+        "redrawAll": 14.65,
+        "redrawAll+layout": 66.52,
+        "toggleOne": 0.37,
+        "toggleAll": 12.64
+      },
+      "memory": {
+        "retained": 11782088,
+        "redrawAll": 6412976
+      }
+    },
+    "vue": {
+      "name": "Vue",
+      "version": "3.5.45",
+      "gzip": 22533,
+      "time": {
+        "init": 29.6,
+        "init+layout": 127.82,
+        "redrawOne": 0.06,
+        "redrawAll": 30.61,
+        "redrawAll+layout": 85.8,
+        "toggleOne": 0.05,
+        "toggleAll": 25.32
+      },
+      "memory": {
+        "retained": 21507248,
+        "redrawAll": 7319808
+      }
+    },
+    "react": {
+      "name": "React",
+      "version": "19.3.1",
+      "gzip": 69045,
+      "time": {
+        "init": 204,
+        "init+layout": 299.57,
+        "redrawOne": 1.81,
+        "redrawAll": 11.32,
+        "redrawAll+layout": 62.69,
+        "toggleOne": 1.81,
+        "toggleAll": 9.06
+      },
+      "memory": {
+        "retained": 7252716,
+        "redrawAll": 9920626
+      }
+    }
+  }
+}
