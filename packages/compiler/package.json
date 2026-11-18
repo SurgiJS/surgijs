@@ -20,7 +20,7 @@
     "url": "git+https://github.com/SurgiJS/surgijs.git",
     "directory": "packages/compiler"
   },
-  "homepage": "https://surgijs.github.io/",
+  "homepage": "https://surgijs.github.io/surgijs/",
   "publishConfig": {
     "access": "public",
     "provenance": true

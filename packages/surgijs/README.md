@@ -20,4 +20,4 @@ defineComponent('my-counter', Counter);
 
 Entry points: `surgijs`, `surgijs/server` (SSR to declarative shadow DOM), `surgijs/hydrate`, `surgijs/jsx-runtime`.
 
-Documentation: https://surgijs.github.io/
+Documentation: https://surgijs.github.io/surgijs/

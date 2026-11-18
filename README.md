@@ -64,7 +64,7 @@ Props are getters. JSX reads them reactively (`{title}`); plain TypeScript code 
 
 ## Benchmark
 
-Changing every label, ms, headless Chrome 157 ([method and full results](https://surgijs.github.io/guide/performance)):
+Changing every label, ms, headless Chrome 157 ([method and full results](https://surgijs.github.io/surgijs/guide/performance)):
 
 | Library | 1 000 rows | 10 000 rows |
 | --- | ---: | ---: |
@@ -89,7 +89,7 @@ Run it locally with `pnpm bench` (`pnpm bench surgijs solid --rows 10000` for a 
 
 ## Links
 
-- Documentation: https://surgijs.github.io/
+- Documentation: https://surgijs.github.io/surgijs/
 - Examples: [`apps/playground`](apps/playground)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 

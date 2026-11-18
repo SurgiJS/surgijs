@@ -27,7 +27,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm docs:build
         env:
-          DOCS_BASE: ${{ vars.DOCS_BASE || '/' }}
+          # Project site lives at /surgijs/; a custom domain sets DOCS_BASE to '/'.
+          DOCS_BASE: ${{ vars.DOCS_BASE || '/surgijs/' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/docs/.vitepress/dist

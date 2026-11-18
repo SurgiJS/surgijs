@@ -26,4 +26,4 @@ import { compile } from '@surgijs/compiler';
 const { code, map } = compile(source, { filename: 'app.tsx', generate: 'dom' });
 ```
 
-Documentation: https://surgijs.github.io/api/compiler
+Documentation: https://surgijs.github.io/surgijs/api/compiler
