@@ -15,7 +15,7 @@
 | `batch` | `(fn) => T`; flushes once at the end |
 | `flush` | `()`; runs queued memos, render effects and effects |
 | `deferMount` | `(fn) => T`; collects effects created inside and starts them after `fn` returns |
-| `bind` | `(node, read, apply, ...args)`; compiled binding |
+| `bind` | `(node, read, apply, arg?)`; compiled binding, `read(arg)` supplies the value |
 | `getOwner` / `runWithOwner` | access and restore the current owner |
 | `handleError` | `(owner, err)`; forwards to the nearest error boundary or throws |
 

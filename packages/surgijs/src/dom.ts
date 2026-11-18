@@ -74,6 +74,10 @@ function write(parent: Node, value: unknown, current: unknown, marker: Node | nu
       if (first!.data !== s) first!.data = s;
       return cur;
     }
+    if (own && !cur.length && !hydrating) {
+      parent.textContent = s;
+      return s ? [parent.firstChild!] : [];
+    }
     if (hydrating && !cur.length) {
       const prev = (marker ? marker.previousSibling : parent.lastChild) as Text | null;
       if (prev && prev.nodeType === 3 && (own || prev.data === s)) {

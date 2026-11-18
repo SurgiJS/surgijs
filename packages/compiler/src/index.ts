@@ -330,7 +330,7 @@ class Compiler {
       ts.forEachChild(n, walk);
     };
     walk(x);
-    if (!ok || !params.size) return { read: `() => ${this.rewrite(x)}`, args: [] };
+    if (!ok || params.size !== 1) return { read: `() => ${this.rewrite(x)}`, args: [] };
     let body = this.text(x);
     for (let i = edits.length - 1; i >= 0; i--) {
       const [s, end, name] = edits[i]!;

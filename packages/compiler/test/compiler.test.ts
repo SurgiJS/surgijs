@@ -62,13 +62,17 @@ describe('compile', () => {
     expect(dom('const el = <div title={o?.f()} />;')).toContain('_$effect(');
   });
 
-  it('hoists readers and deduplicates them', () => {
-    const out = dom('const x = <div class={a() + b()} title={a() + b()} />; const y = <i class={a() + a()} />;');
-    expect(out).toContain('const _b$3 = (p0, p1) => p0() + p1();');
-    expect(out).toContain('_$bind(_el$2, _b$3, _$className, a, b);');
-    expect(out).toContain('_$bind(_el$2, _b$3, _s$4, a, b);');
-    expect(out.match(/=> p0\(\) \+ p1\(\)/g)).toHaveLength(1);
+  it('hoists single-getter readers and deduplicates them', () => {
+    const out = dom('const x = <div class={a() ? "on" : ""} title={a() ? "on" : ""} />; const y = <i class={a() + a()} />;');
+    expect(out).toContain('const _b$3 = (p0) => p0() ? "on" : "";');
+    expect(out).toContain('_$bind(_el$2, _b$3, _$className, a);');
+    expect(out).toContain('_$bind(_el$2, _b$3, _s$4, a);');
+    expect(out.match(/=> p0\(\) \? "on"/g)).toHaveLength(1);
     expect(out).toContain('(p0) => p0() + p0()');
+  });
+
+  it('keeps closures for readers of several getters', () => {
+    expect(dom('const el = <div title={a() + b()} />;')).toContain('_$bind(_el$2, () => a() + b(), _s$3);');
   });
 
   it('keeps closures for reads that touch locals', () => {

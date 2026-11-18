@@ -1,4 +1,4 @@
-import { createMemo, createRoot, createSignal, onCleanup, untrack, type Accessor, type Setter } from './reactivity';
+import { cleanup, createMemo, createSignal, getOwner, onCleanup, runOwned, untrack, type Accessor, type OwnerNode, type Setter } from './reactivity';
 import type { JSX } from './jsx-runtime';
 
 export interface ForProps<T> {
@@ -8,8 +8,8 @@ export interface ForProps<T> {
   children: (item: T, index: Accessor<number>) => JSX.Element;
 }
 
-interface Row {
-  d: () => void;
+/** A row is its own owner: `v` the rendered view, `i` the index setter. */
+interface Row extends OwnerNode {
   v: JSX.Element;
   i: Setter<number> | undefined;
 }
@@ -23,26 +23,30 @@ export function For<T>(props: ForProps<T>): JSX.Element {
   const by = props.by;
   const indexed = render.length > 1;
   let rows = new Map<unknown, Row>();
-  let dupes: (() => void)[] = [];
+  let dupes: Row[] = [];
 
   const clearDupes = () => {
-    for (let i = 0; i < dupes.length; i++) dupes[i]!();
+    for (let i = 0; i < dupes.length; i++) cleanup(dupes[i]!);
     dupes = [];
   };
 
   onCleanup(() => {
     clearDupes();
-    for (const row of rows.values()) row.d();
+    for (const row of rows.values()) cleanup(row);
     rows.clear();
   });
 
-  const make = (item: T, index: number): Row =>
-    createRoot((d) => {
-      let set: Setter<number> | undefined;
-      let get: Accessor<number> = () => index;
-      if (indexed) [get, set] = createSignal(index);
-      return { d, v: render(item, get), i: set };
-    });
+  const fill = (row: Row, item: T, index: number): void => {
+    let get: Accessor<number> = () => index;
+    if (indexed) [get, row.i] = createSignal(index);
+    row.v = render(item, get);
+  };
+
+  const make = (item: T, index: number, owner: OwnerNode | null): Row => {
+    const row: Row = { c: null, b: null, p: owner, k: owner ? owner.k : null, v: undefined, i: undefined };
+    runOwned(row, fill, item, index);
+    return row;
+  };
 
   return createMemo(() => {
     clearDupes();
@@ -50,6 +54,7 @@ export function For<T>(props: ForProps<T>): JSX.Element {
     const items = (typeof each === 'function' ? each() : each) || [];
     const next = new Map<unknown, Row>();
     const out: JSX.Element[] = new Array(items.length);
+    const owner = getOwner();
     untrack(() => {
       for (let i = 0; i < items.length; i++) {
         const item = items[i]!;
@@ -58,14 +63,14 @@ export function For<T>(props: ForProps<T>): JSX.Element {
         if (row) {
           rows.delete(key);
           if (row.i) row.i(i);
-        } else row = make(item, i);
+        } else row = make(item, i, owner);
         const prev = next.get(key);
-        if (prev) dupes.push(prev.d);
+        if (prev) dupes.push(prev);
         next.set(key, row);
         out[i] = row.v;
       }
     });
-    for (const row of rows.values()) row.d();
+    for (const row of rows.values()) cleanup(row);
     rows = next;
     return out;
   }) as unknown as JSX.Element;

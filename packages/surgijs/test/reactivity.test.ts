@@ -178,6 +178,43 @@ describe('computations', () => {
 });
 
 describe('bind', () => {
+  it('keeps the remaining observers when one binding disposes', () => {
+    const [n, setN] = createSignal(1);
+    const a = { v: 0 };
+    const b = { v: 0 };
+    const c = { v: 0 };
+    const disposeA = createRoot((d) => {
+      bind(a, n, (el, v: number) => (el.v = v));
+      return d;
+    });
+    const disposeB = createRoot((d) => {
+      bind(b, n, (el, v: number) => (el.v = v));
+      return d;
+    });
+    createRoot(() => bind(c, n, (el, v: number) => (el.v = v)));
+    disposeA();
+    setN(2);
+    flush();
+    expect([a.v, b.v, c.v]).toEqual([1, 2, 2]);
+    disposeB();
+    setN(3);
+    flush();
+    expect([a.v, b.v, c.v]).toEqual([1, 2, 3]);
+  });
+
+  it('disposes every binding of an owner', () => {
+    const [n, setN] = createSignal(1);
+    const nodes = [{ v: 0 }, { v: 0 }, { v: 0 }];
+    const dispose = createRoot((d) => {
+      for (const node of nodes) bind(node, n, (el, v: number) => (el.v = v));
+      return d;
+    });
+    dispose();
+    setN(2);
+    flush();
+    expect(nodes.map((x) => x.v)).toEqual([1, 1, 1]);
+  });
+
   it('applies on change through a direct read', () => {
     const [n, setN] = createSignal(1);
     const node = { v: 0 };
@@ -197,17 +234,27 @@ describe('bind', () => {
     expect(applied).toBe(2);
   });
 
-  it('passes getters to a hoisted reader', () => {
+  it('passes a getter to a hoisted reader', () => {
+    const [a, setA] = createSignal(1);
+    const node = { v: 0 };
+    const read = (p0: () => number) => p0() * 2;
+    createRoot(() => bind(node, read, (el, v: number) => (el.v = v), a));
+    expect(node.v).toBe(2);
+    setA(10);
+    flush();
+    expect(node.v).toBe(20);
+  });
+
+  it('collects several sources in one binding', () => {
     const [a, setA] = createSignal(1);
     const [b, setB] = createSignal(2);
     const node = { v: 0 };
-    const read = (p0: () => number, p1: () => number) => p0() + p1();
-    createRoot(() => bind(node, read, (el, v: number) => (el.v = v), a, b));
-    expect(node.v).toBe(3);
+    createRoot(() => bind(node, () => a() + b() + a(), (el, v: number) => (el.v = v)));
+    expect(node.v).toBe(4);
     setA(10);
     setB(20);
     flush();
-    expect(node.v).toBe(30);
+    expect(node.v).toBe(40);
   });
 
   it('reads memos as sources', () => {

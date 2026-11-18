@@ -5,7 +5,7 @@ export type Signal<T> = [get: Accessor<T>, set: Setter<T>];
 /** Reactive value: `v` holds the value, `o` the observers. */
 export interface Source {
   v: unknown;
-  o: Observer[] | null;
+  o: Observer | Observer[] | null;
 }
 
 /** Queued work. `t` picks the queue: 0 memo, 1 render, 2 user effect. `st`: 0 idle, 1 queued, -1 disposed. */
@@ -16,11 +16,20 @@ interface Observer {
   d(): void;
 }
 
+/** Binding owned through the `b` list of its owner. */
+export interface Linked extends Observer {
+  nx: Linked | null;
+}
+
 type Cleanup = (() => void) | Observer;
 
-/** Owner: `c` cleanups and owned computations, `p` parent, `k` context, `e` error handler. */
+/**
+ * Owner: `c` cleanups and owned computations, `b` owned bindings, `p` parent, `k` context,
+ * `e` error handler.
+ */
 export interface OwnerNode {
   c: Cleanup[] | null;
+  b?: Linked | null;
   p: OwnerNode | null;
   k: Record<symbol, unknown> | null;
   e?: ((err: unknown) => void) | undefined;
@@ -28,7 +37,10 @@ export interface OwnerNode {
 
 let Owner: OwnerNode | null = null;
 let Listener: Comp | null = null;
-let Collect: Source[] | null = null;
+/** Set while `bind` collects sources: the first goes to `First`; with more, `More` lists all of them. */
+let Collect: true | null = null;
+let First: Source | null = null;
+let More: Source[] | null = null;
 let Index = 0;
 let Fresh: Source[] | null = null;
 let Deferred: Comp[] | null = null;
@@ -39,22 +51,37 @@ let Queues: Observer[][] = [[], [], []];
 
 function track(s: Source): void {
   if (Collect) {
-    if (Collect[Collect.length - 1] !== s) Collect.push(s);
+    if (!First) First = s;
+    else if (!More) {
+      if (s !== First) More = [First, s];
+    } else if (More[More.length - 1] !== s) More.push(s);
   } else if (Fresh) Fresh.push(s);
   else if (Listener!.s && Listener!.s[Index] === s) Index++;
   else Fresh = [s];
 }
 
 function link(s: Source, o: Observer): void {
-  if (s.o) s.o.push(o);
-  else s.o = [o];
+  const list = s.o;
+  if (!list) s.o = o;
+  else if (list instanceof Array) list.push(o);
+  else s.o = [list, o];
 }
 
 function unlink(s: Source, o: Observer): void {
-  const list = s.o!;
-  const i = list.lastIndexOf(o);
-  const last = list.pop()!;
-  if (i < list.length) list[i] = last;
+  const list = s.o;
+  if (list === o) s.o = null;
+  else if (list instanceof Array) {
+    const i = list.lastIndexOf(o);
+    const last = list.pop()!;
+    if (i < list.length) list[i] = last;
+  }
+}
+
+function notify(s: Source): void {
+  const list = s.o;
+  if (!list) return;
+  if (list instanceof Array) for (let i = 0; i < list.length; i++) mark(list[i]!);
+  else mark(list);
 }
 
 function mark(o: Observer): void {
@@ -67,7 +94,13 @@ function mark(o: Observer): void {
   }
 }
 
-function cleanup(o: OwnerNode): void {
+/** Runs the cleanups of `o` and disposes what it owns. */
+export function cleanup(o: OwnerNode): void {
+  let b = o.b;
+  if (b) {
+    o.b = null;
+    for (; b; b = b.nx) b.d();
+  }
   const list = o.c;
   if (!list) return;
   o.c = null;
@@ -120,11 +153,12 @@ export function flush(): void {
 
 class Comp implements OwnerNode, Source, Observer {
   c: Cleanup[] | null = null;
+  b: Linked | null = null;
   p: OwnerNode | null = Owner;
   k: Record<symbol, unknown> | null = Owner ? Owner.k : null;
   st = 0;
   s: Source[] | null = null;
-  o: Observer[] | null = null;
+  o: Observer | Observer[] | null = null;
   f: (prev: any) => any;
   v: unknown;
   t: number;
@@ -174,7 +208,7 @@ class Comp implements OwnerNode, Source, Observer {
     if (this.t) this.v = v;
     else if (!Object.is(v, this.v)) {
       this.v = v;
-      if (this.o) for (const o of this.o) mark(o);
+      notify(this);
     }
   }
 
@@ -187,18 +221,19 @@ class Comp implements OwnerNode, Source, Observer {
   }
 }
 
-/** Binding with fixed sources: `n` node, `r` reader, `a` apply, `x` reader arguments, `s` sources. */
-class Bound implements Observer {
+/** Binding with fixed sources: `n` node, `r` reader, `a` apply, `x` reader argument, `s` sources. */
+class Bound implements Linked {
   declare t: number;
   st = 0;
+  nx: Linked | null = null;
   n: unknown;
-  r: (...args: unknown[]) => unknown;
+  r: (arg: unknown) => unknown;
   a: (node: unknown, value: unknown) => unknown;
-  x: unknown[] | undefined;
+  x: unknown;
   s: Source | Source[];
   v: unknown;
 
-  constructor(n: unknown, r: Bound['r'], a: Bound['a'], x: unknown[] | undefined, s: Source | Source[], v: unknown) {
+  constructor(n: unknown, r: Bound['r'], a: Bound['a'], x: unknown, s: Source | Source[], v: unknown) {
     this.n = n;
     this.r = r;
     this.a = a;
@@ -209,7 +244,7 @@ class Bound implements Observer {
 
   run(): void {
     this.st = 0;
-    const v = this.x ? this.r(...this.x) : this.r();
+    const v = this.r(this.x);
     if (!Object.is(v, this.v)) this.a(this.n, (this.v = v));
   }
 
@@ -235,7 +270,7 @@ export function createSignal<T>(value?: T): Signal<T | undefined> {
       if (typeof next === 'function') next = (next as (prev: unknown) => unknown)(s.v);
       if (!Object.is(s.v, next)) {
         s.v = next;
-        if (s.o) for (const o of s.o) mark(o);
+        notify(s);
       }
       return next;
     }) as Setter<T | undefined>,
@@ -268,7 +303,7 @@ export { createRenderEffect as effect };
 
 /** Creates a detached owner. `fn` receives the dispose function. */
 export function createRoot<T>(fn: (dispose: () => void) => T, owner: OwnerNode | null = Owner): T {
-  const root: OwnerNode = { c: null, p: owner, k: owner ? owner.k : null };
+  const root: OwnerNode = { c: null, b: null, p: owner, k: owner ? owner.k : null };
   const prevOwner = Owner;
   const prevListener = Listener;
   const prevCollect = Collect;
@@ -287,14 +322,19 @@ export function getOwner(): OwnerNode | null {
   return Owner;
 }
 
-export function runWithOwner<T>(owner: OwnerNode | null, fn: () => T): T {
+/** Calls `fn(owner, a, b)` with `owner` as the current owner. */
+export function runOwned<O extends OwnerNode | null, T, A, B>(owner: O, fn: (owner: O, a: A, b: B) => T, a: A, b: B): T {
   const prev = Owner;
   Owner = owner;
   try {
-    return fn();
+    return fn(owner, a, b);
   } finally {
     Owner = prev;
   }
+}
+
+export function runWithOwner<T>(owner: OwnerNode | null, fn: () => T): T {
+  return runOwned(owner as OwnerNode, fn, 0, 0);
 }
 
 export function onCleanup<T extends () => void>(fn: T): T {
@@ -344,24 +384,35 @@ export function deferMount<T>(fn: () => T): T {
  * Applies `apply(node, read(...args))` now and on every change of the sources read
  * during the first call. The compiler emits it for reads that happen on every run.
  */
-export function bind<N, V>(node: N, read: (...args: any[]) => V, apply: (node: N, value: V) => unknown, ...args: unknown[]): void {
+export function bind<N, V, A = undefined>(node: N, read: (arg: A) => V, apply: (node: N, value: V) => unknown, arg?: A): void {
   const prevCollect = Collect;
+  const prevFirst = First;
+  const prevMore = More;
   const prevListener = Listener;
-  const sources: Source[] = (Collect = []);
-  Listener = null;
-  const x = args.length ? args : undefined;
+  Collect = true;
+  First = More = Listener = null;
   let v: V;
+  let one: Source | null;
+  let more: Source[] | null;
   try {
-    v = x ? read(...x) : read();
+    v = read(arg as A);
   } finally {
+    one = First as Source | null;
+    more = More as Source[] | null;
     Collect = prevCollect;
+    First = prevFirst;
+    More = prevMore;
     Listener = prevListener;
   }
   apply(node, v);
-  if (!sources.length) return;
-  const b = new Bound(node, read, apply as Bound['a'], x, sources.length > 1 ? sources : sources[0]!, v);
-  for (const s of sources) link(s, b);
-  own(b);
+  if (!one) return;
+  const b = new Bound(node, read as Bound['r'], apply as Bound['a'], arg, more || one, v);
+  if (more) for (const x of more) link(x, b);
+  else link(one, b);
+  if (Owner) {
+    b.nx = Owner.b || null;
+    Owner.b = b;
+  }
 }
 
 /** Passes `err` to the nearest error handler above `owner`, or throws it. */

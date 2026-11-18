@@ -28,7 +28,7 @@ const Row = (props) => (() => {
 - An expression without calls is static and runs once.
 - An expression with calls is dynamic. Reads that happen on every run become a `bind`: the runtime collects the signals during the first run and re-applies the value when one of them changes.
 - Reads inside conditional branches (`a ? b() : c()`, `a && b()`, `a?.b()`) become a render effect that tracks dependencies on every run.
-- Readers that depend only on their arguments are hoisted to module scope and deduplicated.
+- A reader that calls a single getter is hoisted to module scope, deduplicated, and receives the getter as its argument.
 - A text signal that is the only child binds `setText` to a placeholder text node.
 
 ## Children

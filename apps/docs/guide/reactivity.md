@@ -39,7 +39,7 @@ const dispose = createRoot((dispose) => {
 
 ## Bindings
 
-`bind(node, read, apply, ...args)` is the compact form the compiler emits. It runs `read` once while collecting sources, applies the value, and subscribes a small bound node only when the read touched signals. Updates call `apply(node, value)` when the value changes.
+`bind(node, read, apply, arg?)` is the compact form the compiler emits. It runs `read(arg)` once while collecting sources, applies the value, and subscribes a small bound node only when the read touched signals. Updates call `apply(node, value)` when the value changes. A signal with one observer stores it directly, and an owner keeps its bindings in a linked list, so a bound row allocates no arrays.
 
 ## Hooks
 
