@@ -1,0 +1,68 @@
+{
+  "name": "@surgijs/store",
+  "version": "0.1.0",
+  "description": "Framework-agnostic store: one object, lazy remote data, deep equality subscriptions, unload when unused.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "store",
+    "state",
+    "cache",
+    "fetch",
+    "reactive",
+    "surgijs"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SurgiJS/surgijs.git",
+    "directory": "packages/store"
+  },
+  "homepage": "https://surgijs.github.io/surgijs/",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "bugs": "https://github.com/SurgiJS/surgijs/issues",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "bench": "node bench/run.mjs"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.3.0",
+    "jotai": "^2.15.0",
+    "nanostores": "^1.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.3.1",
+    "redux": "^5.0.1",
+    "valtio": "^2.1.8",
+    "zustand": "^5.0.8"
+  }
+}
