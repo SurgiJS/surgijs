@@ -34,6 +34,7 @@ export default defineConfig({
           { text: 'Getting started', link: '/guide/getting-started' },
           { text: 'JSX to DOM', link: '/guide/jsx' },
           { text: 'Reactivity and hooks', link: '/guide/reactivity' },
+          { text: 'Store', link: '/guide/store' },
           { text: 'Components', link: '/guide/components' },
           { text: 'Control flow', link: '/guide/control-flow' },
           { text: 'SSR and hydration', link: '/guide/ssr' },

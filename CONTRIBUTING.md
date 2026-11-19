@@ -27,13 +27,14 @@ Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit
 
 - `packages/surgijs`: runtime, zero dependencies, `sideEffects: false`.
 - `packages/compiler`: JSX compiler and the Vite / esbuild plugins; `typescript` is its only peer.
+- `packages/store`: framework-agnostic `@surgijs/store` (optional React entry); no dependency on the runtime.
 - `apps/playground`: examples, also used by the runtime tests and the docs.
 - `apps/docs`: VitePress site.
 - `bench`: benchmark against other libraries; its dependencies stay out of the published packages.
 
 ## Changesets
 
-Every change to `surgijs` or `@surgijs/compiler` comes with a changeset:
+Every change to `surgijs`, `@surgijs/compiler`, or `@surgijs/store` comes with a changeset:
 
 ```bash
 pnpm changeset
