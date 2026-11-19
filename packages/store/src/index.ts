@@ -3,6 +3,15 @@ export { action, type Action, type ActionFn, type Get, type SetStore } from './a
 export { derived, type Derived, type DerivedFn, type DerivedGet } from './derived';
 export { fromResponse, isRemoteError, RemoteError, type FromResponseOptions } from './http';
 export {
+  mutation,
+  runMutation,
+  type MutateFn,
+  type Mutation,
+  type MutationContext,
+  type MutationPhase,
+  type MutationStatus,
+} from './mutation';
+export {
   DEFAULT_GC_TIME,
   createRemoteGet,
   isEmptyData,

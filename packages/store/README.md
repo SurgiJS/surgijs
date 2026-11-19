@@ -40,7 +40,8 @@ const st = store.status('results');
 - **`fromResponse` + `report`**: empty 200 ≠ 404; supports error codes and `200` bodies with `{ ok: false }` / `{ error }`.
 - **`store.status(name)`** for UI spinners / empty / not-found / error codes.
 - **`gcTime`** (default 5 minutes) after last unsubscribe; `0` = immediate, `Infinity` = keep.
-- Pagination example: [docs guide](../../apps/docs/guide/store.md).
+- **`mutation()`** for create/update/delete with its own `status` + `refetch('users')`.
+- Pagination + mutations: [docs guide](../../apps/docs/guide/store.md).
 
 ## Watch without extra repaints
 
@@ -123,6 +124,7 @@ Raw numbers are written to `packages/store/bench/results.json`.
 | `store.get` / `set` | read / write sync fields |
 | `store.subscribe(select, fn)` | watch a slice; deep-equal by default |
 | `store.status` / `refetch` / `send` | UI status, reload, POST+refetch |
-| `action` / `store.write` | jotai-style writers |
+| `action` / `store.write` | jotai-style local writers |
+| `mutation` / `store.mutate` | create/update/delete + UI status |
 | `derived` | cached selector |
 | `useStore` / `StoreProvider` | React snapshot or selector |

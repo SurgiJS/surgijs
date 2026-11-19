@@ -73,6 +73,57 @@ return <Rows items={list!} refreshing={st.isFetching} />;
 | `404` | `isError`, `httpStatus: 404` |
 | `200` + `{ ok: false, code, message }` | `isError`, `httpStatus: 200`, `code` |
 
+## Mutations (create / update / delete)
+
+`remote` is for **reads**. For uploads use **`mutation`** — own pending/error status, then `refetch` the list.
+
+```ts
+import { createStore, mutation, remote, fromResponse } from '@surgijs/store';
+
+type User = { id: string; name: string };
+
+const store = createStore({
+  users: remote({
+    deps: () => '/api/users',
+    fetch: async (_get, { signal, report, deps }) => {
+      const res = await fetch(String(deps), { signal });
+      return fromResponse<User[]>(res, { report });
+    },
+  }),
+});
+
+const createUser = mutation(async (input: { name: string }, { signal, report, refetch }) => {
+  const res = await fetch('/api/users', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+    signal,
+  });
+  const user = await fromResponse<User>(res, { report });
+  await refetch('users'); // reload list after create
+  return user;
+});
+
+// submit
+await createUser(store, { name: 'Ada' });
+
+// UI
+const st = createUser.status(store);
+// st.isPending | st.isError | st.isSuccess | st.httpStatus | st.code | st.data
+```
+
+One-off without a reusable mutation object:
+
+```ts
+await store.mutate(async ({ set, signal, report, refetch }) => {
+  const res = await fetch('/api/users', { method: 'POST', body: /* … */, signal });
+  const user = await fromResponse<User>(res, { report });
+  await refetch('users');
+  set('selectedId', user.id);
+  return user;
+});
+```
+
 ## Pagination example
 
 ```ts

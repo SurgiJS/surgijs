@@ -1,6 +1,7 @@
 import type { Get, SetStore } from './action';
 import { deepEqual } from './equal';
 import { isRemoteError } from './http';
+import { runMutation, type MutationContext } from './mutation';
 import {
   DEFAULT_GC_TIME,
   createRemoteGet,
@@ -95,8 +96,8 @@ export interface Store<D extends Record<string, unknown>> {
   refetch<K extends RemoteKeys<D>>(key: K): Promise<RemoteData<D, K> | undefined>;
 
   /**
-   * Send a request, then refetch the remote field by default.
-   * URL defaults to the field's current string `key`.
+   * POST/PUT against a remote's string deps URL, then refetch by default.
+   * Prefer `mutation()` for create/update flows with UI status.
    */
   send<K extends RemoteKeys<D>>(key: K, init?: SendOptions): Promise<Response>;
 
@@ -105,6 +106,12 @@ export interface Store<D extends Record<string, unknown>> {
    * `store.write((get, set, by) => set('count', get('count') * by))(2)`.
    */
   write<A extends unknown[]>(fn: (get: Get<D>, set: SetStore<D>, ...args: A) => void): (...args: A) => void;
+
+  /**
+   * One-off server write (create user, etc.) with get/set/refetch/report.
+   * For reusable mutations with status, use `mutation()` from `@surgijs/store`.
+   */
+  mutate<R>(fn: (ctx: MutationContext<D>) => R | PromiseLike<R>): Promise<R>;
 }
 
 export interface CreateStoreOptions {
@@ -638,6 +645,10 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         }) as Get<D>;
         fn(get, store.set as SetStore<D>, ...args);
       };
+    },
+
+    mutate(fn) {
+      return runMutation(store, fn);
     },
   };
 
