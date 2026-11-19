@@ -51,6 +51,7 @@ describe('remote status: empty vs 404 vs app error', () => {
     const st = store.status('list');
     expect(st.data).toBeNull();
     expect(st.isEmpty).toBe(true);
+    expect(st.status).toBe('empty');
     expect(st.isError).toBe(false);
     expect(st.httpStatus).toBe(200);
     expect(st.hasData).toBe(true);
@@ -68,6 +69,7 @@ describe('remote status: empty vs 404 vs app error', () => {
     const st = store.status('list');
     expect(st.data).toBeUndefined();
     expect(st.isEmpty).toBe(false);
+    expect(st.status).toBe('err');
     expect(st.httpStatus).toBe(404);
     expect(st.code).toBe(404);
     expect(isRemoteError(st.error)).toBe(true);
@@ -88,5 +90,6 @@ describe('remote status: empty vs 404 vs app error', () => {
     expect(st.httpStatus).toBe(200);
     expect(st.code).toBe('VALIDATION');
     expect(st.isSuccess).toBe(false);
+    expect(st.status).toBe('err');
   });
 });

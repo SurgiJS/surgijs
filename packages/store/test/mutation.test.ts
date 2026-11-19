@@ -53,6 +53,7 @@ describe('mutation', () => {
     const user = await createUser(store, { name: 'Ada' });
     expect(user).toEqual({ id: '1', name: 'Ada' });
     expect(createUser.status(store)).toMatchObject({
+      status: 'success',
       isSuccess: true,
       isPending: false,
       httpStatus: 201,
@@ -78,6 +79,7 @@ describe('mutation', () => {
 
     await expect(createUser(store, { name: 'Ada' })).rejects.toMatchObject({ status: 400, code: 'EXISTS' });
     expect(createUser.status(store)).toMatchObject({
+      status: 'err',
       isError: true,
       httpStatus: 400,
       code: 'EXISTS',

@@ -37,6 +37,7 @@ store.set('windowQueryParams', { q: 'ada' }); // does
 ```ts
 const st = store.status('results');
 
+st.status; // 'pending' | 'success' | 'empty' | 'err' — one place for UI
 st.isPending; // first load, no settle yet
 st.isFetching; // request in flight (incl. background refetch)
 st.isSuccess; // last settle ok — including empty `null` / `[]`
@@ -57,11 +58,16 @@ Watch status in React:
 const list = useStore((s) => s.results);
 const st = useStore(() => store.status('results'));
 
-if (st.isPending) return <Spinner />;
-if (st.isError && st.httpStatus === 404) return <NotFound />;
-if (st.isError) return <ErrorBanner code={st.code} error={st.error} />;
-if (st.isEmpty) return <Empty />;
-return <Rows items={list!} refreshing={st.isFetching} />;
+switch (st.status) {
+  case 'pending':
+    return <Spinner />;
+  case 'err':
+    return st.httpStatus === 404 ? <NotFound /> : <ErrorBanner code={st.code} error={st.error} />;
+  case 'empty':
+    return <Empty />;
+  case 'success':
+    return <Rows items={list!} refreshing={st.isFetching} />;
+}
 ```
 
 `fromResponse` distinguishes:
@@ -109,6 +115,7 @@ await createUser(store, { name: 'Ada' });
 
 // UI
 const st = createUser.status(store);
+// st.status → 'idle' | 'pending' | 'success' | 'err'
 // st.isPending | st.isError | st.isSuccess | st.httpStatus | st.code | st.data
 ```
 

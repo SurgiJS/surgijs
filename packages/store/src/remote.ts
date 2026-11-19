@@ -172,8 +172,15 @@ export type RemoteKeys<D extends Record<string, unknown>> = {
 export type RemoteData<D extends Record<string, unknown>, K extends RemoteKeys<D>> =
   D[K] extends RemoteDef<infer U> ? U : never;
 
-/** High-level remote lifecycle for UI. */
-export type RemotePhase = 'idle' | 'pending' | 'success' | 'error';
+/**
+ * Single UI discriminator for `store.status(name).status`.
+ * Priority: `err` > `pending` > `empty` > `success`.
+ * Background refetch keeps last settle; use `isFetching` for a spinner overlay.
+ */
+export type RemotePhase = 'pending' | 'success' | 'empty' | 'err';
+
+/** @deprecated Use `RemotePhase`. */
+export type RemoteUiSt = RemotePhase;
 
 /** Where the current `data` came from. */
 export type RemoteSource = 'network' | 'cache' | undefined;
@@ -182,15 +189,18 @@ export type RemoteSource = 'network' | 'cache' | undefined;
  * Snapshot of a remote field for UI status (spinners, errors, stale hints).
  * Built fresh on each `store.status(name)` / `store.meta(name)` call.
  *
- * Empty success (`null` / `[]` / `''`) is **not** an error — use `isEmpty`.
- * HTTP 404 and `200 + { ok: false }` land in `isError` with `httpStatus` / `code`.
+ * Empty success (`null` / `[]` / `''`) is **not** an error — use `isEmpty` / `status === 'empty'`.
+ * HTTP 404 and `200 + { ok: false }` land in `isError` / `status === 'err'` with `httpStatus` / `code`.
  */
 export interface RemoteMeta<T> {
   /** Last successful payload. `undefined` = never loaded; `null` / `[]` = empty success. */
   data: T | undefined;
   error: unknown;
 
-  /** `idle` | `pending` (no settle yet) | `success` | `error`. */
+  /**
+   * One place for UI: `'pending' | 'success' | 'empty' | 'err'`.
+   * Prefer `switch (st.status)` over juggling the booleans below.
+   */
   status: RemotePhase;
   /** True while a request is in flight (including background refetch). */
   isFetching: boolean;

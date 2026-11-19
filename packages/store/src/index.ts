@@ -10,6 +10,7 @@ export {
   type MutationContext,
   type MutationPhase,
   type MutationStatus,
+  type MutationUiSt,
 } from './mutation';
 export {
   DEFAULT_GC_TIME,
@@ -27,6 +28,7 @@ export {
   type RemoteOptions,
   type RemoteOptionsInput,
   type RemotePhase,
+  type RemoteUiSt,
   type RemoteReport,
   type RemoteSource,
   type StoreState,

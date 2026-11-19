@@ -3,11 +3,22 @@ import { isRemoteError } from './http';
 import type { RemoteKeys, RemoteReport, StoreState } from './remote';
 import type { Selector, Store } from './store';
 
-export type MutationPhase = 'idle' | 'pending' | 'success' | 'error';
+/** Internal lifecycle (maps to public `status`). */
+type MutationPhaseInternal = 'idle' | 'pending' | 'success' | 'error';
+
+/**
+ * Single UI discriminator for `mutation.status(store).status`.
+ * Prefer `switch (st.status)` over juggling booleans.
+ */
+export type MutationPhase = 'idle' | 'pending' | 'success' | 'err';
+
+/** @deprecated Use `MutationPhase`. */
+export type MutationUiSt = MutationPhase;
 
 export interface MutationStatus<T> {
   data: T | undefined;
   error: unknown;
+  /** One place for UI: `'idle' | 'pending' | 'success' | 'err'`. */
   status: MutationPhase;
   isPending: boolean;
   isSuccess: boolean;
@@ -39,7 +50,7 @@ export type MutateFn<D extends Record<string, unknown>, Input, Result> = (
 type Entry<T> = {
   data: T | undefined;
   error: unknown;
-  status: MutationPhase;
+  phase: MutationPhaseInternal;
   httpStatus: number | undefined;
   code: string | number | undefined;
   submittedAt: number;
@@ -54,7 +65,7 @@ function emptyEntry<T>(): Entry<T> {
   return {
     data: undefined,
     error: undefined,
-    status: 'idle',
+    phase: 'idle',
     httpStatus: undefined,
     code: undefined,
     submittedAt: 0,
@@ -66,15 +77,19 @@ function emptyEntry<T>(): Entry<T> {
   };
 }
 
+function toUiStatus(phase: MutationPhaseInternal): MutationPhase {
+  return phase === 'error' ? 'err' : phase;
+}
+
 function snapshot<T>(e: Entry<T>): MutationStatus<T> {
   return {
     data: e.data,
     error: e.error,
-    status: e.status,
-    isPending: e.status === 'pending',
-    isSuccess: e.status === 'success',
-    isError: e.status === 'error',
-    isIdle: e.status === 'idle',
+    status: toUiStatus(e.phase),
+    isPending: e.phase === 'pending',
+    isSuccess: e.phase === 'success',
+    isError: e.phase === 'error',
+    isIdle: e.phase === 'idle',
     httpStatus: e.httpStatus,
     code: e.code,
     submittedAt: e.submittedAt,
@@ -121,7 +136,7 @@ export type Mutation<Input, Result> = {
  * });
  *
  * await createUser(store, { name: 'Ada' });
- * createUser.status(store); // isPending / isError / httpStatus / code
+ * createUser.status(store); // .status / isPending / isError / httpStatus / code
  * ```
  */
 export function mutation<Input, Result>(
@@ -141,7 +156,7 @@ export function mutation<Input, Result>(
     const ctrl = new AbortController();
     e.ctrl = ctrl;
     const seq = ++e.seq;
-    e.status = 'pending';
+    e.phase = 'pending';
     e.error = undefined;
     e.submittedAt = Date.now();
     notify(e);
@@ -166,7 +181,7 @@ export function mutation<Input, Result>(
         refetch: refetch as MutationContext<Record<string, any>>['refetch'],
       });
       if (seq !== e.seq) return result;
-      e.status = 'success';
+      e.phase = 'success';
       e.data = result;
       e.error = undefined;
       e.dataUpdatedAt = Date.now();
@@ -177,7 +192,7 @@ export function mutation<Input, Result>(
       if (seq !== e.seq || (err && typeof err === 'object' && (err as { name?: string }).name === 'AbortError')) {
         throw err;
       }
-      e.status = 'error';
+      e.phase = 'error';
       e.error = err;
       e.errorUpdatedAt = Date.now();
       if (isRemoteError(err)) {

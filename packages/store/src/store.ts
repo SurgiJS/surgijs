@@ -341,7 +341,15 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     const isError = entry.lastStatus === 'error';
     const hasData = entry.dataUpdatedAt > 0;
     const isPending = isFetching && entry.lastStatus === undefined;
-    const status = isPending ? 'pending' : isError ? 'error' : isSuccess ? 'success' : 'idle';
+    const isEmpty = isSuccess && isEmptyData(entry.data);
+    // One place for UI: err > pending > empty > success (never settled → pending).
+    const status = isError
+      ? 'err'
+      : isPending || entry.lastStatus === undefined
+        ? 'pending'
+        : isEmpty
+          ? 'empty'
+          : 'success';
     const gcTime = entry.def.gcTime ?? DEFAULT_GC_TIME;
     const dataUpdatedAt = entry.dataUpdatedAt;
     return {
@@ -353,7 +361,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       isLoading: isPending,
       isSuccess,
       isError,
-      isEmpty: isSuccess && isEmptyData(entry.data),
+      isEmpty,
       hasData,
       isActive: entry.refs > 0,
       deps: entry.key,

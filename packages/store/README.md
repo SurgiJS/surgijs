@@ -32,6 +32,7 @@ store.set('windowQueryParams', { q: 'ada' }); // refetches results
 store.set('noise', 1); // does not call results.fetch
 
 const st = store.status('results');
+// st.status → 'pending' | 'success' | 'empty' | 'err'
 // st.isPending | isFetching | isSuccess | isEmpty | isError
 // st.httpStatus | st.code | st.age | st.source | st.deps | st.gcTime
 ```
