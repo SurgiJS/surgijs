@@ -160,10 +160,20 @@ store.set('query', 'ada'); // refetch from page identity in deps
 
 // UI
 store.subscribe(() => store.status('list'), (st) => {
-  if (st.isPending) showSpinner();
-  else if (st.isError) showError(st.httpStatus, st.code, st.error);
-  else if (st.isEmpty) showEmpty();
-  else showPage(st.data!, { refreshing: st.isFetching, age: st.age });
+  switch (st.status) {
+    case 'pending':
+      showSpinner();
+      break;
+    case 'err':
+      showError(st.httpStatus, st.code, st.error);
+      break;
+    case 'empty':
+      showEmpty();
+      break;
+    case 'success':
+      showPage(st.data!, { refreshing: st.isFetching, age: st.age });
+      break;
+  }
 });
 
 store.write((get, set) => {
