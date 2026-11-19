@@ -1,12 +1,13 @@
 import type { Get, SetStore } from './action';
 import { deepEqual } from './equal';
 import { isRemoteError } from './http';
-import { runMutation, type MutationContext } from './mutation';
 import {
   DEFAULT_GC_TIME,
+  DEFAULT_STALE_TIME,
   createRemoteGet,
   isEmptyData,
   isRemote,
+  resolvePlaceholder,
   type RemoteData,
   type RemoteDef,
   type RemoteKey,
@@ -27,32 +28,22 @@ export interface SubscribeOptions<T> {
   fireImmediately?: boolean;
 }
 
-export interface SendOptions extends RequestInit {
-  /** Override URL. Defaults to the remote field's current `key` when it is a string. */
-  url?: string;
-  /** Refetch the remote field after a successful response. Default `true`. */
-  refetch?: boolean;
-}
-
 type RemoteEntry = {
   def: RemoteDef<unknown>;
   data: unknown;
   error: unknown;
   fetching: boolean;
-  /** Last settle outcome; success allows empty `null` / `[]`. */
   lastStatus: 'success' | 'error' | undefined;
   key: RemoteKey | undefined;
-  /** Sync fields last read by `deps` — skip deps check when an unrelated key is set. */
   depKeys: Set<string> | null;
   refs: number;
   seq: number;
   ctrl: AbortController | null;
-  /** Pending GC timer after the last subscriber leaves. */
   gc: ReturnType<typeof setTimeout> | null;
   dataUpdatedAt: number;
   errorUpdatedAt: number;
   fetchStartedAt: number;
-  source: 'network' | 'cache' | undefined;
+  source: 'network' | 'cache' | 'optimistic' | undefined;
   httpStatus: number | undefined;
   code: string | number | undefined;
 };
@@ -62,87 +53,137 @@ type Sub<D extends Record<string, unknown>> = {
   listener: Listener<unknown>;
   equals: Equals<unknown>;
   value: unknown;
-  /** Top-level keys read by the selector (sync + remote). */
   keys: Set<string>;
 };
 
 export interface Store<D extends Record<string, unknown>> {
-  /** Read the full state or a selected slice. Remote fields are `undefined` until watched and loaded. */
   get(): StoreState<D>;
   get<T>(selector: Selector<D, T>): T;
 
-  /** Write sync fields. Deep-equal writes are no-ops. */
   set<K extends SyncKeys<D>>(key: K, value: D[K]): void;
   set(partial: Partial<{ [K in SyncKeys<D>]: D[K] }>): void;
 
   /**
-   * Watch a selected slice. The first read of a `remote()` field loads it (or reuses
-   * cache within `gcTime`). After the last unsubscribe, data stays until `gcTime`
-   * (default 5 minutes) then unloads. Listener runs only when the selection fails
-   * `equals` (default: deep equality).
+   * Optimistically patch a remote field (or write placeholder). Use with `mutation` rollback.
+   * Does not mark data as fresh for `staleTime`.
    */
+  setData<K extends RemoteKeys<D>>(
+    key: K,
+    value:
+      | RemoteData<D, K>
+      | ((prev: RemoteData<D, K> | undefined) => RemoteData<D, K> | undefined),
+  ): void;
+
   subscribe<T>(selector: Selector<D, T>, listener: Listener<T>, options?: SubscribeOptions<T>): () => void;
 
-  /**
-   * UI status for a remote field (fetching, error, age, deps, TTL, …).
-   * Reading this inside `subscribe` keeps the field loaded.
-   */
+  /** UI status for a remote field. Reading this inside `subscribe` keeps the field loaded. */
   status<K extends RemoteKeys<D>>(key: K): RemoteMeta<RemoteData<D, K>>;
 
-  /** Alias of `status`. */
-  meta<K extends RemoteKeys<D>>(key: K): RemoteMeta<RemoteData<D, K>>;
-
-  /** Force a remote field to reload (no-op when nothing watches it). */
+  /** Force reload. Works without subscribers (warms cache + starts GC if idle). */
   refetch<K extends RemoteKeys<D>>(key: K): Promise<RemoteData<D, K> | undefined>;
 
-  /**
-   * POST/PUT against a remote's string deps URL, then refetch by default.
-   * Prefer `mutation()` for create/update flows with UI status.
-   */
-  send<K extends RemoteKeys<D>>(key: K, init?: SendOptions): Promise<Response>;
+  /** Alias of `refetch` for route preload. */
+  prefetch<K extends RemoteKeys<D>>(key: K): Promise<RemoteData<D, K> | undefined>;
 
   /**
-   * Bind a jotai-style writer to this store:
+   * Bind a jotai-style writer:
    * `store.write((get, set, by) => set('count', get('count') * by))(2)`.
+   * Prefer shared `action()` when the writer is reused.
    */
   write<A extends unknown[]>(fn: (get: Get<D>, set: SetStore<D>, ...args: A) => void): (...args: A) => void;
-
-  /**
-   * One-off server write (create user, etc.) with get/set/refetch/report.
-   * For reusable mutations with status, use `mutation()` from `@surgijs/store`.
-   */
-  mutate<R>(fn: (ctx: MutationContext<D>) => R | PromiseLike<R>): Promise<R>;
 }
 
 export interface CreateStoreOptions {
-  /**
-   * Default `gcTime` for `remote()` fields that omit it.
-   * `0` unloads immediately; `Infinity` keeps forever. Default: 5 minutes.
-   */
+  /** Default `gcTime` for remotes. Default: 5 minutes. */
   gcTime?: number;
+  /** Default `staleTime` for remotes. Default: `0` (always stale). */
+  staleTime?: number;
+  /** Default retry count after the first attempt. Default: `2`. */
+  retry?: number | false;
+  /** Default `refetchOnFocus`. Default: `true`. */
+  refetchOnFocus?: boolean;
+  /** Default `refetchOnReconnect`. Default: `true`. */
+  refetchOnReconnect?: boolean;
+}
+
+type FocusTarget = { stale: () => boolean; reload: () => void };
+
+const focusTargets = new Set<FocusTarget>();
+const onlineTargets = new Set<FocusTarget>();
+let focusBound = false;
+let onlineBound = false;
+
+function ensureFocusListener(): void {
+  if (focusBound || typeof document === 'undefined') return;
+  focusBound = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    for (const t of focusTargets) if (t.stale()) t.reload();
+  });
+}
+
+function ensureOnlineListener(): void {
+  if (onlineBound || typeof window === 'undefined') return;
+  onlineBound = true;
+  window.addEventListener('online', () => {
+    for (const t of onlineTargets) if (t.stale()) t.reload();
+  });
+}
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+      return;
+    }
+    const t = setTimeout(resolve, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function isAbortError(err: unknown): boolean {
+  return !!err && typeof err === 'object' && (err as { name?: string }).name === 'AbortError';
 }
 
 export function createStore<D extends Record<string, unknown>>(def: D, options?: CreateStoreOptions): Store<D> {
   const defaultGc = options?.gcTime ?? DEFAULT_GC_TIME;
+  const defaultStale = options?.staleTime ?? DEFAULT_STALE_TIME;
+  const defaultRetry = options?.retry === false ? 0 : (options?.retry ?? 2);
+  const defaultFocus = options?.refetchOnFocus ?? true;
+  const defaultOnline = options?.refetchOnReconnect ?? true;
+
   const sync: Record<string, unknown> = Object.create(null);
   const remotes = new Map<string, RemoteEntry>();
   const subs = new Set<Sub<D>>();
-  /** Subscribers indexed by top-level key they read. */
   const byKey = new Map<string, Set<Sub<D>>>();
   let version = 0;
   let view: StoreState<D> | undefined;
   let viewVersion = -1;
   let tracking: Set<string> | null = null;
   let notifying = false;
-  /** Queued keys while already notifying (boxed so nested writes can mutate). */
   const pending = { keys: null as Set<string> | null, one: null as string | null };
+  const focusRegs = new Map<string, FocusTarget>();
+  const onlineRegs = new Map<string, FocusTarget>();
 
   for (const key of Object.keys(def)) {
     const value = def[key];
     if (isRemote(value)) {
+      const remoteDef: RemoteDef<unknown> = {
+        ...value,
+        gcTime: value.gcTime ?? defaultGc,
+        staleTime: value.staleTime ?? defaultStale,
+        retry: value.retry === undefined ? defaultRetry : value.retry,
+        refetchOnFocus: value.refetchOnFocus ?? defaultFocus,
+        refetchOnReconnect: value.refetchOnReconnect ?? defaultOnline,
+      };
+      const placeholder = resolvePlaceholder(remoteDef.placeholderData);
       remotes.set(key, {
-        def: { ...value, gcTime: value.gcTime ?? defaultGc },
-        data: undefined,
+        def: remoteDef,
+        data: placeholder,
         error: undefined,
         fetching: false,
         lastStatus: undefined,
@@ -155,7 +196,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         dataUpdatedAt: 0,
         errorUpdatedAt: 0,
         fetchStartedAt: 0,
-        source: undefined,
+        source: placeholder !== undefined ? 'cache' : undefined,
         httpStatus: undefined,
         code: undefined,
       });
@@ -183,6 +224,15 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     const out: Record<string, unknown> = Object.create(null);
     for (const key of Object.keys(sync)) out[key] = sync[key];
     return out;
+  };
+
+  const staleTimeOf = (entry: RemoteEntry): number => entry.def.staleTime ?? defaultStale;
+
+  const isStale = (entry: RemoteEntry): boolean => {
+    if (entry.lastStatus !== 'success') return true;
+    const st = staleTimeOf(entry);
+    if (!Number.isFinite(st)) return false;
+    return Date.now() - entry.dataUpdatedAt >= st;
   };
 
   const indexSub = (sub: Sub<D>): void => {
@@ -234,7 +284,6 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         const state = snapshot();
         const set = byKey.get(k!);
         if (set) for (const sub of set) flushSub(sub, state);
-        // Nested set() may queue into `pending` during flushSub.
         const queued = pending.keys as Set<string> | null;
         const nextOne = pending.one as string | null;
         pending.keys = null;
@@ -296,6 +345,20 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     }
   };
 
+  const scheduleGc = (name: string, entry: RemoteEntry): void => {
+    const ttl = entry.def.gcTime ?? DEFAULT_GC_TIME;
+    if (ttl === 0) {
+      unload(name, entry);
+      return;
+    }
+    if (!Number.isFinite(ttl)) return;
+    if (entry.gc) clearTimeout(entry.gc);
+    entry.gc = setTimeout(() => {
+      entry.gc = null;
+      if (entry.refs === 0) unload(name, entry);
+    }, ttl);
+  };
+
   const unload = (name: string, entry: RemoteEntry): void => {
     if (entry.gc) {
       clearTimeout(entry.gc);
@@ -304,7 +367,8 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     entry.ctrl?.abort();
     entry.ctrl = null;
     entry.seq++;
-    entry.data = undefined;
+    const placeholder = resolvePlaceholder(entry.def.placeholderData);
+    entry.data = placeholder;
     entry.error = undefined;
     entry.fetching = false;
     entry.lastStatus = undefined;
@@ -313,11 +377,58 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     entry.dataUpdatedAt = 0;
     entry.errorUpdatedAt = 0;
     entry.fetchStartedAt = 0;
-    entry.source = undefined;
+    entry.source = placeholder !== undefined ? 'cache' : undefined;
     entry.httpStatus = undefined;
     entry.code = undefined;
     bump();
     notifyKey(name);
+    unregisterFocus(name);
+  };
+
+  const unregisterFocus = (name: string): void => {
+    const f = focusRegs.get(name);
+    if (f) {
+      focusTargets.delete(f);
+      focusRegs.delete(name);
+    }
+    const o = onlineRegs.get(name);
+    if (o) {
+      onlineTargets.delete(o);
+      onlineRegs.delete(name);
+    }
+  };
+
+  const registerFocus = (name: string, entry: RemoteEntry): void => {
+    if (entry.refs <= 0) {
+      unregisterFocus(name);
+      return;
+    }
+    if (entry.def.refetchOnFocus) {
+      ensureFocusListener();
+      if (!focusRegs.has(name)) {
+        const t: FocusTarget = {
+          stale: () => isStale(entry),
+          reload: () => {
+            void load(name, entry, true).catch(() => {});
+          },
+        };
+        focusRegs.set(name, t);
+        focusTargets.add(t);
+      }
+    }
+    if (entry.def.refetchOnReconnect) {
+      ensureOnlineListener();
+      if (!onlineRegs.has(name)) {
+        const t: FocusTarget = {
+          stale: () => isStale(entry),
+          reload: () => {
+            void load(name, entry, true).catch(() => {});
+          },
+        };
+        onlineRegs.set(name, t);
+        onlineTargets.add(t);
+      }
+    }
   };
 
   const readDeps = (entry: RemoteEntry): RemoteKey => {
@@ -339,10 +450,8 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     const isFetching = entry.fetching;
     const isSuccess = entry.lastStatus === 'success';
     const isError = entry.lastStatus === 'error';
-    const hasData = entry.dataUpdatedAt > 0;
     const isPending = isFetching && entry.lastStatus === undefined;
     const isEmpty = isSuccess && isEmptyData(entry.data);
-    // One place for UI: err > pending > empty > success (never settled → pending).
     const status = isError
       ? 'err'
       : isPending || entry.lastStatus === undefined
@@ -351,6 +460,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
           ? 'empty'
           : 'success';
     const gcTime = entry.def.gcTime ?? DEFAULT_GC_TIME;
+    const staleTime = staleTimeOf(entry);
     const dataUpdatedAt = entry.dataUpdatedAt;
     return {
       data: entry.data as T | undefined,
@@ -358,34 +468,83 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       status,
       isFetching,
       isPending,
-      isLoading: isPending,
       isSuccess,
       isError,
       isEmpty,
-      hasData,
+      isStale: isStale(entry),
       isActive: entry.refs > 0,
       deps: entry.key,
-      key: entry.key,
       source: entry.source,
       httpStatus: entry.httpStatus,
       code: entry.code,
       dataUpdatedAt,
-      errorUpdatedAt: entry.errorUpdatedAt,
-      fetchStartedAt: entry.fetchStartedAt,
       age: dataUpdatedAt ? Date.now() - dataUpdatedAt : null,
       gcTime,
-      observers: entry.refs,
-      loading: isFetching,
+      staleTime,
     };
   };
 
+  const settleOk = (name: string, entry: RemoteEntry, seq: number, data: unknown): unknown => {
+    if (seq !== entry.seq) return entry.data;
+    entry.fetching = false;
+    entry.error = undefined;
+    entry.lastStatus = 'success';
+    entry.data = data;
+    entry.dataUpdatedAt = Date.now();
+    entry.source = 'network';
+    if (entry.httpStatus === undefined) entry.httpStatus = 200;
+    bump();
+    notifyKey(name);
+    if (entry.refs === 0) scheduleGc(name, entry);
+    return entry.data;
+  };
+
+  const settleErr = (name: string, entry: RemoteEntry, seq: number, err: unknown): never => {
+    if (seq !== entry.seq || isAbortError(err)) {
+      throw err;
+    }
+    entry.fetching = false;
+    entry.error = err;
+    entry.lastStatus = 'error';
+    entry.errorUpdatedAt = Date.now();
+    entry.source = 'network';
+    applyErrorMeta(entry, err);
+    bump();
+    notifyKey(name);
+    if (entry.refs === 0) scheduleGc(name, entry);
+    throw err;
+  };
+
+  const runFetch = async (
+    entry: RemoteEntry,
+    get: ReturnType<typeof createRemoteGet>,
+    deps: RemoteKey,
+    report: (info: { status?: number; code?: string | number }) => void,
+    signal: AbortSignal,
+  ): Promise<unknown> => {
+    const maxRetry = entry.def.retry;
+    let attempt = 0;
+    for (;;) {
+      try {
+        return await entry.def.fetch(get, { signal, deps, get, report });
+      } catch (err) {
+        if (isAbortError(err) || attempt >= maxRetry) throw err;
+        const delay =
+          typeof entry.def.retryDelay === 'function'
+            ? entry.def.retryDelay(attempt, err)
+            : entry.def.retryDelay;
+        attempt++;
+        await sleep(delay, signal);
+      }
+    }
+  };
+
   const load = (name: string, entry: RemoteEntry, force: boolean): Promise<unknown> => {
-    // Only re-fetch when deps change (or forced) — unrelated store writes skip fetch.
     const nextDeps = readDeps(entry);
     if (
       !force &&
       deepEqual(entry.key, nextDeps) &&
-      (entry.fetching || entry.lastStatus !== undefined)
+      (entry.fetching || (entry.lastStatus === 'success' && !isStale(entry)))
     ) {
       if (!entry.fetching && entry.lastStatus === 'success') entry.source = entry.source ?? 'cache';
       return Promise.resolve(entry.data);
@@ -410,56 +569,35 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       notifyKey(name);
     };
 
-    let result: unknown;
-    try {
-      result = entry.def.fetch(get, {
-        signal: ctrl.signal,
-        deps: nextDeps,
-        key: nextDeps,
-        get,
-        report,
-      });
-    } catch (err) {
-      if (seq !== entry.seq) return Promise.resolve(entry.data);
-      entry.fetching = false;
-      entry.error = err;
-      entry.lastStatus = 'error';
-      entry.errorUpdatedAt = Date.now();
-      entry.source = 'network';
-      applyErrorMeta(entry, err);
-      bump();
-      notifyKey(name);
-      return Promise.reject(err);
+    // Sync fetch: settle immediately (no microtask race on subscribe/unsubscribe).
+    if (entry.def.retry === 0) {
+      try {
+        const result = entry.def.fetch(get, { signal: ctrl.signal, deps: nextDeps, get, report });
+        if (result == null || typeof (result as { then?: unknown }).then !== 'function') {
+          return Promise.resolve(settleOk(name, entry, seq, result));
+        }
+        return Promise.resolve(result as PromiseLike<unknown>).then(
+          (data) => settleOk(name, entry, seq, data),
+          (err) => {
+            if (seq !== entry.seq || isAbortError(err)) return entry.data;
+            return settleErr(name, entry, seq, err);
+          },
+        );
+      } catch (err) {
+        if (seq !== entry.seq) return Promise.resolve(entry.data);
+        try {
+          settleErr(name, entry, seq, err);
+        } catch (e) {
+          return Promise.reject(e);
+        }
+      }
     }
 
-    return Promise.resolve(result).then(
-      (data) => {
-        if (seq !== entry.seq) return entry.data;
-        entry.fetching = false;
-        entry.error = undefined;
-        entry.lastStatus = 'success';
-        // Allow null / [] as real empty success (do not treat as “no data”).
-        entry.data = data;
-        entry.dataUpdatedAt = Date.now();
-        entry.source = 'network';
-        if (entry.httpStatus === undefined) entry.httpStatus = 200;
-        bump();
-        notifyKey(name);
-        return entry.data;
-      },
+    return runFetch(entry, get, nextDeps, report, ctrl.signal).then(
+      (data) => settleOk(name, entry, seq, data),
       (err) => {
-        if (seq !== entry.seq || (err && typeof err === 'object' && (err as { name?: string }).name === 'AbortError')) {
-          return entry.data;
-        }
-        entry.fetching = false;
-        entry.error = err;
-        entry.lastStatus = 'error';
-        entry.errorUpdatedAt = Date.now();
-        entry.source = 'network';
-        applyErrorMeta(entry, err);
-        bump();
-        notifyKey(name);
-        throw err;
+        if (seq !== entry.seq || isAbortError(err)) return entry.data;
+        return settleErr(name, entry, seq, err);
       },
     );
   };
@@ -472,6 +610,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       entry.gc = null;
     }
     entry.refs++;
+    registerFocus(name, entry);
     if (entry.refs === 1) void load(name, entry, false).catch(() => {});
   };
 
@@ -481,7 +620,8 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     entry.refs--;
     if (entry.refs !== 0) return;
 
-    // Nobody watching: drop in-flight work, keep completed cache for gcTime.
+    unregisterFocus(name);
+
     if (entry.fetching) {
       entry.ctrl?.abort();
       entry.ctrl = null;
@@ -491,18 +631,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       notifyKey(name);
     }
 
-    const ttl = entry.def.gcTime ?? DEFAULT_GC_TIME;
-    if (ttl === 0) {
-      unload(name, entry);
-      return;
-    }
-    if (!Number.isFinite(ttl)) return;
-
-    if (entry.gc) clearTimeout(entry.gc);
-    entry.gc = setTimeout(() => {
-      entry.gc = null;
-      if (entry.refs === 0) unload(name, entry);
-    }, ttl);
+    scheduleGc(name, entry);
   };
 
   const trackSelect = <T>(selector: Selector<D, T>): { value: T; keys: Set<string> } => {
@@ -526,8 +655,8 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     }
   };
 
-  const write = (key: string, value: unknown): boolean => {
-    if (remotes.has(key)) throw new Error(`@surgijs/store: "${key}" is remote; use refetch/send`);
+  const writeSync = (key: string, value: unknown): boolean => {
+    if (remotes.has(key)) throw new Error(`@surgijs/store: "${key}" is remote; use setData/refetch`);
     if (!(key in sync)) throw new Error(`@surgijs/store: unknown key "${key}"`);
     const prev = sync[key];
     if (Object.is(prev, value) || deepEqual(prev, value)) return false;
@@ -570,6 +699,16 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     notifyKeys(changed);
   };
 
+  const forceLoad = (key: string): Promise<unknown> => {
+    const entry = remotes.get(key);
+    if (!entry) throw new Error(`@surgijs/store: "${key}" is not remote`);
+    if (entry.gc) {
+      clearTimeout(entry.gc);
+      entry.gc = null;
+    }
+    return load(key, entry, true);
+  };
+
   const store: Store<D> = {
     get: ((selector?: Selector<D, unknown>) => {
       if (!selector) return snapshot();
@@ -578,15 +717,32 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
 
     set(keyOrPartial: string | Record<string, unknown>, maybeValue?: unknown) {
       if (typeof keyOrPartial === 'string') {
-        if (write(keyOrPartial, maybeValue)) afterSyncWrite(keyOrPartial);
+        if (writeSync(keyOrPartial, maybeValue)) afterSyncWrite(keyOrPartial);
         return;
       }
       const changed = new Set<string>();
       for (const key of Object.keys(keyOrPartial)) {
-        if (write(key, keyOrPartial[key])) changed.add(key);
+        if (writeSync(key, keyOrPartial[key])) changed.add(key);
       }
       if (changed.size === 1) afterSyncWrite(changed.values().next().value!);
       else if (changed.size) afterSyncWriteMany(changed);
+    },
+
+    setData(key, value) {
+      const name = key as string;
+      const entry = remotes.get(name);
+      if (!entry) throw new Error(`@surgijs/store: "${name}" is not remote`);
+      const next =
+        typeof value === 'function'
+          ? (value as (prev: unknown) => unknown)(entry.data)
+          : value;
+      if (Object.is(entry.data, next) || deepEqual(entry.data, next)) return;
+      entry.data = next;
+      entry.source = 'optimistic';
+      // Keep lastStatus so UI can stay on success/empty while optimistic.
+      if (entry.lastStatus === undefined && next !== undefined) entry.lastStatus = 'success';
+      bump();
+      notifyKey(name);
     },
 
     subscribe(selector, listener, options) {
@@ -619,29 +775,12 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       return snapshotStatus<RemoteData<D, typeof key>>(entry);
     },
 
-    meta(key) {
-      return store.status(key);
-    },
-
     refetch(key) {
-      const entry = remotes.get(key as string);
-      if (!entry) throw new Error(`@surgijs/store: "${String(key)}" is not remote`);
-      if (entry.refs <= 0) return Promise.resolve(undefined as RemoteData<D, typeof key> | undefined);
-      return load(key as string, entry, true) as Promise<RemoteData<D, typeof key> | undefined>;
+      return forceLoad(key as string) as Promise<RemoteData<D, typeof key> | undefined>;
     },
 
-    async send(key, init = {}) {
-      const entry = remotes.get(key as string);
-      if (!entry) throw new Error(`@surgijs/store: "${String(key)}" is not remote`);
-      const { url, refetch: shouldRefetch = true, ...request } = init;
-      const target = url ?? (typeof entry.key === 'string' ? entry.key : undefined);
-      if (target == null) {
-        throw new Error(`@surgijs/store: send("${String(key)}") needs a string deps value or url`);
-      }
-      const response = await fetch(target, request);
-      if (!response.ok) throw new Error(`@surgijs/store: send("${String(key)}") failed: ${response.status}`);
-      if (shouldRefetch && entry.refs > 0) await load(key as string, entry, true);
-      return response;
+    prefetch(key) {
+      return forceLoad(key as string) as Promise<RemoteData<D, typeof key> | undefined>;
     },
 
     write(fn) {
@@ -653,10 +792,6 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         }) as Get<D>;
         fn(get, store.set as SetStore<D>, ...args);
       };
-    },
-
-    mutate(fn) {
-      return runMutation(store, fn);
     },
   };
 

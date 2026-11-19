@@ -306,10 +306,11 @@ function suiteRemoteDeps() {
             fetches++;
             return fetches;
           },
+          staleTime: Infinity,
+          retry: false,
         }),
       });
       store.subscribe((s) => s.data, () => {});
-      // warm first load
       return () => {
         store.set('noise', store.get((s) => s.noise) + 1);
         if (fetches > 1) throw new Error('fetch ran on noise write');
@@ -325,6 +326,7 @@ function suiteRemoteDeps() {
             fetches++;
             return get.q;
           },
+          retry: false,
         }),
       });
       store.subscribe((s) => s.data, () => {});
@@ -354,12 +356,66 @@ function suiteRemoteDeps() {
   ];
 }
 
+/** Fresh remount / status / optimistic setData microbenches (store-only). */
+function suiteRemoteExtras() {
+  return [
+    bench('surgijs/store staleTime skip remount', () => {
+      let fetches = 0;
+      const store = createStore({
+        data: remote({
+          deps: () => 1,
+          fetch: () => ++fetches, // sync settle so warmup is finished
+          staleTime: Infinity,
+          retry: false,
+          gcTime: 60_000,
+        }),
+      });
+      const warm = store.subscribe((s) => s.data, () => {});
+      warm();
+      if (fetches !== 1) throw new Error('warmup failed');
+      return () => {
+        const u = store.subscribe((s) => s.data, () => {});
+        u();
+        if (fetches !== 1) throw new Error('staleTime Infinity still refetched');
+      };
+    }),
+    bench('surgijs/store status()', () => {
+      const store = createStore({
+        data: remote({
+          deps: () => 1,
+          fetch: () => 1,
+          staleTime: Infinity,
+          retry: false,
+        }),
+      });
+      store.subscribe((s) => s.data, () => {});
+      return () => void store.status('data').status;
+    }),
+    bench('surgijs/store setData optimistic', () => {
+      const store = createStore({
+        data: remote({
+          deps: () => 1,
+          fetch: () => [{ id: 1 }],
+          staleTime: Infinity,
+          retry: false,
+        }),
+      });
+      store.subscribe((s) => s.data, () => {});
+      let n = 0;
+      return () => {
+        store.setData('data', [{ id: ++n }]);
+      };
+    }),
+  ];
+}
+
 const suites = [
   ['update watched field (' + SUBS + ' subs)', suiteUpdateWatched],
   ['deep-equal rewrite (skip notify)', suiteDeepEqualSkip],
   ['action + derived', suiteActionDerived],
   ['noise update (unrelated field)', suiteNoiseIsolation],
   ['remote deps (fetch only when deps change)', suiteRemoteDeps],
+  ['remote stale / status / setData', suiteRemoteExtras],
 ];
 
 console.log(`@surgijs/store benches — ${ITER.toLocaleString()} iterations, ${SUBS} subscribers\n`);

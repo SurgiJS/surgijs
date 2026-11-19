@@ -91,6 +91,7 @@ describe('remote', () => {
           return { key: deps, q: get('q'), list: [1] };
         },
         gcTime: 60_000,
+        staleTime: Infinity,
       }),
     });
 
@@ -128,9 +129,26 @@ describe('remote', () => {
       data: undefined,
       isFetching: false,
       deps: undefined,
-      hasData: false,
     });
     vi.useRealTimers();
+  });
+
+  it('refetches on remount when staleTime is 0', async () => {
+    let loads = 0;
+    const store = createStore({
+      users: remote({
+        deps: () => '/users',
+        fetch: async () => ++loads,
+        gcTime: 60_000,
+        staleTime: 0,
+        retry: false,
+      }),
+    });
+    const stop = store.subscribe((s) => s.users, () => {});
+    await vi.waitFor(() => expect(store.get((s) => s.users)).toBe(1));
+    stop();
+    store.subscribe((s) => s.users, () => {});
+    await vi.waitFor(() => expect(loads).toBe(2));
   });
 
   it('unloads immediately when gcTime is 0', async () => {
@@ -140,6 +158,7 @@ describe('remote', () => {
         deps: () => '/users',
         fetch: async () => ++loads,
         gcTime: 0,
+        retry: false,
       }),
     });
     const stop = store.subscribe((s) => s.users, () => {});
@@ -163,6 +182,8 @@ describe('remote', () => {
           void signal;
           return { url: `${path}?${params}`, n: loads };
         },
+        retry: false,
+        staleTime: Infinity,
       }),
     });
 
@@ -182,16 +203,81 @@ describe('remote', () => {
     expect(loads).toBe(3);
   });
 
-  it('accepts legacy key as alias for deps', async () => {
+  it('retries failed fetches', async () => {
     let loads = 0;
     const store = createStore({
       users: remote({
-        key: () => '/users',
-        fetch: async () => ++loads,
+        deps: () => '/users',
+        fetch: async () => {
+          loads++;
+          if (loads < 3) throw new Error('boom');
+          return loads;
+        },
+        retry: 2,
+        retryDelay: 0,
+        staleTime: Infinity,
       }),
     });
     store.subscribe((s) => s.users, () => {});
-    await vi.waitFor(() => expect(store.get((s) => s.users)).toBe(1));
+    await vi.waitFor(() => expect(store.get((s) => s.users)).toBe(3));
+    expect(loads).toBe(3);
+  });
+
+  it('prefetch warms cache without a subscriber', async () => {
+    let loads = 0;
+    const store = createStore({
+      users: remote({
+        deps: () => '/users',
+        fetch: async () => ++loads,
+        gcTime: 60_000,
+        staleTime: Infinity,
+        retry: false,
+      }),
+    });
+    await store.prefetch('users');
+    expect(store.get((s) => s.users)).toBe(1);
+    expect(store.status('users').status).toBe('success');
+    store.subscribe((s) => s.users, () => {});
+    await Promise.resolve();
+    expect(loads).toBe(1);
+  });
+
+  it('setData patches remote optimistically', async () => {
+    const store = createStore({
+      users: remote({
+        deps: () => '/users',
+        fetch: async () => [{ id: '1', name: 'Ada' }],
+        retry: false,
+        staleTime: Infinity,
+      }),
+    });
+    store.subscribe((s) => s.users, () => {});
+    await vi.waitFor(() => expect(store.get((s) => s.users)?.length).toBe(1));
+    store.setData('users', (prev) => [...(prev ?? []), { id: 'tmp', name: 'Bob' }]);
+    expect(store.get((s) => s.users)).toEqual([
+      { id: '1', name: 'Ada' },
+      { id: 'tmp', name: 'Bob' },
+    ]);
+    expect(store.status('users').source).toBe('optimistic');
+  });
+
+  it('shows placeholderData while pending', async () => {
+    let resolve!: (v: number) => void;
+    const store = createStore({
+      users: remote({
+        deps: () => '/users',
+        fetch: () => new Promise<number>((r) => {
+          resolve = r;
+        }),
+        placeholderData: 0,
+        retry: false,
+      }),
+    });
+    store.subscribe((s) => s.users, () => {});
+    expect(store.get((s) => s.users)).toBe(0);
+    expect(store.status('users').isPending).toBe(true);
+    resolve(7);
+    await vi.waitFor(() => expect(store.get((s) => s.users)).toBe(7));
   });
 
   it('refetches manually while watched', async () => {
@@ -200,45 +286,12 @@ describe('remote', () => {
       users: remote({
         deps: () => '/users',
         fetch: async () => ++loads,
+        retry: false,
       }),
     });
     store.subscribe((s) => s.users, () => {});
     await vi.waitFor(() => expect(store.get((s) => s.users)).toBe(1));
     await store.refetch('users');
     expect(store.get((s) => s.users)).toBe(2);
-  });
-
-  it('send posts and refetches', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === 'POST') return new Response('ok', { status: 200 });
-      return new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const store = createStore({
-      users: remote({
-        deps: () => '/api/users',
-        fetch: async (_get, { signal, deps }) => {
-          const res = await fetch(String(deps), { signal });
-          return res.json();
-        },
-      }),
-    });
-    store.subscribe((s) => s.users, () => {});
-    await vi.waitFor(() => expect(store.get((s) => s.users)).toEqual({ ok: true }));
-    await store.send('users', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Ada' }),
-      headers: { 'content-type': 'application/json' },
-    });
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/users',
-      expect.objectContaining({ method: 'POST' }),
-    );
-    await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(3));
-    vi.unstubAllGlobals();
   });
 });

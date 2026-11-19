@@ -1,19 +1,12 @@
 import type { Get, SetStore } from './action';
 import { isRemoteError } from './http';
-import type { RemoteKeys, RemoteReport, StoreState } from './remote';
+import type { RemoteData, RemoteKeys, RemoteReport, StoreState } from './remote';
 import type { Selector, Store } from './store';
 
-/** Internal lifecycle (maps to public `status`). */
 type MutationPhaseInternal = 'idle' | 'pending' | 'success' | 'error';
 
-/**
- * Single UI discriminator for `mutation.status(store).status`.
- * Prefer `switch (st.status)` over juggling booleans.
- */
+/** Single UI discriminator for `mutation.status(store).status`. */
 export type MutationPhase = 'idle' | 'pending' | 'success' | 'err';
-
-/** @deprecated Use `MutationPhase`. */
-export type MutationUiSt = MutationPhase;
 
 export interface MutationStatus<T> {
   data: T | undefined;
@@ -26,7 +19,6 @@ export interface MutationStatus<T> {
   isIdle: boolean;
   httpStatus: number | undefined;
   code: string | number | undefined;
-  /** When the current/last run started. */
   submittedAt: number;
   dataUpdatedAt: number;
   errorUpdatedAt: number;
@@ -35,10 +27,12 @@ export interface MutationStatus<T> {
 export interface MutationContext<D extends Record<string, unknown>> {
   get: Get<D>;
   set: SetStore<D>;
+  /** Read a remote field's current data (including optimistic). */
+  getData: <K extends RemoteKeys<D>>(key: K) => RemoteData<D, K> | undefined;
+  /** Optimistically patch remote data; pair with try/catch rollback. */
+  setData: Store<D>['setData'];
   signal: AbortSignal;
-  /** Attach HTTP / app codes to mutation status. */
   report: (info: RemoteReport) => void;
-  /** Reload watched remotes after a successful write. */
   refetch: (...keys: RemoteKeys<D>[]) => Promise<void>;
 }
 
@@ -119,24 +113,22 @@ export type Mutation<Input, Result> = {
 };
 
 /**
- * Server write (create / update / delete) with its own UI status.
- * Independent of `remote()` — POST/PUT/PATCH/DELETE without a read cache.
+ * Server write (create / update / delete) with UI status + optimistic helpers.
  *
  * ```ts
- * const createUser = mutation(async (input: { name: string }, { signal, report, refetch }) => {
- *   const res = await fetch('/api/users', {
- *     method: 'POST',
- *     headers: { 'content-type': 'application/json' },
- *     body: JSON.stringify(input),
- *     signal,
- *   });
- *   const user = await fromResponse(res, { report });
- *   await refetch('users');
- *   return user;
+ * const createUser = mutation(async (input: { name: string }, { setData, getData, signal, report, refetch }) => {
+ *   const prev = getData('users');
+ *   setData('users', [...(prev ?? []), { id: 'tmp', ...input }]);
+ *   try {
+ *     const res = await fetch('/api/users', { method: 'POST', body: JSON.stringify(input), signal });
+ *     const user = await fromResponse(res, { report });
+ *     await refetch('users');
+ *     return user;
+ *   } catch (e) {
+ *     setData('users', prev);
+ *     throw e;
+ *   }
  * });
- *
- * await createUser(store, { name: 'Ada' });
- * createUser.status(store); // .status / isPending / isError / httpStatus / code
  * ```
  */
 export function mutation<Input, Result>(
@@ -176,6 +168,10 @@ export function mutation<Input, Result>(
       const result = await fn(input, {
         get: makeGet(store) as Get<Record<string, any>>,
         set: store.set as SetStore<Record<string, any>>,
+        getData: ((key: string) => store.get((s) => s[key as keyof StoreState<D>])) as MutationContext<
+          Record<string, any>
+        >['getData'],
+        setData: store.setData as Store<Record<string, any>>['setData'],
         signal: ctrl.signal,
         report,
         refetch: refetch as MutationContext<Record<string, any>>['refetch'],
@@ -228,22 +224,4 @@ export function mutation<Input, Result>(
   };
 
   return run;
-}
-
-/** One-off mutate on a store (no persistent status object). */
-export async function runMutation<D extends Record<string, unknown>, Result>(
-  store: Store<D>,
-  fn: (ctx: MutationContext<D>) => Result | PromiseLike<Result>,
-): Promise<Result> {
-  const ctrl = new AbortController();
-  const refetch = async (...keys: RemoteKeys<D>[]) => {
-    await Promise.all(keys.map((k) => store.refetch(k)));
-  };
-  return fn({
-    get: makeGet(store),
-    set: store.set as SetStore<D>,
-    signal: ctrl.signal,
-    report: () => {},
-    refetch,
-  });
 }

@@ -3,6 +3,9 @@ export const REMOTE = Symbol.for('surgijs.store.remote');
 /** Default remote GC: unload 5 minutes after the last subscriber leaves. */
 export const DEFAULT_GC_TIME = 5 * 60 * 1000;
 
+/** Default: data is immediately stale (refetch on remount / focus when enabled). */
+export const DEFAULT_STALE_TIME = 0;
+
 export type RemoteKey = string | number | boolean | null | undefined | bigint | symbol | object;
 
 /**
@@ -26,8 +29,6 @@ export interface RemoteContext {
   signal: AbortSignal;
   /** Current `deps(get)` value for this load. */
   deps: RemoteKey;
-  /** @deprecated Same as `deps` (kept for older examples). */
-  key: RemoteKey;
   /** Same reader as the first `fetch` argument. */
   get: RemoteGet;
   /** Attach HTTP / app codes to `store.status(...)` while the request runs. */
@@ -35,6 +36,8 @@ export interface RemoteContext {
 }
 
 type DepsFn = (get: RemoteGet) => RemoteKey;
+
+export type RetryDelay = number | ((attempt: number, error: unknown) => number);
 
 export interface RemoteOptions<T> {
   /**
@@ -47,12 +50,7 @@ export interface RemoteOptions<T> {
    */
   deps: DepsFn;
   /**
-   * Alias of `deps` (same behavior). Prefer `deps`.
-   * @deprecated Use `deps`.
-   */
-  key?: DepsFn;
-  /**
-   * Loads data. Called on first watch and when `deps` changes — not on every
+   * Loads data. Called on first watch and when `deps` change / stale — not on every
    * store write. Read the store with `get` inside.
    */
   fetch: (get: RemoteGet, ctx: RemoteContext) => T | PromiseLike<T>;
@@ -62,31 +60,57 @@ export interface RemoteOptions<T> {
    * Omit to use `createStore(..., { gcTime })` or the 5-minute default.
    */
   gcTime?: number;
+  /**
+   * How long successful data stays fresh (ms). Fresh data skips remount/focus refetch.
+   * `0` (default) = always stale. `Infinity` = never auto-refetch while cached.
+   */
+  staleTime?: number;
+  /**
+   * Retry failed fetches. `false` / `0` = no retry. Number = max attempts after the first try.
+   * Default `2` (up to 3 total tries).
+   */
+  retry?: number | false;
+  /** Delay between retries. Number or `(attempt, error) => ms`. Default exponential backoff. */
+  retryDelay?: RetryDelay;
+  /** Refetch stale watched fields when the tab becomes visible. Default `true`. */
+  refetchOnFocus?: boolean;
+  /** Refetch stale watched fields when the browser comes online. Default `true`. */
+  refetchOnReconnect?: boolean;
+  /** Seed data before the first successful fetch (shown while pending). */
+  placeholderData?: T | (() => T);
 }
-
-/** Accept `deps` or legacy `key`. */
-export type RemoteOptionsInput<T> = Omit<RemoteOptions<T>, 'deps' | 'key'> &
-  (
-    | { deps: DepsFn; key?: DepsFn }
-    | { deps?: DepsFn; key: DepsFn }
-  );
 
 export interface RemoteDef<T> {
   readonly [REMOTE]: true;
   readonly deps: DepsFn;
   readonly fetch: RemoteOptions<T>['fetch'];
-  /** Explicit override; `undefined` means “use store / default”. */
   readonly gcTime?: number;
+  readonly staleTime?: number;
+  readonly retry: number;
+  readonly retryDelay: RetryDelay;
+  readonly refetchOnFocus: boolean;
+  readonly refetchOnReconnect: boolean;
+  readonly placeholderData?: T | (() => T);
 }
 
-export function remote<T>(options: RemoteOptionsInput<T>): RemoteDef<T> {
-  const deps = options.deps ?? options.key;
-  if (!deps) throw new Error('@surgijs/store: remote() needs deps (or key)');
+export function defaultRetryDelay(attempt: number): number {
+  return Math.min(1000 * 2 ** attempt, 30_000);
+}
+
+export function remote<T>(options: RemoteOptions<T>): RemoteDef<T> {
+  if (!options.deps) throw new Error('@surgijs/store: remote() needs deps');
+  const retry = options.retry === false ? 0 : (options.retry ?? 2);
   return {
     [REMOTE]: true,
-    deps,
+    deps: options.deps,
     fetch: options.fetch,
     gcTime: options.gcTime,
+    staleTime: options.staleTime,
+    retry,
+    retryDelay: options.retryDelay ?? defaultRetryDelay,
+    refetchOnFocus: options.refetchOnFocus ?? true,
+    refetchOnReconnect: options.refetchOnReconnect ?? true,
+    placeholderData: options.placeholderData,
   };
 }
 
@@ -179,51 +203,41 @@ export type RemoteData<D extends Record<string, unknown>, K extends RemoteKeys<D
  */
 export type RemotePhase = 'pending' | 'success' | 'empty' | 'err';
 
-/** @deprecated Use `RemotePhase`. */
-export type RemoteUiSt = RemotePhase;
-
 /** Where the current `data` came from. */
-export type RemoteSource = 'network' | 'cache' | undefined;
+export type RemoteSource = 'network' | 'cache' | 'optimistic' | undefined;
 
 /**
  * Snapshot of a remote field for UI status (spinners, errors, stale hints).
- * Built fresh on each `store.status(name)` / `store.meta(name)` call.
+ * Built fresh on each `store.status(name)` call.
  *
  * Empty success (`null` / `[]` / `''`) is **not** an error — use `isEmpty` / `status === 'empty'`.
  * HTTP 404 and `200 + { ok: false }` land in `isError` / `status === 'err'` with `httpStatus` / `code`.
  */
 export interface RemoteMeta<T> {
-  /** Last successful payload. `undefined` = never loaded; `null` / `[]` = empty success. */
+  /** Last successful / optimistic / placeholder payload. */
   data: T | undefined;
   error: unknown;
 
-  /**
-   * One place for UI: `'pending' | 'success' | 'empty' | 'err'`.
-   * Prefer `switch (st.status)` over juggling the booleans below.
-   */
+  /** One place for UI: `'pending' | 'success' | 'empty' | 'err'`. */
   status: RemotePhase;
   /** True while a request is in flight (including background refetch). */
   isFetching: boolean;
   /** First load: fetching and never settled successfully. */
   isPending: boolean;
-  /** Alias of `isPending`. */
-  isLoading: boolean;
   /** Last settle was success (including empty body). */
   isSuccess: boolean;
-  /** Last settle was error (404, network, or 200+error body). Previous `data` may remain. */
+  /** Last settle was error. Previous `data` may remain. */
   isError: boolean;
   /** Success with empty payload (`null`, `[]`, or `''`). */
   isEmpty: boolean;
-  /** At least one successful settle exists (`data` may be empty). */
-  hasData: boolean;
+  /** Fresh vs past `staleTime` (false while never loaded). */
+  isStale: boolean;
   /** At least one subscriber is keeping this field alive. */
   isActive: boolean;
 
   /** Last `deps(get)` identity. */
   deps: RemoteKey | undefined;
-  /** @deprecated Same as `deps`. */
-  key: RemoteKey | undefined;
-  /** `network` after a fetch, `cache` when reused without a new request. */
+  /** `network` | `cache` | `optimistic`. */
   source: RemoteSource;
 
   /** HTTP status of the last report / error (`200`, `404`, …). */
@@ -233,22 +247,20 @@ export interface RemoteMeta<T> {
 
   /** Epoch ms of last successful data write (`0` if never). */
   dataUpdatedAt: number;
-  /** Epoch ms of last error (`0` if none). */
-  errorUpdatedAt: number;
-  /** Epoch ms when the current (or last) fetch started (`0` if never). */
-  fetchStartedAt: number;
   /** `Date.now() - dataUpdatedAt`, or `null` if never successfully loaded. */
   age: number | null;
 
   /** GC TTL for this field (ms). */
   gcTime: number;
-  /** Active subscriber count for this remote. */
-  observers: number;
-
-  /** @deprecated Use `isFetching`. */
-  loading: boolean;
+  /** Freshness window (ms). */
+  staleTime: number;
 }
 
 export function isEmptyData(data: unknown): boolean {
   return data == null || data === '' || (Array.isArray(data) && data.length === 0);
+}
+
+export function resolvePlaceholder<T>(value: T | (() => T) | undefined): T | undefined {
+  if (value === undefined) return undefined;
+  return typeof value === 'function' ? (value as () => T)() : value;
 }

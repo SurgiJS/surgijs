@@ -27,6 +27,8 @@ describe('mutation', () => {
           const res = await fetch(String(deps), { signal });
           return fromResponse<{ id: string; name: string }[]>(res, { report });
         },
+        retry: false,
+        staleTime: Infinity,
       }),
     });
 
@@ -65,42 +67,44 @@ describe('mutation', () => {
     vi.unstubAllGlobals();
   });
 
-  it('surfaces 400 app errors on mutation status', async () => {
+  it('rolls back optimistic setData on error', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(JSON.stringify({ message: 'taken', code: 'EXISTS' }), { status: 400 })),
     );
 
-    const store = createStore({ n: 0 });
-    const createUser = mutation(async (_input: { name: string }, { signal, report }) => {
-      const res = await fetch('/api/users', { method: 'POST', signal });
-      return fromResponse(res, { report });
+    const store = createStore({
+      users: remote({
+        deps: () => '/api/users',
+        fetch: async () => [{ id: '1', name: 'Ada' }],
+        retry: false,
+        staleTime: Infinity,
+      }),
+    });
+    store.subscribe((s) => s.users, () => {});
+    await vi.waitFor(() => expect(store.get((s) => s.users)?.length).toBe(1));
+
+    type User = { id: string; name: string };
+    const createUser = mutation(async (input: { name: string }, { getData, setData, signal, report }) => {
+      const prev = getData('users') as User[] | undefined;
+      setData('users', [...(prev ?? []), { id: 'tmp', name: input.name }]);
+      try {
+        const res = await fetch('/api/users', { method: 'POST', signal });
+        return await fromResponse(res, { report });
+      } catch (e) {
+        setData('users', prev as User[] | undefined);
+        throw e;
+      }
     });
 
     await expect(createUser(store, { name: 'Ada' })).rejects.toMatchObject({ status: 400, code: 'EXISTS' });
+    expect(store.get((s) => s.users)).toEqual([{ id: '1', name: 'Ada' }]);
     expect(createUser.status(store)).toMatchObject({
       status: 'err',
       isError: true,
       httpStatus: 400,
       code: 'EXISTS',
     });
-    vi.unstubAllGlobals();
-  });
-
-  it('store.mutate one-off create', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response(JSON.stringify({ id: '2' }), { status: 200, headers: { 'content-type': 'application/json' } })),
-    );
-    const store = createStore({ lastId: '' });
-    const id = await store.mutate(async ({ set, signal, report }) => {
-      const res = await fetch('/api/users', { method: 'POST', signal });
-      const user = await fromResponse<{ id: string }>(res, { report });
-      set('lastId', user.id);
-      return user.id;
-    });
-    expect(id).toBe('2');
-    expect(store.get((s) => s.lastId)).toBe('2');
     vi.unstubAllGlobals();
   });
 });

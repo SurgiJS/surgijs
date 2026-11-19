@@ -44,6 +44,7 @@ describe('remote status: empty vs 404 vs app error', () => {
       list: remote({
         deps: () => '/empty',
         fetch: async (_get, { report }) => fromResponse(new Response('', { status: 200 }), { report }),
+        retry: false,
       }),
     });
     store.subscribe((s) => s.list, () => {});
@@ -54,7 +55,6 @@ describe('remote status: empty vs 404 vs app error', () => {
     expect(st.status).toBe('empty');
     expect(st.isError).toBe(false);
     expect(st.httpStatus).toBe(200);
-    expect(st.hasData).toBe(true);
   });
 
   it('marks 404 as error with httpStatus', async () => {
@@ -62,6 +62,7 @@ describe('remote status: empty vs 404 vs app error', () => {
       list: remote({
         deps: () => '/missing',
         fetch: async (_get, { report }) => fromResponse(jsonResponse({ message: 'nope' }, 404), { report }),
+        retry: false,
       }),
     });
     store.subscribe((s) => s.list, () => {});
@@ -82,6 +83,7 @@ describe('remote status: empty vs 404 vs app error', () => {
         deps: () => '/app-err',
         fetch: async (_get, { report }) =>
           fromResponse(jsonResponse({ ok: false, code: 'VALIDATION', message: 'bad' }), { report }),
+        retry: false,
       }),
     });
     store.subscribe((s) => s.list, () => {});

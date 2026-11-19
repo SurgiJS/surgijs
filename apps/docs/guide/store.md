@@ -1,6 +1,6 @@
 # @surgijs/store
 
-Framework-agnostic store (React, Angular, SurgiJS, or plain JS). One object, lazy remotes with **`deps`** (fetch only when deps change), rich **`status()`** for UI, GC with TTL (default 5 minutes). Not tied to the SurgiJS runtime.
+Framework-agnostic store (React, Angular, SurgiJS, or plain JS). One object, lazy remotes with **`deps`**, **`staleTime`**, retry, focus/reconnect refetch, **`status()`** for UI, GC with TTL. Not tied to the SurgiJS runtime.
 
 ```bash
 npm i @surgijs/store
@@ -19,6 +19,10 @@ const store = createStore({
   noise: 0,
   results: remote({
     deps: (get) => [get.windowLocation, get.windowQueryParams],
+    staleTime: 30_000, // fresh for 30s — skip remount/focus refetch
+    retry: 2,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
     fetch: async (get, { signal, report }) => {
       const path = get('windowLocation') as string;
       const q = new URLSearchParams(get('windowQueryParams') as Record<string, string>);
@@ -30,6 +34,7 @@ const store = createStore({
 
 store.set('noise', 1); // does not call fetch
 store.set('windowQueryParams', { q: 'ada' }); // does
+await store.prefetch('results'); // warm cache without a subscriber
 ```
 
 ## Status for UI
@@ -40,6 +45,7 @@ const st = store.status('results');
 st.status; // 'pending' | 'success' | 'empty' | 'err' — one place for UI
 st.isPending; // first load, no settle yet
 st.isFetching; // request in flight (incl. background refetch)
+st.isStale; // past staleTime (or never loaded)
 st.isSuccess; // last settle ok — including empty `null` / `[]`
 st.isEmpty; // success with empty payload (not a 404)
 st.isError; // 404, network, or 200 + `{ ok: false }` / `{ error }`
@@ -47,7 +53,8 @@ st.httpStatus; // 200 | 404 | …
 st.code; // app or HTTP code
 st.error; // RemoteError with `.status`, `.code`, `.body`
 st.age; // ms since last successful data
-st.source; // 'network' | 'cache'
+st.source; // 'network' | 'cache' | 'optimistic'
+st.staleTime;
 st.gcTime;
 st.deps;
 ```
@@ -98,37 +105,29 @@ const store = createStore({
   }),
 });
 
-const createUser = mutation(async (input: { name: string }, { signal, report, refetch }) => {
-  const res = await fetch('/api/users', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(input),
-    signal,
-  });
-  const user = await fromResponse<User>(res, { report });
-  await refetch('users'); // reload list after create
-  return user;
+const createUser = mutation(async (input: { name: string }, { getData, setData, signal, report, refetch }) => {
+  const prev = getData('users');
+  setData('users', [...(prev ?? []), { id: 'tmp', ...input }]); // optimistic
+  try {
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+      signal,
+    });
+    const user = await fromResponse<User>(res, { report });
+    await refetch('users');
+    return user;
+  } catch (e) {
+    setData('users', prev); // rollback
+    throw e;
+  }
 });
 
-// submit
 await createUser(store, { name: 'Ada' });
 
-// UI
 const st = createUser.status(store);
 // st.status → 'idle' | 'pending' | 'success' | 'err'
-// st.isPending | st.isError | st.isSuccess | st.httpStatus | st.code | st.data
-```
-
-One-off without a reusable mutation object:
-
-```ts
-await store.mutate(async ({ set, signal, report, refetch }) => {
-  const res = await fetch('/api/users', { method: 'POST', body: /* … */, signal });
-  const user = await fromResponse<User>(res, { report });
-  await refetch('users');
-  set('selectedId', user.id);
-  return user;
-});
 ```
 
 ## Pagination example
