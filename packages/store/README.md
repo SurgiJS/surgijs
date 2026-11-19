@@ -9,35 +9,38 @@ npm i @surgijs/store
 ## One object
 
 ```ts
-import { createStore, remote, action, derived } from '@surgijs/store';
+import { createStore, remote, fromResponse, action, derived } from '@surgijs/store';
 
 const store = createStore({
-  userId: 1,
   windowLocation: '/api/search',
   windowQueryParams: { q: '' } as Record<string, string>,
-  user: remote({
-    key: (get) => `/api/users/${get.userId}`,
-    fetch: (_get, { signal, key }) => fetch(String(key), { signal }).then((r) => r.json()),
-  }),
+  noise: 0,
   results: remote({
-    // When these store fields change, key changes → fetch runs again.
-    key: (get) => [get.windowLocation, get.windowQueryParams],
-    fetch: (get, { signal }) => {
+    // fetch runs only when these change — not when `noise` changes
+    deps: (get) => [get.windowLocation, get.windowQueryParams],
+    fetch: async (get, { signal, report }) => {
       const path = get('windowLocation') as string;
       const params = new URLSearchParams(get('windowQueryParams') as Record<string, string>);
-      return fetch(`${path}?${params}`, { signal }).then((r) => r.json());
+      const res = await fetch(`${path}?${params}`, { signal });
+      // empty 200 → null (isEmpty); 404 → error; 200+{ok:false} → error with code
+      return fromResponse(res, { report });
     },
   }),
 });
 
-store.set('windowQueryParams', { q: 'ada' }); // refetches `results` while watched
+store.set('windowQueryParams', { q: 'ada' }); // refetches results
+store.set('noise', 1); // does not call results.fetch
+
+const st = store.status('results');
+// st.isPending | isFetching | isSuccess | isEmpty | isError
+// st.httpStatus | st.code | st.age | st.source | st.deps | st.gcTime
 ```
 
-- First `subscribe` / `useStore` read of a remote loads it.
-- `key` / `fetch` receive `get` — read the store as `get('field')`, `get(s => s.field)`, or `get.field`. Put changing inputs in `key` so updates refetch.
-- After the last unsubscribe, data stays for **`gcTime`** (default **5 minutes**), then unloads. Re-subscribe within the window reuses the cache (no refetch if `key` is unchanged).
-- `gcTime: 0` unloads immediately; `Infinity` keeps forever. Set per field or via `createStore(def, { gcTime })`.
-- `store.refetch('user')` forces a reload; `store.send('results', { method: 'POST', body })` posts then refetches.
+- **`deps`** decides when `fetch` runs. Unrelated writes do not call `fetch`.
+- **`fromResponse` + `report`**: empty 200 ≠ 404; supports error codes and `200` bodies with `{ ok: false }` / `{ error }`.
+- **`store.status(name)`** for UI spinners / empty / not-found / error codes.
+- **`gcTime`** (default 5 minutes) after last unsubscribe; `0` = immediate, `Infinity` = keep.
+- Pagination example: [docs guide](../../apps/docs/guide/store.md).
 
 ## Watch without extra repaints
 
@@ -106,6 +109,7 @@ Node microbenchmarks vs popular stores (`pnpm bench:store`), 50k iterations, 50 
 | Deep-equal rewrite (skip notify) | ~1.8× zustand ref-eq; skips notify when structure matches |
 | Action + derived | ~1.8× nanostores |
 | Noise update (unrelated field) | beats zustand / redux / jotai / valtio (key-indexed subs) |
+| Remote deps (fetch only on deps change) | see `pnpm bench:store` |
 
 Raw numbers are written to `packages/store/bench/results.json`.
 
@@ -114,10 +118,11 @@ Raw numbers are written to `packages/store/bench/results.json`.
 | API | Role |
 | --- | --- |
 | `createStore(def, { gcTime? })` | one state object; `remote()` fields are lazy |
-| `remote({ key, fetch, gcTime? })` | lazy field; TTL after last unsubscribe (default 5m) |
+| `remote({ deps, fetch, gcTime? })` | lazy field; `fetch` only when `deps` changes |
+| `fromResponse` / `RemoteError` | empty 200 vs 404 vs 200+error body |
 | `store.get` / `set` | read / write sync fields |
 | `store.subscribe(select, fn)` | watch a slice; deep-equal by default |
-| `store.meta` / `refetch` / `send` | remote status, reload, POST+refetch |
+| `store.status` / `refetch` / `send` | UI status, reload, POST+refetch |
 | `action` / `store.write` | jotai-style writers |
 | `derived` | cached selector |
 | `useStore` / `StoreProvider` | React snapshot or selector |

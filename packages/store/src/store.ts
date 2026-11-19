@@ -1,8 +1,10 @@
 import type { Get, SetStore } from './action';
 import { deepEqual } from './equal';
+import { isRemoteError } from './http';
 import {
   DEFAULT_GC_TIME,
   createRemoteGet,
+  isEmptyData,
   isRemote,
   type RemoteData,
   type RemoteDef,
@@ -35,13 +37,23 @@ type RemoteEntry = {
   def: RemoteDef<unknown>;
   data: unknown;
   error: unknown;
-  loading: boolean;
+  fetching: boolean;
+  /** Last settle outcome; success allows empty `null` / `[]`. */
+  lastStatus: 'success' | 'error' | undefined;
   key: RemoteKey | undefined;
+  /** Sync fields last read by `deps` — skip deps check when an unrelated key is set. */
+  depKeys: Set<string> | null;
   refs: number;
   seq: number;
   ctrl: AbortController | null;
   /** Pending GC timer after the last subscriber leaves. */
   gc: ReturnType<typeof setTimeout> | null;
+  dataUpdatedAt: number;
+  errorUpdatedAt: number;
+  fetchStartedAt: number;
+  source: 'network' | 'cache' | undefined;
+  httpStatus: number | undefined;
+  code: string | number | undefined;
 };
 
 type Sub<D extends Record<string, unknown>> = {
@@ -70,7 +82,13 @@ export interface Store<D extends Record<string, unknown>> {
    */
   subscribe<T>(selector: Selector<D, T>, listener: Listener<T>, options?: SubscribeOptions<T>): () => void;
 
-  /** Status of a remote field. Reading this inside `subscribe` keeps the field loaded. */
+  /**
+   * UI status for a remote field (fetching, error, age, deps, TTL, …).
+   * Reading this inside `subscribe` keeps the field loaded.
+   */
+  status<K extends RemoteKeys<D>>(key: K): RemoteMeta<RemoteData<D, K>>;
+
+  /** Alias of `status`. */
   meta<K extends RemoteKeys<D>>(key: K): RemoteMeta<RemoteData<D, K>>;
 
   /** Force a remote field to reload (no-op when nothing watches it). */
@@ -119,12 +137,20 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         def: { ...value, gcTime: value.gcTime ?? defaultGc },
         data: undefined,
         error: undefined,
-        loading: false,
+        fetching: false,
+        lastStatus: undefined,
         key: undefined,
+        depKeys: null,
         refs: 0,
         seq: 0,
         ctrl: null,
         gc: null,
+        dataUpdatedAt: 0,
+        errorUpdatedAt: 0,
+        fetchStartedAt: 0,
+        source: undefined,
+        httpStatus: undefined,
+        code: undefined,
       });
     } else {
       sync[key] = value;
@@ -273,40 +299,119 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     entry.seq++;
     entry.data = undefined;
     entry.error = undefined;
-    entry.loading = false;
+    entry.fetching = false;
+    entry.lastStatus = undefined;
     entry.key = undefined;
+    entry.depKeys = null;
+    entry.dataUpdatedAt = 0;
+    entry.errorUpdatedAt = 0;
+    entry.fetchStartedAt = 0;
+    entry.source = undefined;
+    entry.httpStatus = undefined;
+    entry.code = undefined;
     bump();
     notifyKey(name);
   };
 
+  const readDeps = (entry: RemoteEntry): RemoteKey => {
+    const tracked = new Set<string>();
+    const get = createRemoteGet(syncState(), tracked);
+    const value = entry.def.deps(get);
+    entry.depKeys = tracked;
+    return value;
+  };
+
+  const applyErrorMeta = (entry: RemoteEntry, err: unknown): void => {
+    if (isRemoteError(err)) {
+      if (err.status !== undefined) entry.httpStatus = err.status;
+      if (err.code !== undefined) entry.code = err.code;
+    }
+  };
+
+  const snapshotStatus = <T>(entry: RemoteEntry): RemoteMeta<T> => {
+    const isFetching = entry.fetching;
+    const isSuccess = entry.lastStatus === 'success';
+    const isError = entry.lastStatus === 'error';
+    const hasData = entry.dataUpdatedAt > 0;
+    const isPending = isFetching && entry.lastStatus === undefined;
+    const status = isPending ? 'pending' : isError ? 'error' : isSuccess ? 'success' : 'idle';
+    const gcTime = entry.def.gcTime ?? DEFAULT_GC_TIME;
+    const dataUpdatedAt = entry.dataUpdatedAt;
+    return {
+      data: entry.data as T | undefined,
+      error: entry.error,
+      status,
+      isFetching,
+      isPending,
+      isLoading: isPending,
+      isSuccess,
+      isError,
+      isEmpty: isSuccess && isEmptyData(entry.data),
+      hasData,
+      isActive: entry.refs > 0,
+      deps: entry.key,
+      key: entry.key,
+      source: entry.source,
+      httpStatus: entry.httpStatus,
+      code: entry.code,
+      dataUpdatedAt,
+      errorUpdatedAt: entry.errorUpdatedAt,
+      fetchStartedAt: entry.fetchStartedAt,
+      age: dataUpdatedAt ? Date.now() - dataUpdatedAt : null,
+      gcTime,
+      observers: entry.refs,
+      loading: isFetching,
+    };
+  };
+
   const load = (name: string, entry: RemoteEntry, force: boolean): Promise<unknown> => {
-    const get = createRemoteGet(syncState());
-    const nextKey = entry.def.key(get);
+    // Only re-fetch when deps change (or forced) — unrelated store writes skip fetch.
+    const nextDeps = readDeps(entry);
     if (
       !force &&
-      deepEqual(entry.key, nextKey) &&
-      (entry.loading || entry.data !== undefined || entry.error !== undefined)
+      deepEqual(entry.key, nextDeps) &&
+      (entry.fetching || entry.lastStatus !== undefined)
     ) {
+      if (!entry.fetching && entry.lastStatus === 'success') entry.source = entry.source ?? 'cache';
       return Promise.resolve(entry.data);
     }
 
     entry.ctrl?.abort();
     const ctrl = new AbortController();
     entry.ctrl = ctrl;
-    entry.key = nextKey;
-    entry.loading = true;
-    entry.error = undefined;
+    entry.key = nextDeps;
+    entry.fetching = true;
+    entry.fetchStartedAt = Date.now();
     const seq = ++entry.seq;
     bump();
     notifyKey(name);
 
+    const get = createRemoteGet(syncState());
+    const report = (info: { status?: number; code?: string | number }) => {
+      if (seq !== entry.seq) return;
+      if (info.status !== undefined) entry.httpStatus = info.status;
+      if (info.code !== undefined) entry.code = info.code;
+      bump();
+      notifyKey(name);
+    };
+
     let result: unknown;
     try {
-      result = entry.def.fetch(get, { signal: ctrl.signal, key: nextKey, get });
+      result = entry.def.fetch(get, {
+        signal: ctrl.signal,
+        deps: nextDeps,
+        key: nextDeps,
+        get,
+        report,
+      });
     } catch (err) {
       if (seq !== entry.seq) return Promise.resolve(entry.data);
-      entry.loading = false;
+      entry.fetching = false;
       entry.error = err;
+      entry.lastStatus = 'error';
+      entry.errorUpdatedAt = Date.now();
+      entry.source = 'network';
+      applyErrorMeta(entry, err);
       bump();
       notifyKey(name);
       return Promise.reject(err);
@@ -315,9 +420,14 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     return Promise.resolve(result).then(
       (data) => {
         if (seq !== entry.seq) return entry.data;
-        entry.loading = false;
+        entry.fetching = false;
         entry.error = undefined;
-        if (!deepEqual(entry.data, data)) entry.data = data;
+        entry.lastStatus = 'success';
+        // Allow null / [] as real empty success (do not treat as “no data”).
+        entry.data = data;
+        entry.dataUpdatedAt = Date.now();
+        entry.source = 'network';
+        if (entry.httpStatus === undefined) entry.httpStatus = 200;
         bump();
         notifyKey(name);
         return entry.data;
@@ -326,8 +436,12 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         if (seq !== entry.seq || (err && typeof err === 'object' && (err as { name?: string }).name === 'AbortError')) {
           return entry.data;
         }
-        entry.loading = false;
+        entry.fetching = false;
         entry.error = err;
+        entry.lastStatus = 'error';
+        entry.errorUpdatedAt = Date.now();
+        entry.source = 'network';
+        applyErrorMeta(entry, err);
         bump();
         notifyKey(name);
         throw err;
@@ -343,7 +457,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       entry.gc = null;
     }
     entry.refs++;
-    if (entry.refs === 1) void load(name, entry, false);
+    if (entry.refs === 1) void load(name, entry, false).catch(() => {});
   };
 
   const release = (name: string): void => {
@@ -353,11 +467,11 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     if (entry.refs !== 0) return;
 
     // Nobody watching: drop in-flight work, keep completed cache for gcTime.
-    if (entry.loading) {
+    if (entry.fetching) {
       entry.ctrl?.abort();
       entry.ctrl = null;
       entry.seq++;
-      entry.loading = false;
+      entry.fetching = false;
       bump();
       notifyKey(name);
     }
@@ -406,27 +520,38 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     return true;
   };
 
+  const maybeReloadRemotes = (changedKey: string | Set<string>): void => {
+    if (!remotes.size) return;
+    for (const [name, entry] of remotes) {
+      if (entry.refs <= 0) continue;
+      if (entry.depKeys) {
+        if (typeof changedKey === 'string') {
+          if (!entry.depKeys.has(changedKey)) continue;
+        } else {
+          let hit = false;
+          for (const k of changedKey) {
+            if (entry.depKeys.has(k)) {
+              hit = true;
+              break;
+            }
+          }
+          if (!hit) continue;
+        }
+      }
+      const nextDeps = readDeps(entry);
+      if (!deepEqual(entry.key, nextDeps)) void load(name, entry, true).catch(() => {});
+    }
+  };
+
   const afterSyncWrite = (key: string): void => {
     bump();
-    if (remotes.size) {
-      for (const [name, entry] of remotes) {
-        if (entry.refs <= 0) continue;
-        const nextKey = entry.def.key(createRemoteGet(syncState()));
-        if (!deepEqual(entry.key, nextKey)) void load(name, entry, true);
-      }
-    }
+    maybeReloadRemotes(key);
     notifyKey(key);
   };
 
   const afterSyncWriteMany = (changed: Set<string>): void => {
     bump();
-    if (remotes.size) {
-      for (const [name, entry] of remotes) {
-        if (entry.refs <= 0) continue;
-        const nextKey = entry.def.key(createRemoteGet(syncState()));
-        if (!deepEqual(entry.key, nextKey)) void load(name, entry, true);
-      }
-    }
+    maybeReloadRemotes(changed);
     notifyKeys(changed);
   };
 
@@ -471,17 +596,16 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       };
     },
 
-    meta(key) {
+    status(key) {
       const name = key as string;
       tracking?.add(name);
       const entry = remotes.get(name);
       if (!entry) throw new Error(`@surgijs/store: "${String(key)}" is not remote`);
-      return {
-        data: entry.data,
-        loading: entry.loading,
-        error: entry.error,
-        key: entry.key,
-      } as RemoteMeta<RemoteData<D, typeof key>>;
+      return snapshotStatus<RemoteData<D, typeof key>>(entry);
+    },
+
+    meta(key) {
+      return store.status(key);
     },
 
     refetch(key) {
@@ -496,7 +620,9 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       if (!entry) throw new Error(`@surgijs/store: "${String(key)}" is not remote`);
       const { url, refetch: shouldRefetch = true, ...request } = init;
       const target = url ?? (typeof entry.key === 'string' ? entry.key : undefined);
-      if (target == null) throw new Error(`@surgijs/store: send("${String(key)}") needs a string key or url`);
+      if (target == null) {
+        throw new Error(`@surgijs/store: send("${String(key)}") needs a string deps value or url`);
+      }
       const response = await fetch(target, request);
       if (!response.ok) throw new Error(`@surgijs/store: send("${String(key)}") failed: ${response.status}`);
       if (shouldRefetch && entry.refs > 0) await load(key as string, entry, true);

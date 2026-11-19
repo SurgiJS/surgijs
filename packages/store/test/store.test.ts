@@ -85,10 +85,10 @@ describe('remote', () => {
     const store = createStore({
       q: 'a',
       users: remote({
-        key: (s) => `/users?q=${s.q}`,
-        fetch: async (get, { key }) => {
+        deps: (s) => `/users?q=${s.q}`,
+        fetch: async (get, { deps }) => {
           loads++;
-          return { key, q: get('q'), list: [1] };
+          return { key: deps, q: get('q'), list: [1] };
         },
         gcTime: 60_000,
       }),
@@ -115,44 +115,47 @@ describe('remote', () => {
     expect(loads).toBe(2);
 
     stop();
-    // Still cached during gcTime
     expect(store.get((s) => s.users)).toEqual({ key: '/users?q=b', q: 'b', list: [1] });
 
     const stop2 = store.subscribe((s) => s.users, () => {});
     await Promise.resolve();
-    expect(loads).toBe(2); // reused cache, same key
+    expect(loads).toBe(2);
     stop2();
 
     await vi.advanceTimersByTimeAsync(60_000);
     expect(store.get((s) => s.users)).toBeUndefined();
-    expect(store.meta('users')).toMatchObject({ data: undefined, loading: false, key: undefined });
+    expect(store.status('users')).toMatchObject({
+      data: undefined,
+      isFetching: false,
+      deps: undefined,
+      hasData: false,
+    });
     vi.useRealTimers();
   });
 
   it('unloads immediately when gcTime is 0', async () => {
     let loads = 0;
-    const store = createStore(
-      {
-        users: remote({
-          key: () => '/users',
-          fetch: async () => ++loads,
-          gcTime: 0,
-        }),
-      },
-    );
+    const store = createStore({
+      users: remote({
+        deps: () => '/users',
+        fetch: async () => ++loads,
+        gcTime: 0,
+      }),
+    });
     const stop = store.subscribe((s) => s.users, () => {});
     await vi.waitFor(() => expect(store.get((s) => s.users)).toBe(1));
     stop();
     expect(store.get((s) => s.users)).toBeUndefined();
   });
 
-  it('refetches when store fields read by key/get change', async () => {
+  it('calls fetch only when deps change, not on unrelated writes', async () => {
     let loads = 0;
     const store = createStore({
       windowLocation: '/api/search',
       windowQueryParams: { q: 'a' } as Record<string, string>,
+      noise: 0,
       results: remote({
-        key: (get) => [get('windowLocation'), get('windowQueryParams')],
+        deps: (get) => [get.windowLocation, get.windowQueryParams],
         fetch: async (get, { signal }) => {
           loads++;
           const path = get('windowLocation') as string;
@@ -166,6 +169,11 @@ describe('remote', () => {
     store.subscribe((s) => s.results, () => {});
     await vi.waitFor(() => expect(store.get((s) => s.results)).toEqual({ url: '/api/search?q=a', n: 1 }));
 
+    store.set('noise', 1);
+    store.set('noise', 2);
+    await Promise.resolve();
+    expect(loads).toBe(1);
+
     store.set('windowQueryParams', { q: 'b' });
     await vi.waitFor(() => expect(store.get((s) => s.results)).toEqual({ url: '/api/search?q=b', n: 2 }));
 
@@ -174,11 +182,23 @@ describe('remote', () => {
     expect(loads).toBe(3);
   });
 
-  it('refetches manually while watched', async () => {
+  it('accepts legacy key as alias for deps', async () => {
     let loads = 0;
     const store = createStore({
       users: remote({
         key: () => '/users',
+        fetch: async () => ++loads,
+      }),
+    });
+    store.subscribe((s) => s.users, () => {});
+    await vi.waitFor(() => expect(store.get((s) => s.users)).toBe(1));
+  });
+
+  it('refetches manually while watched', async () => {
+    let loads = 0;
+    const store = createStore({
+      users: remote({
+        deps: () => '/users',
         fetch: async () => ++loads,
       }),
     });
@@ -200,9 +220,9 @@ describe('remote', () => {
 
     const store = createStore({
       users: remote({
-        key: () => '/api/users',
-        fetch: async (_get, { signal, key }) => {
-          const res = await fetch(String(key), { signal });
+        deps: () => '/api/users',
+        fetch: async (_get, { signal, deps }) => {
+          const res = await fetch(String(deps), { signal });
           return res.json();
         },
       }),

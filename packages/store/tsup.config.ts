@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     react: 'src/react.ts',
   },
+  // http helpers ship in the main entry
   format: ['esm'],
   target: 'es2022',
   platform: 'neutral',

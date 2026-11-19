@@ -9,7 +9,7 @@ import { atom, createStore as createJotaiStore } from 'jotai/vanilla';
 import { atom as nanotom, computed as nanoComputed } from 'nanostores';
 import { proxy, subscribe as valtioSubscribe, snapshot } from 'valtio/vanilla';
 import { createStore as createZustandStore } from 'zustand/vanilla';
-import { action, createStore, derived } from '../dist/index.js';
+import { action, createStore, derived, remote } from '../dist/index.js';
 
 const ITER = 50_000;
 const SUBS = 50;
@@ -289,11 +289,77 @@ function suiteNoiseIsolation() {
   ];
 }
 
+/**
+ * Remote watched; write an unrelated field — fetch must not run.
+ * Also compare a deps change that does trigger fetch.
+ */
+function suiteRemoteDeps() {
+  return [
+    bench('surgijs/store noise (no fetch)', () => {
+      let fetches = 0;
+      const store = createStore({
+        q: 'a',
+        noise: 0,
+        data: remote({
+          deps: (get) => get.q,
+          fetch: async () => {
+            fetches++;
+            return fetches;
+          },
+        }),
+      });
+      store.subscribe((s) => s.data, () => {});
+      // warm first load
+      return () => {
+        store.set('noise', store.get((s) => s.noise) + 1);
+        if (fetches > 1) throw new Error('fetch ran on noise write');
+      };
+    }),
+    bench('surgijs/store deps change (fetch)', () => {
+      let fetches = 0;
+      const store = createStore({
+        q: 0,
+        data: remote({
+          deps: (get) => get.q,
+          fetch: async (get) => {
+            fetches++;
+            return get.q;
+          },
+        }),
+      });
+      store.subscribe((s) => s.data, () => {});
+      let n = 0;
+      return () => store.set('q', ++n);
+    }),
+    bench('zustand noise + selector', () => {
+      const store = createZustandStore(() => ({ q: 'a', noise: 0, data: 1 }));
+      store.subscribe((s) => s.data, () => {}, { equalityFn: Object.is });
+      let n = 0;
+      return () => store.setState({ noise: ++n });
+    }),
+    bench('redux noise', () => {
+      const reducer = (state = { q: 'a', noise: 0, data: 1 }, action) => {
+        if (action.type === 'noise') return { ...state, noise: action.n };
+        return state;
+      };
+      const store = createReduxStore(reducer);
+      let prev = store.getState().data;
+      store.subscribe(() => {
+        const next = store.getState().data;
+        if (!Object.is(prev, next)) prev = next;
+      });
+      let n = 0;
+      return () => store.dispatch({ type: 'noise', n: ++n });
+    }),
+  ];
+}
+
 const suites = [
   ['update watched field (' + SUBS + ' subs)', suiteUpdateWatched],
   ['deep-equal rewrite (skip notify)', suiteDeepEqualSkip],
   ['action + derived', suiteActionDerived],
   ['noise update (unrelated field)', suiteNoiseIsolation],
+  ['remote deps (fetch only when deps change)', suiteRemoteDeps],
 ];
 
 console.log(`@surgijs/store benches — ${ITER.toLocaleString()} iterations, ${SUBS} subscribers\n`);
