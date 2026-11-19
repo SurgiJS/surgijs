@@ -1,6 +1,6 @@
 # @surgijs/store
 
-Framework-agnostic store (React, Angular, SurgiJS, or plain JS). One object, lazy remotes, deep-equality watches. Not tied to the SurgiJS runtime.
+Framework-agnostic store (React, Angular, SurgiJS, or plain JS). One object, lazy remotes, deep-equality watches, GC with TTL after the last reader leaves (default 5 minutes). Not tied to the SurgiJS runtime.
 
 ```bash
 npm i @surgijs/store

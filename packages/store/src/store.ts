@@ -1,6 +1,7 @@
 import type { Get, SetStore } from './action';
 import { deepEqual } from './equal';
 import {
+  DEFAULT_GC_TIME,
   isRemote,
   type RemoteData,
   type RemoteDef,
@@ -38,6 +39,8 @@ type RemoteEntry = {
   refs: number;
   seq: number;
   ctrl: AbortController | null;
+  /** Pending GC timer after the last subscriber leaves. */
+  gc: ReturnType<typeof setTimeout> | null;
 };
 
 type Sub<D extends Record<string, unknown>> = {
@@ -59,9 +62,10 @@ export interface Store<D extends Record<string, unknown>> {
   set(partial: Partial<{ [K in SyncKeys<D>]: D[K] }>): void;
 
   /**
-   * Watch a selected slice. The first read of a `remote()` field loads it; the last
-   * unsubscribe unloads it. Listener runs only when the selected value fails `equals`
-   * (default: deep equality).
+   * Watch a selected slice. The first read of a `remote()` field loads it (or reuses
+   * cache within `gcTime`). After the last unsubscribe, data stays until `gcTime`
+   * (default 5 minutes) then unloads. Listener runs only when the selection fails
+   * `equals` (default: deep equality).
    */
   subscribe<T>(selector: Selector<D, T>, listener: Listener<T>, options?: SubscribeOptions<T>): () => void;
 
@@ -84,7 +88,16 @@ export interface Store<D extends Record<string, unknown>> {
   write<A extends unknown[]>(fn: (get: Get<D>, set: SetStore<D>, ...args: A) => void): (...args: A) => void;
 }
 
-export function createStore<D extends Record<string, unknown>>(def: D): Store<D> {
+export interface CreateStoreOptions {
+  /**
+   * Default `gcTime` for `remote()` fields that omit it.
+   * `0` unloads immediately; `Infinity` keeps forever. Default: 5 minutes.
+   */
+  gcTime?: number;
+}
+
+export function createStore<D extends Record<string, unknown>>(def: D, options?: CreateStoreOptions): Store<D> {
+  const defaultGc = options?.gcTime ?? DEFAULT_GC_TIME;
   const sync: Record<string, unknown> = Object.create(null);
   const remotes = new Map<string, RemoteEntry>();
   const subs = new Set<Sub<D>>();
@@ -102,7 +115,7 @@ export function createStore<D extends Record<string, unknown>>(def: D): Store<D>
     const value = def[key];
     if (isRemote(value)) {
       remotes.set(key, {
-        def: value,
+        def: { ...value, gcTime: value.gcTime ?? defaultGc },
         data: undefined,
         error: undefined,
         loading: false,
@@ -110,6 +123,7 @@ export function createStore<D extends Record<string, unknown>>(def: D): Store<D>
         refs: 0,
         seq: 0,
         ctrl: null,
+        gc: null,
       });
     } else {
       sync[key] = value;
@@ -248,11 +262,26 @@ export function createStore<D extends Record<string, unknown>>(def: D): Store<D>
     }
   };
 
+  const unload = (name: string, entry: RemoteEntry): void => {
+    if (entry.gc) {
+      clearTimeout(entry.gc);
+      entry.gc = null;
+    }
+    entry.ctrl?.abort();
+    entry.ctrl = null;
+    entry.seq++;
+    entry.data = undefined;
+    entry.error = undefined;
+    entry.loading = false;
+    entry.key = undefined;
+    bump();
+    notifyKey(name);
+  };
+
   const load = (name: string, entry: RemoteEntry, force: boolean): Promise<unknown> => {
     const nextKey = entry.def.key(syncState());
     if (
       !force &&
-      entry.refs > 0 &&
       deepEqual(entry.key, nextKey) &&
       (entry.loading || entry.data !== undefined || entry.error !== undefined)
     ) {
@@ -307,6 +336,10 @@ export function createStore<D extends Record<string, unknown>>(def: D): Store<D>
   const retain = (name: string): void => {
     const entry = remotes.get(name);
     if (!entry) return;
+    if (entry.gc) {
+      clearTimeout(entry.gc);
+      entry.gc = null;
+    }
     entry.refs++;
     if (entry.refs === 1) void load(name, entry, false);
   };
@@ -315,17 +348,30 @@ export function createStore<D extends Record<string, unknown>>(def: D): Store<D>
     const entry = remotes.get(name);
     if (!entry || entry.refs <= 0) return;
     entry.refs--;
-    if (entry.refs === 0) {
+    if (entry.refs !== 0) return;
+
+    // Nobody watching: drop in-flight work, keep completed cache for gcTime.
+    if (entry.loading) {
       entry.ctrl?.abort();
       entry.ctrl = null;
       entry.seq++;
-      entry.data = undefined;
-      entry.error = undefined;
       entry.loading = false;
-      entry.key = undefined;
       bump();
       notifyKey(name);
     }
+
+    const ttl = entry.def.gcTime ?? DEFAULT_GC_TIME;
+    if (ttl === 0) {
+      unload(name, entry);
+      return;
+    }
+    if (!Number.isFinite(ttl)) return;
+
+    if (entry.gc) clearTimeout(entry.gc);
+    entry.gc = setTimeout(() => {
+      entry.gc = null;
+      if (entry.refs === 0) unload(name, entry);
+    }, ttl);
   };
 
   const trackSelect = <T>(selector: Selector<D, T>): { value: T; keys: Set<string> } => {

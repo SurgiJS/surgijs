@@ -79,7 +79,8 @@ describe('action / write / derived', () => {
 });
 
 describe('remote', () => {
-  it('loads on first subscribe and unloads when unused', async () => {
+  it('loads on first subscribe, keeps cache for gcTime, then unloads', async () => {
+    vi.useFakeTimers();
     let loads = 0;
     const store = createStore({
       q: 'a',
@@ -89,6 +90,7 @@ describe('remote', () => {
           loads++;
           return { key, list: [1] };
         },
+        gcTime: 60_000,
       }),
     });
 
@@ -109,8 +111,35 @@ describe('remote', () => {
     expect(loads).toBe(2);
 
     stop();
+    // Still cached during gcTime
+    expect(store.get((s) => s.users)).toEqual({ key: '/users?q=b', list: [1] });
+
+    const stop2 = store.subscribe((s) => s.users, () => {});
+    await Promise.resolve();
+    expect(loads).toBe(2); // reused cache, same key
+    stop2();
+
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(store.get((s) => s.users)).toBeUndefined();
     expect(store.meta('users')).toMatchObject({ data: undefined, loading: false, key: undefined });
+    vi.useRealTimers();
+  });
+
+  it('unloads immediately when gcTime is 0', async () => {
+    let loads = 0;
+    const store = createStore(
+      {
+        users: remote({
+          key: () => '/users',
+          fetch: async () => ++loads,
+          gcTime: 0,
+        }),
+      },
+    );
+    const stop = store.subscribe((s) => s.users, () => {});
+    await vi.waitFor(() => expect(store.get((s) => s.users)).toBe(1));
+    stop();
+    expect(store.get((s) => s.users)).toBeUndefined();
   });
 
   it('refetches manually while watched', async () => {

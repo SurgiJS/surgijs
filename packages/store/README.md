@@ -1,6 +1,6 @@
 # @surgijs/store
 
-Framework-agnostic store: **one object**, lazy remote fields, jotai-style writers, deep-equality subscriptions, unload when nothing watches. Use it from React, Angular, SurgiJS, or plain JS.
+Framework-agnostic store: **one object**, lazy remote fields, jotai-style writers, deep-equality subscriptions, GC with TTL when nothing watches. Use it from React, Angular, SurgiJS, or plain JS.
 
 ```bash
 npm i @surgijs/store
@@ -26,9 +26,18 @@ const store = createStore({
 ```
 
 - First `subscribe` / `useStore` read of `user` loads it.
-- Last unsubscribe unloads it (memory back).
+- After the last unsubscribe, data stays for **`gcTime`** (default **5 minutes**), then unloads. Re-subscribe within the window reuses the cache (no refetch if `key` is unchanged).
+- `gcTime: 0` unloads immediately; `Infinity` keeps forever. Set per field or via `createStore(def, { gcTime })`.
 - Changing `userId` or `q` refetches while watched.
 - `store.refetch('user')` forces a reload; `store.send('users', { method: 'POST', body })` posts then refetches.
+
+```ts
+remote({
+  key: (s) => `/api/users/${s.userId}`,
+  fetch: (url, { signal }) => fetch(String(url), { signal }).then((r) => r.json()),
+  gcTime: 5 * 60 * 1000, // optional; default 5 minutes
+});
+```
 
 ## Watch without extra repaints
 
@@ -104,7 +113,8 @@ Raw numbers are written to `packages/store/bench/results.json`.
 
 | API | Role |
 | --- | --- |
-| `createStore(def)` | one state object; `remote()` fields are lazy |
+| `createStore(def, { gcTime? })` | one state object; `remote()` fields are lazy |
+| `remote({ key, fetch, gcTime? })` | lazy field; TTL after last unsubscribe (default 5m) |
 | `store.get` / `set` | read / write sync fields |
 | `store.subscribe(select, fn)` | watch a slice; deep-equal by default |
 | `store.meta` / `refetch` / `send` | remote status, reload, POST+refetch |
