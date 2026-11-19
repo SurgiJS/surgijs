@@ -37,6 +37,9 @@ const st = store.status('results');
 // st.isStale | isFetching | httpStatus | code | age | source
 ```
 
+**Remotes are top-level only.** No `remote()` inside nested objects and no `status('a.b.c')`.
+For catalogs / details use sync route fields + flat remotes (`catalogProducts`, `productDetail`) linked by `deps` — see [guide: Complex stores](../../apps/docs/guide/store.md#complex-stores-important).
+
 ## Mutations + optimistic
 
 ```ts

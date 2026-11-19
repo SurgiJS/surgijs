@@ -37,6 +37,77 @@ store.set('windowQueryParams', { q: 'ada' }); // does
 await store.prefetch('results'); // warm cache without a subscriber
 ```
 
+## Complex stores (important)
+
+**`remote()` is top-level only.** Nested remotes and dotted status paths are **not** supported:
+
+```ts
+// ❌ does not work — remote buried in a nested object is treated as sync data
+createStore({
+  products: {
+    apple: {
+      macbooks: remote({ deps: () => '/…', fetch: … }),
+    },
+  },
+});
+
+// ❌ throws: "products.apple.macbooks" is not remote
+store.status('products.apple.macbooks');
+```
+
+Shape complex apps as **nested sync UI state** + **flat named remotes** wired through `deps`:
+
+```ts
+const store = createStore({
+  // UI / route — nesting is fine
+  route: { catalog: 'apple', product: 'macbooks' } as {
+    catalog: string;
+    product: string;
+  },
+  filters: { q: '', page: 1 },
+  selectedId: null as string | null,
+
+  // server — one top-level remote per query
+  catalogProducts: remote({
+    deps: (get) => {
+      const r = get('route') as { catalog: string; product: string };
+      const f = get('filters') as { q: string; page: number };
+      return ['/api/catalog', r.catalog, r.product, f.q, f.page];
+    },
+    fetch: async (_get, { signal, report, deps }) => {
+      const [, catalog, product, q, page] = deps as [string, string, string, string, number];
+      const res = await fetch(`/api/${catalog}/${product}?q=${q}&page=${page}`, { signal });
+      return fromResponse(res, { report });
+    },
+  }),
+
+  productDetail: remote({
+    deps: (get) => get.selectedId,
+    fetch: async (_get, { signal, report, deps }) => {
+      if (deps == null) return null;
+      const res = await fetch(`/api/products/${deps}`, { signal });
+      return fromResponse(res, { report });
+    },
+  }),
+});
+
+store.set('route', { catalog: 'apple', product: 'macbooks' }); // refetch list
+store.set('selectedId', 'mbp-14'); // refetch detail
+store.status('catalogProducts'); // ✅ top-level name only
+store.status('productDetail');
+```
+
+| In your head | In the store |
+| --- | --- |
+| `products.apple.macbooks` | `catalogProducts` + `route` |
+| `user.profile` | `userProfile` |
+| `cart.items` (server) | `cartItems` remote |
+| `cart.items` (local only) | sync nested `cart` |
+
+- **One store** — shared UI + related screens (same `deps` graph).
+- **Several stores** — unrelated features (`authStore` / `shopStore`), each with its own provider or `useStore(shopStore)`.
+- `status('…')` / `refetch` / `prefetch` / `setData` always take the **top-level remote key**, same as the field you read in `useStore`.
+
 ## Status for UI
 
 ```ts
