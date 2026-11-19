@@ -150,6 +150,8 @@ export function mutation<Input, Result>(
     const seq = ++e.seq;
     e.phase = 'pending';
     e.error = undefined;
+    e.httpStatus = undefined;
+    e.code = undefined;
     e.submittedAt = Date.now();
     notify(e);
 

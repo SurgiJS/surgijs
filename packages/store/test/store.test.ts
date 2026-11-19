@@ -294,4 +294,88 @@ describe('remote', () => {
     await store.refetch('users');
     expect(store.get((s) => s.users)).toBe(2);
   });
+
+  it('re-tracks remotes when selector branch changes', async () => {
+    let aLoads = 0;
+    let bLoads = 0;
+    const store = createStore({
+      mode: 'a' as 'a' | 'b',
+      a: remote({
+        deps: () => 'a',
+        fetch: async () => ++aLoads,
+        retry: false,
+        staleTime: Infinity,
+      }),
+      b: remote({
+        deps: () => 'b',
+        fetch: async () => ++bLoads,
+        retry: false,
+        staleTime: Infinity,
+      }),
+    });
+    const seen: unknown[] = [];
+    store.subscribe(
+      (s) => (s.mode === 'a' ? s.a : s.b),
+      (v) => {
+        seen.push(v);
+      },
+    );
+    await vi.waitFor(() => expect(store.get((s) => s.a)).toBe(1));
+    expect(bLoads).toBe(0);
+    store.set('mode', 'b');
+    await vi.waitFor(() => expect(store.get((s) => s.b)).toBe(1));
+    expect(seen).toContain(1);
+  });
+
+  it('notifies nested writes queued during flush', () => {
+    const store = createStore({ a: 0, b: 0, c: 0 });
+    const order: string[] = [];
+    store.subscribe(
+      (s) => s.a,
+      () => {
+        order.push('a');
+        store.set('b', 1);
+      },
+    );
+    store.subscribe(
+      (s) => s.b,
+      () => {
+        order.push('b');
+        store.set('c', 1);
+      },
+    );
+    store.subscribe(
+      (s) => s.c,
+      () => {
+        order.push('c');
+      },
+    );
+    store.set('a', 1);
+    expect(order).toEqual(['a', 'b', 'c']);
+    expect(store.get()).toEqual({ a: 1, b: 1, c: 1 });
+  });
+
+  it('clears error code after a successful refetch', async () => {
+    let fail = true;
+    const store = createStore({
+      list: remote({
+        deps: () => '/x',
+        fetch: async (_get, { report }) => {
+          if (fail) {
+            report({ status: 404, code: 'MISSING' });
+            throw Object.assign(new Error('nope'), { status: 404, code: 'MISSING' });
+          }
+          report({ status: 200 });
+          return [1];
+        },
+        retry: false,
+      }),
+    });
+    store.subscribe((s) => s.list, () => {});
+    await vi.waitFor(() => expect(store.status('list').isError).toBe(true));
+    expect(store.status('list').code).toBe('MISSING');
+    fail = false;
+    await store.refetch('list');
+    expect(store.status('list')).toMatchObject({ status: 'success', code: undefined, httpStatus: 200 });
+  });
 });

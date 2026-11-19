@@ -252,8 +252,26 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     }
   };
 
-  const flushSub = (sub: Sub<D>, state: StoreState<D>): void => {
-    const value = sub.selector(state);
+  const setsEqual = (a: Set<string>, b: Set<string>): boolean => {
+    if (a.size !== b.size) return false;
+    for (const k of a) if (!b.has(k)) return false;
+    return true;
+  };
+
+  /** Re-track selector keys so dynamic remotes retain/load after branch changes. */
+  const flushSub = (sub: Sub<D>): void => {
+    const { value, keys } = trackSelect(sub.selector as Selector<D, unknown>);
+    if (!setsEqual(sub.keys, keys)) {
+      unindexSub(sub);
+      for (const name of sub.keys) {
+        if (remotes.has(name) && !keys.has(name)) release(name);
+      }
+      for (const name of keys) {
+        if (remotes.has(name) && !sub.keys.has(name)) retain(name);
+      }
+      sub.keys = keys;
+      indexSub(sub);
+    }
     if (sub.equals(sub.value, value)) return;
     const prev = sub.value;
     sub.value = value;
@@ -268,40 +286,46 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     } else pending.one = key;
   };
 
-  const notifyKey = (key: string): void => {
+  const takePending = (): Set<string> | null => {
+    if (pending.keys) {
+      const keys = pending.keys;
+      pending.keys = null;
+      pending.one = null;
+      return keys;
+    }
+    if (pending.one) {
+      const key = pending.one;
+      pending.one = null;
+      return new Set([key]);
+    }
+    return null;
+  };
+
+  /** Drain notify queue until nested writes stop enqueueing keys. */
+  const drainNotify = (initial: Set<string> | string): void => {
     if (notifying) {
-      queueKey(key);
+      if (typeof initial === 'string') queueKey(initial);
+      else for (const k of initial) queueKey(k);
       return;
     }
     notifying = true;
     try {
-      let one: string | null = key;
-      do {
-        const k = one;
-        one = null;
-        pending.one = null;
-        pending.keys = null;
-        const state = snapshot();
-        const set = byKey.get(k!);
-        if (set) for (const sub of set) flushSub(sub, state);
-        const queued = pending.keys as Set<string> | null;
-        const nextOne = pending.one as string | null;
+      let batch: Set<string> | null = typeof initial === 'string' ? new Set([initial]) : initial;
+      while (batch) {
         pending.keys = null;
         pending.one = null;
-        if (queued) {
-          const state2 = snapshot();
-          const seen = new Set<Sub<D>>();
-          for (const key2 of queued) {
-            const group = byKey.get(key2);
-            if (!group) continue;
-            for (const sub of group) {
-              if (seen.has(sub)) continue;
-              seen.add(sub);
-              flushSub(sub, state2);
-            }
+        const seen = new Set<Sub<D>>();
+        for (const key of batch) {
+          const set = byKey.get(key);
+          if (!set) continue;
+          for (const sub of set) {
+            if (seen.has(sub)) continue;
+            seen.add(sub);
+            flushSub(sub);
           }
-        } else if (nextOne) one = nextOne;
-      } while (one);
+        }
+        batch = takePending();
+      }
     } finally {
       notifying = false;
       pending.one = null;
@@ -309,40 +333,14 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     }
   };
 
+  const notifyKey = (key: string): void => drainNotify(key);
+
   const notifyKeys = (changed: Set<string>): void => {
     if (changed.size === 1) {
       notifyKey(changed.values().next().value!);
       return;
     }
-    if (notifying) {
-      if (!pending.keys) pending.keys = new Set(changed);
-      else for (const k of changed) pending.keys.add(k);
-      return;
-    }
-    notifying = true;
-    try {
-      let batch: Set<string> | null = changed;
-      do {
-        const keys = batch!;
-        batch = null;
-        pending.keys = null;
-        const state = snapshot();
-        const seen = new Set<Sub<D>>();
-        for (const key of keys) {
-          const set = byKey.get(key);
-          if (!set) continue;
-          for (const sub of set) {
-            if (seen.has(sub)) continue;
-            seen.add(sub);
-            flushSub(sub, state);
-          }
-        }
-        batch = pending.keys as Set<string> | null;
-      } while (batch);
-    } finally {
-      notifying = false;
-      pending.keys = null;
-    }
+    drainNotify(changed);
   };
 
   const scheduleGc = (name: string, entry: RemoteEntry): void => {
@@ -492,6 +490,8 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     entry.data = data;
     entry.dataUpdatedAt = Date.now();
     entry.source = 'network';
+    // Drop prior error codes; keep httpStatus if report() set it during fetch.
+    entry.code = undefined;
     if (entry.httpStatus === undefined) entry.httpStatus = 200;
     bump();
     notifyKey(name);
@@ -556,6 +556,8 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     entry.key = nextDeps;
     entry.fetching = true;
     entry.fetchStartedAt = Date.now();
+    entry.httpStatus = undefined;
+    entry.code = undefined;
     const seq = ++entry.seq;
     bump();
     notifyKey(name);

@@ -41,14 +41,18 @@ function useSelector<D extends Record<string, unknown>, T>(
   selectorRef.current = selector;
   const equalsRef = useRef(equals);
   equalsRef.current = equals;
-  const cache = useRef<{ ready: boolean; value: T }>({ ready: false, value: undefined as T });
+  const cache = useRef<{ ready: boolean; value: T; selector: Selector<D, T> | null }>({
+    ready: false,
+    value: undefined as T,
+    selector: null,
+  });
 
   const subscribe = useCallback(
     (onChange: () => void) =>
       store.subscribe(
         (s) => selectorRef.current(s),
         (value) => {
-          cache.current = { ready: true, value };
+          cache.current = { ready: true, value, selector: selectorRef.current };
           onChange();
         },
         { equals: (a, b) => equalsRef.current(a, b) },
@@ -57,10 +61,12 @@ function useSelector<D extends Record<string, unknown>, T>(
   );
 
   const getSnapshot = () => {
-    if (!cache.current.ready) {
-      cache.current = { ready: true, value: selectorRef.current(store.get() as StoreState<D>) };
-    }
-    return cache.current.value;
+    const sel = selectorRef.current;
+    // Recompute when the selector identity changes (closed-over inputs).
+    if (cache.current.ready && cache.current.selector === sel) return cache.current.value;
+    const next = sel(store.get() as StoreState<D>);
+    cache.current = { ready: true, value: next, selector: sel };
+    return next;
   };
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
@@ -77,20 +83,23 @@ function useSelector<D extends Record<string, unknown>, T>(
  */
 function useSnapshot<D extends Record<string, unknown>>(store: Store<D>): StoreState<D> {
   const access = useRef<string[][]>([]);
+  const pathsRef = useRef<string[][]>([]);
   const [, rerender] = useReducer((n: number) => n + 1, 0);
 
   access.current = [];
   const state = store.get();
   const snap = createSnapshot(state, access.current);
+  // Resubscribe only when accessed paths change — not on every parent re-render.
+  const pathKey = access.current.map((p) => p.join('\0')).join('\n');
 
   useLayoutEffect(() => {
-    const paths = access.current.slice();
+    pathsRef.current = access.current.slice();
     return store.subscribe(
-      (s) => paths.map((p) => getPath(s, p)),
+      (s) => pathsRef.current.map((p) => getPath(s, p)),
       () => rerender(),
       { equals: deepEqual },
     );
-  });
+  }, [store, pathKey]);
 
   return snap;
 }
