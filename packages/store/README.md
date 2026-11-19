@@ -13,31 +13,31 @@ import { createStore, remote, action, derived } from '@surgijs/store';
 
 const store = createStore({
   userId: 1,
-  q: '',
+  windowLocation: '/api/search',
+  windowQueryParams: { q: '' } as Record<string, string>,
   user: remote({
-    key: (s) => `/api/users/${s.userId}`,
-    fetch: (url, { signal }) => fetch(String(url), { signal }).then((r) => r.json()),
+    key: (get) => `/api/users/${get.userId}`,
+    fetch: (_get, { signal, key }) => fetch(String(key), { signal }).then((r) => r.json()),
   }),
-  users: remote({
-    key: (s) => `/api/users?q=${s.q}`,
-    fetch: (url, { signal }) => fetch(String(url), { signal }).then((r) => r.json()),
+  results: remote({
+    // When these store fields change, key changes → fetch runs again.
+    key: (get) => [get.windowLocation, get.windowQueryParams],
+    fetch: (get, { signal }) => {
+      const path = get('windowLocation') as string;
+      const params = new URLSearchParams(get('windowQueryParams') as Record<string, string>);
+      return fetch(`${path}?${params}`, { signal }).then((r) => r.json());
+    },
   }),
 });
+
+store.set('windowQueryParams', { q: 'ada' }); // refetches `results` while watched
 ```
 
-- First `subscribe` / `useStore` read of `user` loads it.
+- First `subscribe` / `useStore` read of a remote loads it.
+- `key` / `fetch` receive `get` — read the store as `get('field')`, `get(s => s.field)`, or `get.field`. Put changing inputs in `key` so updates refetch.
 - After the last unsubscribe, data stays for **`gcTime`** (default **5 minutes**), then unloads. Re-subscribe within the window reuses the cache (no refetch if `key` is unchanged).
 - `gcTime: 0` unloads immediately; `Infinity` keeps forever. Set per field or via `createStore(def, { gcTime })`.
-- Changing `userId` or `q` refetches while watched.
-- `store.refetch('user')` forces a reload; `store.send('users', { method: 'POST', body })` posts then refetches.
-
-```ts
-remote({
-  key: (s) => `/api/users/${s.userId}`,
-  fetch: (url, { signal }) => fetch(String(url), { signal }).then((r) => r.json()),
-  gcTime: 5 * 60 * 1000, // optional; default 5 minutes
-});
-```
+- `store.refetch('user')` forces a reload; `store.send('results', { method: 'POST', body })` posts then refetches.
 
 ## Watch without extra repaints
 

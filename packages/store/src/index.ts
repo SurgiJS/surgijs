@@ -3,11 +3,13 @@ export { action, type Action, type ActionFn, type Get, type SetStore } from './a
 export { derived, type Derived, type DerivedFn, type DerivedGet } from './derived';
 export {
   DEFAULT_GC_TIME,
+  createRemoteGet,
   remote,
   isRemote,
   type RemoteContext,
   type RemoteData,
   type RemoteDef,
+  type RemoteGet,
   type RemoteKey,
   type RemoteKeys,
   type RemoteMeta,

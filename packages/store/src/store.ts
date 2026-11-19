@@ -2,6 +2,7 @@ import type { Get, SetStore } from './action';
 import { deepEqual } from './equal';
 import {
   DEFAULT_GC_TIME,
+  createRemoteGet,
   isRemote,
   type RemoteData,
   type RemoteDef,
@@ -279,7 +280,8 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
   };
 
   const load = (name: string, entry: RemoteEntry, force: boolean): Promise<unknown> => {
-    const nextKey = entry.def.key(syncState());
+    const get = createRemoteGet(syncState());
+    const nextKey = entry.def.key(get);
     if (
       !force &&
       deepEqual(entry.key, nextKey) &&
@@ -300,7 +302,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
 
     let result: unknown;
     try {
-      result = entry.def.fetch(nextKey, { signal: ctrl.signal });
+      result = entry.def.fetch(get, { signal: ctrl.signal, key: nextKey, get });
     } catch (err) {
       if (seq !== entry.seq) return Promise.resolve(entry.data);
       entry.loading = false;
@@ -409,7 +411,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     if (remotes.size) {
       for (const [name, entry] of remotes) {
         if (entry.refs <= 0) continue;
-        const nextKey = entry.def.key(syncState());
+        const nextKey = entry.def.key(createRemoteGet(syncState()));
         if (!deepEqual(entry.key, nextKey)) void load(name, entry, true);
       }
     }
@@ -421,7 +423,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     if (remotes.size) {
       for (const [name, entry] of remotes) {
         if (entry.refs <= 0) continue;
-        const nextKey = entry.def.key(syncState());
+        const nextKey = entry.def.key(createRemoteGet(syncState()));
         if (!deepEqual(entry.key, nextKey)) void load(name, entry, true);
       }
     }

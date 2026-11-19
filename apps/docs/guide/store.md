@@ -11,14 +11,23 @@ import { createStore, remote, action } from '@surgijs/store';
 
 const store = createStore({
   userId: 1,
+  windowLocation: '/api/search',
+  windowQueryParams: { q: '' } as Record<string, string>,
   user: remote({
-    key: (s) => `/api/users/${s.userId}`,
-    fetch: (url, { signal }) => fetch(String(url), { signal }).then((r) => r.json()),
+    key: (get) => `/api/users/${get.userId}`,
+    fetch: (_get, { signal, key }) => fetch(String(key), { signal }).then((r) => r.json()),
+  }),
+  results: remote({
+    key: (get) => [get.windowLocation, get.windowQueryParams],
+    fetch: (get, { signal }) => {
+      const path = get('windowLocation') as string;
+      const q = new URLSearchParams(get('windowQueryParams') as Record<string, string>);
+      return fetch(`${path}?${q}`, { signal }).then((r) => r.json());
+    },
   }),
 });
 
-const bump = action((get, set, by: number) => set('userId', get('userId') + by));
-bump(store, 1);
+store.set('windowQueryParams', { q: 'ada' }); // refetches results
 ```
 
 ## React snapshot

@@ -86,9 +86,9 @@ describe('remote', () => {
       q: 'a',
       users: remote({
         key: (s) => `/users?q=${s.q}`,
-        fetch: async (key) => {
+        fetch: async (get, { key }) => {
           loads++;
-          return { key, list: [1] };
+          return { key, q: get('q'), list: [1] };
         },
         gcTime: 60_000,
       }),
@@ -102,17 +102,21 @@ describe('remote', () => {
         seen.push(v);
       },
     );
-    await vi.waitFor(() => expect(store.get((s) => s.users)).toEqual({ key: '/users?q=a', list: [1] }));
+    await vi.waitFor(() =>
+      expect(store.get((s) => s.users)).toEqual({ key: '/users?q=a', q: 'a', list: [1] }),
+    );
     expect(loads).toBe(1);
-    expect(seen.at(-1)).toEqual({ key: '/users?q=a', list: [1] });
+    expect(seen.at(-1)).toEqual({ key: '/users?q=a', q: 'a', list: [1] });
 
     store.set('q', 'b');
-    await vi.waitFor(() => expect(store.get((s) => s.users)).toEqual({ key: '/users?q=b', list: [1] }));
+    await vi.waitFor(() =>
+      expect(store.get((s) => s.users)).toEqual({ key: '/users?q=b', q: 'b', list: [1] }),
+    );
     expect(loads).toBe(2);
 
     stop();
     // Still cached during gcTime
-    expect(store.get((s) => s.users)).toEqual({ key: '/users?q=b', list: [1] });
+    expect(store.get((s) => s.users)).toEqual({ key: '/users?q=b', q: 'b', list: [1] });
 
     const stop2 = store.subscribe((s) => s.users, () => {});
     await Promise.resolve();
@@ -142,6 +146,34 @@ describe('remote', () => {
     expect(store.get((s) => s.users)).toBeUndefined();
   });
 
+  it('refetches when store fields read by key/get change', async () => {
+    let loads = 0;
+    const store = createStore({
+      windowLocation: '/api/search',
+      windowQueryParams: { q: 'a' } as Record<string, string>,
+      results: remote({
+        key: (get) => [get('windowLocation'), get('windowQueryParams')],
+        fetch: async (get, { signal }) => {
+          loads++;
+          const path = get('windowLocation') as string;
+          const params = new URLSearchParams(get('windowQueryParams') as Record<string, string>);
+          void signal;
+          return { url: `${path}?${params}`, n: loads };
+        },
+      }),
+    });
+
+    store.subscribe((s) => s.results, () => {});
+    await vi.waitFor(() => expect(store.get((s) => s.results)).toEqual({ url: '/api/search?q=a', n: 1 }));
+
+    store.set('windowQueryParams', { q: 'b' });
+    await vi.waitFor(() => expect(store.get((s) => s.results)).toEqual({ url: '/api/search?q=b', n: 2 }));
+
+    store.set('windowLocation', '/api/other');
+    await vi.waitFor(() => expect(store.get((s) => s.results)).toEqual({ url: '/api/other?q=b', n: 3 }));
+    expect(loads).toBe(3);
+  });
+
   it('refetches manually while watched', async () => {
     let loads = 0;
     const store = createStore({
@@ -169,8 +201,8 @@ describe('remote', () => {
     const store = createStore({
       users: remote({
         key: () => '/api/users',
-        fetch: async (url, { signal }) => {
-          const res = await fetch(String(url), { signal });
+        fetch: async (_get, { signal, key }) => {
+          const res = await fetch(String(key), { signal });
           return res.json();
         },
       }),
