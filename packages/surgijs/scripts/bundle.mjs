@@ -53,7 +53,7 @@ export async function bundle(contents) {
 
 /** Size budgets, min+gzip bytes. */
 export const CASES = [
-  { name: 'full runtime (export *)', entry: "export * from 'surgijs';", limit: 6037 },
+  { name: 'full runtime (export *)', entry: "export * from 'surgijs';", limit: 6071 },
   {
     name: 'useState only',
     entry: "import { useState } from 'surgijs'; const [n, setN] = useState(0); setN(1); console.log(n());",

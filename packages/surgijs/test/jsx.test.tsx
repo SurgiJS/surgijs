@@ -116,6 +116,17 @@ describe('templates', () => {
     expect(p.querySelector('i')!.title).toBe('b2');
   });
 
+  it('clears style keys that the next style object leaves out', () => {
+    const [s, setS] = useState<Record<string, string>>({ color: 'red', fontWeight: 'bold', '--gap': '2px' });
+    const host = mount(() => <div style={s()} />);
+    const div = host.firstChild as HTMLElement;
+    setS({ color: 'blue' });
+    flush();
+    expect(div.style.color).toBe('blue');
+    expect(div.style.fontWeight).toBe('');
+    expect(div.style.getPropertyValue('--gap')).toBe('');
+  });
+
   it('sets namespaced SVG attributes', () => {
     const [href, setHref] = useState('#a');
     const host = mount(() => (
