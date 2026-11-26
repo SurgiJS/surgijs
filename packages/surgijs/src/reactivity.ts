@@ -70,7 +70,10 @@ function link(s: Source, o: Observer): void {
   else if (list instanceof Array) {
     const i = list.push(o) - 1;
     if (o.h < i) o.h = i;
-  } else s.o = [list, o];
+  } else {
+    s.o = [list, o];
+    if (o.h < 1) o.h = 1;
+  }
 }
 
 /** Removes `o` by swapping the last observer into its slot; the hint makes the lookup O(1). */
