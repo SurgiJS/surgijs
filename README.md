@@ -1,6 +1,6 @@
 # SurgiJS
 
-Compiled Web Components on JSX/TSX. The compiler hoists static HTML into templates and turns every dynamic expression into a direct binding, so a state change performs one DOM write per affected binding. The runtime has zero dependencies: about 5.6 KB gzip for everything, about 3.5 KB for a compiled counter app.
+Compiled Web Components on JSX/TSX. The compiler hoists static HTML into templates and turns every dynamic expression into a direct binding, so a state change performs one DOM write per affected binding. The runtime has zero dependencies: about 5.9 KB gzip for everything, about 3.6 KB for a compiled counter app.
 
 - Signals with microtask batching, memos, effects, ownership and context.
 - `defineComponent` creates standard custom elements: typed attributes, property reflection, shadow or light DOM, form association.
