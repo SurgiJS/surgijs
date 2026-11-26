@@ -266,4 +266,24 @@ describe('bind', () => {
     flush();
     expect(node.v).toBe(8);
   });
+
+  it('follows sources that a conditional read switches to', () => {
+    const [cond, setCond] = createSignal(true);
+    const [a, setA] = createSignal('a1');
+    const [b, setB] = createSignal('b1');
+    const node = { v: '' };
+    createRoot(() => bind(node, () => (cond() ? a() : b()), (el, v: string) => (el.v = v)));
+    setCond(false);
+    flush();
+    expect(node.v).toBe('b1');
+    setB('b2');
+    flush();
+    expect(node.v).toBe('b2');
+    setA('a2');
+    flush();
+    expect(node.v).toBe('b2');
+    setCond(true);
+    flush();
+    expect(node.v).toBe('a2');
+  });
 });

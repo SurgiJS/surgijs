@@ -95,6 +95,26 @@ describe('templates', () => {
     expect(input.getAttribute('disabled')).toBe('');
   });
 
+  it('updates attributes read through helpers and props with conditional reads', () => {
+    const [cond, setCond] = useState(true);
+    const [a] = useState('a');
+    const [b, setB] = useState('b1');
+    const cls = () => (cond() ? a() : b());
+    const Child = (props: ReactiveProps<{ label: string }>) => <i title={props.label} />;
+    const host = mount(() => (
+      <p class={cls()}>
+        <Child label={cond() ? a() : b()} />
+      </p>
+    ));
+    const p = host.firstChild as HTMLElement;
+    setCond(false);
+    flush();
+    setB('b2');
+    flush();
+    expect(p.className).toBe('b2');
+    expect(p.querySelector('i')!.title).toBe('b2');
+  });
+
   it('sets namespaced SVG attributes', () => {
     const [href, setHref] = useState('#a');
     const host = mount(() => (
