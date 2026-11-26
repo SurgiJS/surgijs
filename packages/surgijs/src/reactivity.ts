@@ -8,10 +8,14 @@ export interface Source {
   o: Observer | Observer[] | null;
 }
 
-/** Queued work. `t` picks the queue: 0 memo, 1 render, 2 user effect. `st`: 0 idle, 1 queued, -1 disposed. */
+/**
+ * Queued work. `t` picks the queue: 0 memo, 1 render, 2 user effect. `st`: 0 idle, 1 queued, -1 disposed.
+ * `h`: index hint into the longest observer list it joined, `-1` when unknown.
+ */
 interface Observer {
   st: number;
   t: number;
+  h: number;
   run(): void;
   d(): void;
 }
@@ -63,17 +67,25 @@ function track(s: Source): void {
 function link(s: Source, o: Observer): void {
   const list = s.o;
   if (!list) s.o = o;
-  else if (list instanceof Array) list.push(o);
-  else s.o = [list, o];
+  else if (list instanceof Array) {
+    const i = list.push(o) - 1;
+    if (o.h < i) o.h = i;
+  } else s.o = [list, o];
 }
 
+/** Removes `o` by swapping the last observer into its slot; the hint makes the lookup O(1). */
 function unlink(s: Source, o: Observer): void {
   const list = s.o;
   if (list === o) s.o = null;
   else if (list instanceof Array) {
-    const i = list.lastIndexOf(o);
+    let i = o.h;
+    if (list[i] === o) o.h = -1;
+    else if ((i = list.lastIndexOf(o)) < 0) return;
     const last = list.pop()!;
-    if (i < list.length) list[i] = last;
+    if (i < list.length) {
+      list[i] = last;
+      if (last.h === list.length) last.h = i;
+    }
   }
 }
 
@@ -157,6 +169,7 @@ class Comp implements OwnerNode, Source, Observer {
   p: OwnerNode | null = Owner;
   k: Record<symbol, unknown> | null = Owner ? Owner.k : null;
   st = 0;
+  h = -1;
   s: Source[] | null = null;
   o: Observer | Observer[] | null = null;
   f: (prev: any) => any;
@@ -264,6 +277,7 @@ const Bound = /* @__PURE__ */ (() => {
   class Bound implements Linked {
     declare t: number;
     st = 0;
+    h = -1;
     nx: Linked | null = null;
     p: OwnerNode | null = Owner;
     n: unknown;

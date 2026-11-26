@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   batch,
   bind,
@@ -265,6 +265,40 @@ describe('bind', () => {
     setN(4);
     flush();
     expect(node.v).toBe(8);
+  });
+
+  it('disposes many bindings of one source with at most one search of its observer list', () => {
+    const [sel, setSel] = createSignal(0);
+    const [label] = createSignal('x');
+    const disposers: (() => void)[] = [];
+    for (let i = 0; i < 500; i++)
+      createRoot((d) => {
+        disposers.push(d);
+        bind({}, () => (sel() === i ? label() : ''), () => {});
+      });
+    const search = vi.spyOn(Array.prototype, 'lastIndexOf');
+    try {
+      for (const d of disposers) d();
+      expect(search.mock.calls.length).toBeLessThanOrEqual(1);
+    } finally {
+      search.mockRestore();
+    }
+    setSel(1);
+    flush();
+  });
+
+  it('keeps exactly the surviving bindings after disposal in any order', () => {
+    const [n, setN] = createSignal(0);
+    const nodes = Array.from({ length: 200 }, () => ({ v: 0 }));
+    const disposers = nodes.map((node) => createRoot((d) => (bind(node, n, (el, v: number) => (el.v = v)), d)));
+    const gone = new Set<number>();
+    for (let k = 0; k < 120; k++) {
+      const i = (k * 37 + 11) % nodes.length;
+      if (!gone.has(i)) disposers[i]!(), gone.add(i);
+    }
+    setN(7);
+    flush();
+    nodes.forEach((node, i) => expect(node.v).toBe(gone.has(i) ? 0 : 7));
   });
 
   it('follows sources that a conditional read switches to', () => {
