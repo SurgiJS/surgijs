@@ -28,7 +28,7 @@ With a shadow root the component renders into it and slots work as usual. A clos
 
 In light DOM the original children move into `props.children` before the first render, and the component places them wherever it inserts `{props.children}`.
 
-Disconnecting disposes the render root and clears it. Reconnecting renders again with the current property values.
+Disconnecting disposes the render root and clears it in the next microtask. An element moved within the document (removed and inserted again in the same task) keeps its rendered tree and state. Reconnecting after disposal renders again with the current property values.
 
 ## Forms
 
