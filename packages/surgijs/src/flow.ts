@@ -20,20 +20,32 @@ const truthy = (v: unknown): boolean => v != null && v !== false;
 const resolve = (c: unknown, value?: unknown): JSX.Element =>
   (typeof c === 'function' ? (c as (v: unknown) => JSX.Element)(value) : c) as JSX.Element;
 
-/** Mounts `render(i)` for the selected index; the previous branch disposes. */
-function branch(select: () => number, render: (i: number) => JSX.Element): JSX.Element {
+/**
+ * Mounts `render(i, value(i))` for the selected index; the previous branch disposes.
+ * A change of either the index or the value mounts the branch again.
+ */
+function branch(select: () => number, value: (i: number) => unknown, render: (i: number, v: unknown) => JSX.Element): JSX.Element {
   let dispose: (() => void) | undefined;
+  let index: number | undefined;
+  let current: unknown;
   onCleanup(() => dispose && dispose());
-  const index = createMemo(select);
-  return createMemo(() => {
-    const i = index();
+  return createMemo((prev) => {
+    const i = select();
+    const v = value(i);
+    if (i === index && Object.is(v, current)) return prev;
+    index = i;
+    current = v;
     if (dispose) dispose();
     return createRoot((d) => {
       dispose = d;
-      return untrack(() => render(i));
+      return untrack(() => render(i, v));
     });
   }) as unknown as JSX.Element;
 }
+
+/** The `when` value for a child function that declares a parameter (it re-mounts on change); `undefined` otherwise. */
+const keyed = (on: boolean, c: { when: MaybeAccessor<unknown>; children: unknown }): unknown =>
+  on && typeof c.children === 'function' && c.children.length ? read(c.when) : undefined;
 
 export interface ShowProps<T> {
   when: MaybeAccessor<T | null | undefined | false>;
@@ -41,11 +53,15 @@ export interface ShowProps<T> {
   children: Branch<T>;
 }
 
-/** `when ? children : fallback`. `0` and `''` count as true; `null`, `undefined`, `false` as false. */
+/**
+ * `when ? children : fallback`. `0` and `''` count as true; `null`, `undefined`, `false` as false.
+ * A function child receives the value and renders again when it changes.
+ */
 export function Show<T>(props: ShowProps<T>): JSX.Element {
   return branch(
     () => (truthy(read(props.when)) ? 1 : 0),
-    (i) => (i ? resolve(props.children, untrack(() => read(props.when))) : resolve(props.fallback)),
+    (i) => keyed(i > 0, props),
+    (i, v) => (i ? resolve(props.children, v) : resolve(props.fallback)),
   );
 }
 
@@ -79,11 +95,8 @@ export function Switch(props: SwitchProps): JSX.Element {
       for (let i = 0; i < cases.length; i++) if (truthy(read(cases[i]!.when))) return i;
       return -1;
     },
-    (i) => {
-      if (i < 0) return resolve(props.fallback);
-      const c = cases[i]!;
-      return resolve(c.children, untrack(() => read(c.when)));
-    },
+    (i) => keyed(i >= 0, cases[i]!),
+    (i, v) => (i < 0 ? resolve(props.fallback) : resolve(cases[i]!.children, v)),
   );
 }
 

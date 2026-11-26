@@ -219,6 +219,40 @@ describe('Show / Switch', () => {
     expect(host.textContent).toBe('');
   });
 
+  it('renders function children again when the truthy value changes', () => {
+    const [user, setUser] = useState<{ name: string } | null>({ name: 'Ann' });
+    const [page, setPage] = useState<{ title: string } | null>({ title: 'Home' });
+    const host = mount(() => (
+      <div>
+        <Show when={user()}>{(u: { name: string }) => <b>{u.name}</b>}</Show>
+        <Switch>
+          <Match when={page()}>{(p: { title: string }) => <i>{p.title}</i>}</Match>
+        </Switch>
+      </div>
+    ));
+    expect(host.textContent).toBe('AnnHome');
+    setUser({ name: 'Bob' });
+    setPage({ title: 'About' });
+    flush();
+    expect(host.textContent).toBe('BobAbout');
+  });
+
+  it('keeps static children mounted while the value stays truthy', () => {
+    const [n, setN] = useState(1);
+    let renders = 0;
+    const Child = () => (renders++, <b>child</b>);
+    mount(() => (
+      <div>
+        <Show when={n()}>
+          <Child />
+        </Show>
+      </div>
+    ));
+    setN(2);
+    flush();
+    expect(renders).toBe(1);
+  });
+
   it('switches between matches', () => {
     const [n, setN] = useState(1);
     const host = mount(() => (
