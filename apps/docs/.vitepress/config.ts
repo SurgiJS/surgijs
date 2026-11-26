@@ -10,7 +10,7 @@ export default defineConfig({
   base: process.env.DOCS_BASE ?? '/',
   cleanUrls: true,
   vue: {
-    template: { compilerOptions: { isCustomElement: (tag) => tag === 'my-counter' || tag === 'ui-dropdown' } },
+    template: { compilerOptions: { isCustomElement: (tag) => ['my-counter', 'ui-dropdown', 'ui-virtual-table', 'ui-tile-grid'].includes(tag) } },
   },
   vite: {
     plugins: [surgi({ include: /apps\/playground\/src\/.*\.tsx$/ })],
