@@ -449,7 +449,17 @@ export function deferMount<T>(fn: () => T): T {
     return fn();
   } finally {
     Deferred = prev;
-    for (const c of list) if (!c.st) c.run();
+    let error: [unknown] | undefined;
+    for (const c of list) {
+      if (!c.st) {
+        try {
+          c.run();
+        } catch (err) {
+          error ||= [err];
+        }
+      }
+    }
+    if (error) throw error[0];
   }
 }
 

@@ -155,6 +155,22 @@ describe('computations', () => {
     expect(log).toEqual(['body', 'effect']);
   });
 
+  it('deferMount runs every effect before rethrowing the first error', () => {
+    const log: string[] = [];
+    expect(() =>
+      createRoot(() =>
+        deferMount(() => {
+          createEffect(() => log.push('first'));
+          createEffect(() => {
+            throw new Error('boom');
+          });
+          createEffect(() => log.push('third'));
+        }),
+      ),
+    ).toThrow('boom');
+    expect(log).toEqual(['first', 'third']);
+  });
+
   it('useEffect tracks deps only and runs cleanup', () => {
     const [a, setA] = createSignal(0);
     const [b, setB] = createSignal(0);
