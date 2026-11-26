@@ -141,12 +141,18 @@ export function flush(): void {
   running = true;
   scheduled = false;
   let error: [unknown] | undefined;
+  let rounds = 0;
   try {
     for (let i = 0; i < 3; ) {
       const q = Queues[i]!;
       if (!q.length) {
         i++;
         continue;
+      }
+      if (++rounds > 1e5) {
+        for (const list of Queues) for (const o of list) if (o.st > 0) o.st = 0;
+        Queues = [[], [], []];
+        throw new Error('Infinite update loop');
       }
       Queues[i] = [];
       for (const o of q) {

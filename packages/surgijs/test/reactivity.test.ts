@@ -177,6 +177,26 @@ describe('computations', () => {
   });
 });
 
+describe('flush', () => {
+  it('stops an effect that keeps writing the signal it reads', () => {
+    const [n, setN] = createSignal(0);
+    let runs = 0;
+    createRoot(() =>
+      createEffect(() => {
+        runs++;
+        setN(n() + 1);
+      }),
+    );
+    flush();
+    setN(-1);
+    expect(() => flush()).toThrow(/Infinite update loop/);
+    expect(runs).toBeGreaterThan(1000);
+    const after = runs;
+    flush();
+    expect(runs).toBe(after);
+  });
+});
+
 describe('bind', () => {
   it('keeps the remaining observers when one binding disposes', () => {
     const [n, setN] = createSignal(1);
