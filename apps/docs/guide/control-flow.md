@@ -18,7 +18,7 @@ Rows are keyed by `by(item, index)` or by the item itself. A row whose key survi
 </Show>
 ```
 
-`when` counts as true for any value except `null`, `undefined` and `false`, so `0` and `''` render the children. A function child receives the value. Switching branches disposes the previous one.
+`when` counts as true for any value except `null`, `undefined` and `false`, so `0` and `''` render the children. A function child that declares a parameter receives the value and renders again when the value changes. Switching branches disposes the previous one.
 
 ## Switch and Match
 

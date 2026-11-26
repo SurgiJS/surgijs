@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createContext,
+  createRenderEffect,
   createResource,
   createRoot,
   createSignal,
@@ -93,6 +94,37 @@ describe('templates', () => {
     expect(input.style.width).toBe('20px');
     expect(input.value).toBe('20');
     expect(input.getAttribute('disabled')).toBe('');
+  });
+
+  it('updates attributes read through helpers and props with conditional reads', () => {
+    const [cond, setCond] = useState(true);
+    const [a] = useState('a');
+    const [b, setB] = useState('b1');
+    const cls = () => (cond() ? a() : b());
+    const Child = (props: ReactiveProps<{ label: string }>) => <i title={props.label} />;
+    const host = mount(() => (
+      <p class={cls()}>
+        <Child label={cond() ? a() : b()} />
+      </p>
+    ));
+    const p = host.firstChild as HTMLElement;
+    setCond(false);
+    flush();
+    setB('b2');
+    flush();
+    expect(p.className).toBe('b2');
+    expect(p.querySelector('i')!.title).toBe('b2');
+  });
+
+  it('clears style keys that the next style object leaves out', () => {
+    const [s, setS] = useState<Record<string, string>>({ color: 'red', fontWeight: 'bold', '--gap': '2px' });
+    const host = mount(() => <div style={s()} />);
+    const div = host.firstChild as HTMLElement;
+    setS({ color: 'blue' });
+    flush();
+    expect(div.style.color).toBe('blue');
+    expect(div.style.fontWeight).toBe('');
+    expect(div.style.getPropertyValue('--gap')).toBe('');
   });
 
   it('sets namespaced SVG attributes', () => {
@@ -199,6 +231,40 @@ describe('Show / Switch', () => {
     expect(host.textContent).toBe('');
   });
 
+  it('renders function children again when the truthy value changes', () => {
+    const [user, setUser] = useState<{ name: string } | null>({ name: 'Ann' });
+    const [page, setPage] = useState<{ title: string } | null>({ title: 'Home' });
+    const host = mount(() => (
+      <div>
+        <Show when={user()}>{(u: { name: string }) => <b>{u.name}</b>}</Show>
+        <Switch>
+          <Match when={page()}>{(p: { title: string }) => <i>{p.title}</i>}</Match>
+        </Switch>
+      </div>
+    ));
+    expect(host.textContent).toBe('AnnHome');
+    setUser({ name: 'Bob' });
+    setPage({ title: 'About' });
+    flush();
+    expect(host.textContent).toBe('BobAbout');
+  });
+
+  it('keeps static children mounted while the value stays truthy', () => {
+    const [n, setN] = useState(1);
+    let renders = 0;
+    const Child = () => (renders++, <b>child</b>);
+    mount(() => (
+      <div>
+        <Show when={n()}>
+          <Child />
+        </Show>
+      </div>
+    ));
+    setN(2);
+    flush();
+    expect(renders).toBe(1);
+  });
+
   it('switches between matches', () => {
     const [n, setN] = useState(1);
     const host = mount(() => (
@@ -256,6 +322,33 @@ describe('For', () => {
     flush();
     expect(Array.from(ul.children)).toEqual([lb]);
     expect(disposed.sort()).toEqual(['a', 'c']);
+  });
+
+  it('disposes every row after a row render throws', async () => {
+    const [items, setItems] = createSignal([1, 2, 3]);
+    const [n, setN] = createSignal(0);
+    let runs = 0;
+    const host = mount(() => (
+      <div>
+        <ErrorBoundary fallback={<b>err</b>}>
+          <For each={items()}>
+            {(i: number) => {
+              if (i === 99) throw new Error('bad row');
+              createRenderEffect(() => (n(), runs++));
+              return <span>{i}</span>;
+            }}
+          </For>
+        </ErrorBoundary>
+      </div>
+    ));
+    setItems([1, 2, 3, 99]);
+    flush();
+    await tick();
+    expect(host.textContent).toBe('err');
+    const before = runs;
+    setN(1);
+    flush();
+    expect(runs).toBe(before);
   });
 
   it('keys rows with by', () => {
@@ -342,6 +435,22 @@ describe('ErrorBoundary', () => {
     reset();
     await tick();
     expect(host.textContent).toBe('fine');
+  });
+
+  it('catches errors thrown by attribute and text bindings on update', async () => {
+    const [user, setUser] = createSignal<{ name: string } | null>({ name: 'ann' });
+    const host = mount(() => (
+      <div>
+        <ErrorBoundary fallback={<b>caught</b>}>
+          <p title={user()!.name}>{`${user()!.name}`}</p>
+        </ErrorBoundary>
+      </div>
+    ));
+    expect(host.textContent).toBe('ann');
+    setUser(null);
+    expect(() => flush()).not.toThrow();
+    await tick();
+    expect(host.textContent).toBe('caught');
   });
 
   it('catches errors thrown while mounting children', async () => {

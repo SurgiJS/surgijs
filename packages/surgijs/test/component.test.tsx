@@ -123,7 +123,7 @@ describe('defineComponent', () => {
     expect(el.innerHTML).toBe('<section><b>kept</b></section>');
   });
 
-  it('disposes on disconnect and renders again on reconnect', () => {
+  it('disposes after disconnect and renders again on reconnect', async () => {
     const log: string[] = [];
     defineComponent('x-life', () => {
       const [n] = useState(1);
@@ -134,10 +134,29 @@ describe('defineComponent', () => {
     const el = document.createElement('x-life');
     document.body.appendChild(el);
     el.remove();
+    await Promise.resolve();
     expect(el.shadowRoot!.childNodes.length).toBe(0);
     document.body.appendChild(el);
     expect(el.shadowRoot!.innerHTML).toBe('<i>1</i>');
     expect(log).toEqual(['render', 'dispose', 'render']);
+  });
+
+  it('keeps state and skips re-rendering when moved', async () => {
+    let renders = 0;
+    defineComponent('x-move', () => {
+      renders++;
+      const [n, setN] = useState(0);
+      return <button onClick={() => setN((v) => v + 1)}>{n}</button>;
+    });
+    const a = document.createElement('x-move');
+    const b = document.createElement('x-move');
+    document.body.append(a, b);
+    (a.shadowRoot!.querySelector('button') as HTMLButtonElement).click();
+    flush();
+    document.body.appendChild(a);
+    await Promise.resolve();
+    expect(a.shadowRoot!.textContent).toBe('1');
+    expect(renders).toBe(2);
   });
 
   it('handles clicks inside a closed shadow root exactly once', () => {

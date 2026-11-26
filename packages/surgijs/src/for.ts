@@ -56,18 +56,23 @@ export function For<T>(props: ForProps<T>): JSX.Element {
     const out: JSX.Element[] = new Array(items.length);
     const owner = getOwner();
     untrack(() => {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]!;
-        const key = by ? by(item, i) : item;
-        let row = rows.get(key);
-        if (row) {
-          rows.delete(key);
-          if (row.i) row.i(i);
-        } else row = make(item, i, owner);
-        const prev = next.get(key);
-        if (prev) dupes.push(prev);
-        next.set(key, row);
-        out[i] = row.v;
+      try {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]!;
+          const key = by ? by(item, i) : item;
+          let row = rows.get(key);
+          if (row) {
+            rows.delete(key);
+            if (row.i) row.i(i);
+          } else row = make(item, i, owner);
+          const prev = next.get(key);
+          if (prev) dupes.push(prev);
+          next.set(key, row);
+          out[i] = row.v;
+        }
+      } catch (err) {
+        for (const [key, row] of next) rows.set(key, row);
+        throw err;
       }
     });
     for (const row of rows.values()) cleanup(row);
