@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createContext,
+  createRenderEffect,
   createResource,
   createRoot,
   createSignal,
@@ -310,6 +311,33 @@ describe('For', () => {
     flush();
     expect(Array.from(ul.children)).toEqual([lb]);
     expect(disposed.sort()).toEqual(['a', 'c']);
+  });
+
+  it('disposes every row after a row render throws', async () => {
+    const [items, setItems] = createSignal([1, 2, 3]);
+    const [n, setN] = createSignal(0);
+    let runs = 0;
+    const host = mount(() => (
+      <div>
+        <ErrorBoundary fallback={<b>err</b>}>
+          <For each={items()}>
+            {(i: number) => {
+              if (i === 99) throw new Error('bad row');
+              createRenderEffect(() => (n(), runs++));
+              return <span>{i}</span>;
+            }}
+          </For>
+        </ErrorBoundary>
+      </div>
+    ));
+    setItems([1, 2, 3, 99]);
+    flush();
+    await tick();
+    expect(host.textContent).toBe('err');
+    const before = runs;
+    setN(1);
+    flush();
+    expect(runs).toBe(before);
   });
 
   it('keys rows with by', () => {
