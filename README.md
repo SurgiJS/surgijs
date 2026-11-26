@@ -86,6 +86,7 @@ Run it locally with `pnpm bench` (`pnpm bench surgijs solid --rows 10000` for a 
 | --- | --- |
 | [`surgijs`](packages/surgijs) | runtime: `surgijs`, `surgijs/server`, `surgijs/hydrate`, `surgijs/jsx-runtime` |
 | [`@surgijs/compiler`](packages/compiler) | `compile()`, `@surgijs/compiler/vite`, `@surgijs/compiler/esbuild` |
+| [`@surgijs/store`](packages/store) | framework-agnostic store: one object, lazy remotes, deep-equal watches |
 
 ## Links
 

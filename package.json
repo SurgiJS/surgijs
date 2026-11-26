@@ -15,6 +15,7 @@
     "docs:dev": "pnpm --filter @surgijs/docs dev",
     "docs:build": "pnpm --filter @surgijs/docs build",
     "bench": "pnpm --filter @surgijs/bench bench",
+    "bench:store": "node packages/store/bench/run.mjs",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && changeset publish"
