@@ -256,12 +256,16 @@ function each(s: Sources, fn: (s: Source, o: Observer) => void, o: Observer): vo
 type Reader = (arg: unknown) => unknown;
 type Apply = (node: unknown, value: unknown) => unknown;
 
-/** Binding: `n` node, `r` reader, `a` apply, `x` reader argument, `s` sources of the last read. */
+/**
+ * Binding: `n` node, `r` reader, `a` apply, `x` reader argument, `s` sources of the last read,
+ * `p` owner that receives its errors.
+ */
 const Bound = /* @__PURE__ */ (() => {
   class Bound implements Linked {
     declare t: number;
     st = 0;
     nx: Linked | null = null;
+    p: OwnerNode | null = Owner;
     n: unknown;
     r: Reader;
     a: Apply;
@@ -280,13 +284,17 @@ const Bound = /* @__PURE__ */ (() => {
 
     run(): void {
       this.st = 0;
-      const v = gather(this.r, this.x);
-      const s = Got;
-      if (!same(s, this.s)) {
-        each(this.s, unlink, this);
-        each((this.s = s), link, this);
+      try {
+        const v = gather(this.r, this.x);
+        const s = Got;
+        if (!same(s, this.s)) {
+          each(this.s, unlink, this);
+          each((this.s = s), link, this);
+        }
+        if (!Object.is(v, this.v)) this.a(this.n, (this.v = v));
+      } catch (err) {
+        recover(this.p, err);
       }
-      if (!Object.is(v, this.v)) this.a(this.n, (this.v = v));
     }
 
     d(): void {

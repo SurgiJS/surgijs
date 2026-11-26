@@ -364,6 +364,22 @@ describe('ErrorBoundary', () => {
     expect(host.textContent).toBe('fine');
   });
 
+  it('catches errors thrown by attribute and text bindings on update', async () => {
+    const [user, setUser] = createSignal<{ name: string } | null>({ name: 'ann' });
+    const host = mount(() => (
+      <div>
+        <ErrorBoundary fallback={<b>caught</b>}>
+          <p title={user()!.name}>{`${user()!.name}`}</p>
+        </ErrorBoundary>
+      </div>
+    ));
+    expect(host.textContent).toBe('ann');
+    setUser(null);
+    expect(() => flush()).not.toThrow();
+    await tick();
+    expect(host.textContent).toBe('caught');
+  });
+
   it('catches errors thrown while mounting children', async () => {
     const Bad = (): JSX.Element => {
       throw new Error('mount');
