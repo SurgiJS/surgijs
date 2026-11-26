@@ -215,7 +215,7 @@ class Comp implements OwnerNode, Source, Observer {
       for (let i = Index; i < s.length; i++) unlink(s[i]!, this);
       s.length = Index;
     }
-    const fresh = Fresh as typeof prevFresh;
+    const fresh = this.st < 0 ? null : (Fresh as typeof prevFresh);
     if (fresh) {
       for (const x of fresh) link(x, this);
       if (s) s.push(...fresh);

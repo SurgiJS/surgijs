@@ -155,6 +155,24 @@ describe('computations', () => {
     expect(log).toEqual(['body', 'effect']);
   });
 
+  it('drops the sources of a computation that disposes its own root while running', () => {
+    const [done, setDone] = createSignal(true);
+    let runs = 0;
+    createRoot((dispose) =>
+      createRenderEffect(() => {
+        runs++;
+        if (done()) dispose();
+      }),
+    );
+    expect(runs).toBe(1);
+    setDone(false);
+    flush();
+    expect(runs).toBe(1);
+    setDone(true);
+    flush();
+    expect(runs).toBe(1);
+  });
+
   it('deferMount runs every effect before rethrowing the first error', () => {
     const log: string[] = [];
     expect(() =>
