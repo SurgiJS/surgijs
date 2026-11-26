@@ -135,6 +135,13 @@ function recover(o: OwnerNode | null, err: unknown): void {
   throw err;
 }
 
+/** Drops every queued computation (they run again on their next change) and throws. */
+function overflow(): never {
+  for (const list of Queues) for (const o of list) if (o.st > 0) o.st = 0;
+  Queues = [[], [], []];
+  throw new Error('Infinite update loop');
+}
+
 /** Runs every queued computation now: memos first, then render effects, then effects. */
 export function flush(): void {
   if (running) return;
@@ -149,11 +156,7 @@ export function flush(): void {
         i++;
         continue;
       }
-      if (++rounds > 1e5) {
-        for (const list of Queues) for (const o of list) if (o.st > 0) o.st = 0;
-        Queues = [[], [], []];
-        throw new Error('Infinite update loop');
-      }
+      if (++rounds > 1e5) overflow();
       Queues[i] = [];
       for (const o of q) {
         if (o.st > 0) {
