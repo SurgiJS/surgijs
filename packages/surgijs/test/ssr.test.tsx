@@ -5,6 +5,7 @@ import { attrPart, escape, renderToStream, renderToString, shadowHTML } from '@s
 import { Counter } from '../../../apps/playground/src/counter.tsx';
 import * as server from '../../../apps/playground/src/counter.tsx?ssr';
 import * as app from './fixtures/ssr-app.tsx?ssr';
+import * as dom from './fixtures/ssr-app.tsx';
 
 const ServerCounter = server.Counter!;
 
@@ -151,6 +152,20 @@ describe('hydration', () => {
     expect(p.lastChild).toBe(value);
     expect(p.textContent).toBe('Value: 1');
     expect(root.innerHTML).toBe('<div class="card"><h3>Counter</h3><p>Value: 1</p><button>Add</button></div>');
+    log.mockRestore();
+  });
+
+  it('replaces server content of control flow instead of duplicating it', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const html = renderToString('x-list-hyd', app.List as never, { items: ['x'] });
+    const el = document.createElement('x-list-hyd');
+    el.attachShadow({ mode: 'open' }).innerHTML = html.replace(/^<[^>]*><template shadowrootmode="open">/, '').replace(/<\/template>.*$/, '');
+    document.body.appendChild(el);
+    enableHydration();
+    defineComponent('x-list-hyd', dom.List, { items: Array, mode: String, show: Boolean });
+    el.setAttribute('items', '["x"]');
+    flush();
+    expect(el.shadowRoot!.innerHTML).toBe('<div><!----><ul><li>x</li></ul><em>other</em></div>');
     log.mockRestore();
   });
 
