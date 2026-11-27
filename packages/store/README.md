@@ -37,6 +37,8 @@ const st = store.status('results');
 // st.isStale | isFetching | httpStatus | code | age | source
 ```
 
+`createStore(def, options)` options are the defaults for every `remote()`; an option on the remote wins. When `deps` change, `data` resets (or stays with `keepPreviousData: true`; see `status().isPreviousData` / `dataDeps`). Also available: `debounce`, `createRemote<State>()` for typed `get`, `persist`, `syncLocation`, and `@surgijs/store/core` (`fromStore`, `fromStatus`) for SurgiJS signals. Details in the [guide](../../apps/docs/guide/store.md).
+
 **Remotes are top-level only.** No `remote()` inside nested objects and no `status('a.b.c')`.
 For catalogs / details use sync route fields + flat remotes (`catalogProducts`, `productDetail`) linked by `deps` — see [guide: Complex stores](../../apps/docs/guide/store.md#complex-stores-important).
 

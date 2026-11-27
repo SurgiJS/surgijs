@@ -1,5 +1,7 @@
 export { deepEqual } from './equal';
 export { action, type Action, type ActionFn, type Get, type SetStore } from './action';
+export { persist, type PersistOptions } from './persist';
+export { syncLocation, type SyncLocationOptions } from './location';
 export { derived, type Derived, type DerivedFn, type DerivedGet } from './derived';
 export { fromResponse, isRemoteError, RemoteError, type FromResponseOptions } from './http';
 export {
@@ -13,6 +15,7 @@ export {
 export {
   DEFAULT_GC_TIME,
   DEFAULT_STALE_TIME,
+  createRemote,
   createRemoteGet,
   defaultRetryDelay,
   isEmptyData,
