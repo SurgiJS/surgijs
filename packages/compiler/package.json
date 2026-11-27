@@ -46,10 +46,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "peerDependencies": {
-    "typescript": ">=5.0 <7"
-  },
-  "devDependencies": {
-    "typescript": "~6.0.3"
+  "dependencies": {
+    "oxc-parser": "^0.160.0"
   }
 }
