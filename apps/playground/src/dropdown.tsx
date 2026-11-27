@@ -1,4 +1,4 @@
-import { createMemo, defineComponent, For, Show, useId, useState, type ReactiveProps } from 'surgijs';
+import { createMemo, defineComponent, For, Show, useId, useState, type ReactiveProps } from '@surgijs/core';
 
 export interface DropdownOption {
   value: string;

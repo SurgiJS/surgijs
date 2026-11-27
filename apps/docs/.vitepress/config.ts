@@ -16,8 +16,8 @@ export default defineConfig({
     plugins: [surgi({ include: /apps\/playground\/src\/.*\.tsx$/ })],
     resolve: {
       alias: [
-        { find: /^surgijs$/, replacement: `${runtime}index.ts` },
-        { find: /^surgijs\/(.*)$/, replacement: `${runtime}$1.ts` },
+        { find: /^@surgijs\/core$/, replacement: `${runtime}index.ts` },
+        { find: /^@surgijs\/core\/(.*)$/, replacement: `${runtime}$1.ts` },
       ],
     },
   },
@@ -44,7 +44,7 @@ export default defineConfig({
       {
         text: 'Reference',
         items: [
-          { text: 'surgijs', link: '/api/' },
+          { text: '@surgijs/core', link: '/api/' },
           { text: '@surgijs/compiler', link: '/api/compiler' },
           { text: 'Live examples', link: '/examples' },
         ],

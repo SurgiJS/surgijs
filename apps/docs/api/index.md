@@ -59,7 +59,7 @@ The compiler emits these; they are public for hand-written integrations.
 | `toNodes(value)` | resolves a value to a node list |
 | `diff(parent, a, b)` | keyed reconciliation of two node lists |
 
-## surgijs/server
+## @surgijs/core/server
 
 | Export | Purpose |
 | --- | --- |
@@ -67,7 +67,7 @@ The compiler emits these; they are public for hand-written integrations.
 | `shadowHTML(tag, inner, attrs?)` | host tag wrapper |
 | `escape(value)`, `attrPart(name, value)` | helpers used by SSR output |
 
-## surgijs/hydrate
+## @surgijs/core/hydrate
 
 | Export | Purpose |
 | --- | --- |

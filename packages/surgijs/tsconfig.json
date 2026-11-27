@@ -3,8 +3,8 @@
   "compilerOptions": {
     "types": ["node"],
     "paths": {
-      "surgijs": ["./src/index.ts"],
-      "surgijs/*": ["./src/*.ts"]
+      "@surgijs/core": ["./src/index.ts"],
+      "@surgijs/core/*": ["./src/*.ts"]
     }
   },
   "include": ["src", "test", "tsup.config.ts", "vitest.config.ts"]

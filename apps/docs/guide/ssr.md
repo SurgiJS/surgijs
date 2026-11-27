@@ -5,7 +5,7 @@
 Compile server modules with `generate: 'ssr'`. With the Vite plugin, an import with the `?ssr` query does this per module:
 
 ```ts
-import { renderToString } from 'surgijs/server';
+import { renderToString } from '@surgijs/core/server';
 import { Counter } from './counter.tsx?ssr';
 
 const html = renderToString('my-counter', Counter, { title: 'Clicks', step: 2 });
@@ -17,7 +17,7 @@ The SSR output concatenates strings with `escape` and `attrPart` and never touch
 ## Hydration
 
 ```ts
-import { enableHydration } from 'surgijs/hydrate';
+import { enableHydration } from '@surgijs/core/hydrate';
 import './counter';
 
 enableHydration();

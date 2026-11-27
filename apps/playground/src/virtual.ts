@@ -1,4 +1,4 @@
-import { createMemo, createSignal, type Accessor } from 'surgijs';
+import { createMemo, createSignal, type Accessor } from '@surgijs/core';
 
 export interface WindowOptions {
   /** Number of items. */

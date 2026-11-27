@@ -52,12 +52,12 @@ function parseArgs(argv) {
 }
 
 const plugins = {
-  /** `surgijs` from workspace sources, `.tsx` through the workspace compiler. */
+  /** `@surgijs/core` from workspace sources, `.tsx` through the workspace compiler. */
   surgijs: {
     name: 'surgijs',
     setup(b) {
-      b.onResolve({ filter: /^surgijs$/ }, () => ({ path: `${runtime}index.ts` }));
-      b.onResolve({ filter: /^surgijs\/(.+)$/ }, (args) => ({ path: `${runtime}${args.path.slice(8)}.ts` }));
+      b.onResolve({ filter: /^@surgijs\/core$/ }, () => ({ path: `${runtime}index.ts` }));
+      b.onResolve({ filter: /^@surgijs\/core\/(.+)$/ }, (args) => ({ path: `${runtime}${args.path.slice('@surgijs/core/'.length)}.ts` }));
       b.onLoad({ filter: /\.tsx$/ }, async (args) => {
         const { compile } = await import('../packages/compiler/src/index.ts');
         const { code } = compile(await readFile(args.path, 'utf8'), { filename: args.path, sourceMap: false });

@@ -1,4 +1,4 @@
-import { createMemo, defineComponent, For, onCleanup, onMount, useState, type ReactiveProps } from 'surgijs';
+import { createMemo, defineComponent, For, onCleanup, onMount, useState, type ReactiveProps } from '@surgijs/core';
 import { createVirtualWindow } from './virtual';
 
 export interface TileGridProps {

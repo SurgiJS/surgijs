@@ -18,7 +18,7 @@ import {
   useState,
   type JSX,
   type ReactiveProps,
-} from 'surgijs';
+} from '@surgijs/core';
 
 const tick = () => new Promise((r) => setTimeout(r));
 

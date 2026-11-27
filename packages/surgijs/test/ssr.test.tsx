@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, flush } from 'surgijs';
-import { disableHydration, enableHydration } from 'surgijs/hydrate';
-import { attrPart, escape, renderToString, shadowHTML } from 'surgijs/server';
+import { defineComponent, flush } from '@surgijs/core';
+import { disableHydration, enableHydration } from '@surgijs/core/hydrate';
+import { attrPart, escape, renderToString, shadowHTML } from '@surgijs/core/server';
 import { Counter } from '../../../apps/playground/src/counter.tsx';
 import * as server from '../../../apps/playground/src/counter.tsx?ssr';
 

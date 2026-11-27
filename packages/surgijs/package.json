@@ -1,5 +1,5 @@
 {
-  "name": "surgijs",
+  "name": "@surgijs/core",
   "version": "0.2.0",
   "description": "Compiled Web Components with JSX/TSX: hoisted templates, fine-grained signals, one DOM write per binding.",
   "license": "MIT",
@@ -23,8 +23,7 @@
   },
   "homepage": "https://surgijs.github.io/surgijs/",
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "bugs": "https://github.com/SurgiJS/surgijs/issues",
   "exports": {

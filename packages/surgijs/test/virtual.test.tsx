@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { flush } from 'surgijs';
+import { flush } from '@surgijs/core';
 import { personAt } from '../../../apps/playground/src/virtual-table.tsx';
 import '../../../apps/playground/src/virtual-tiles.tsx';
 

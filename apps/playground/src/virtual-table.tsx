@@ -1,4 +1,4 @@
-import { createMemo, defineComponent, For, useState, type ReactiveProps } from 'surgijs';
+import { createMemo, defineComponent, For, useState, type ReactiveProps } from '@surgijs/core';
 import { createVirtualWindow } from './virtual';
 
 export interface VirtualTableProps {
