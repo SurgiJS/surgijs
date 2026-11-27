@@ -17,7 +17,7 @@ const meta = {
     type: { control: 'inline-radio', options: ['button', 'submit', 'reset'] },
     disabled: { control: 'boolean' },
     loading: { control: 'boolean' },
-    label: { control: 'text', description: 'Accessible name for icon-only buttons' },
+    label: { control: 'text' },
   },
   render: (args) => html`<s-button
     variant=${args.variant ?? nothing}

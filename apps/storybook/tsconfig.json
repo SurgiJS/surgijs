@@ -7,7 +7,8 @@
       "@surgijs/core/*": ["../../packages/surgijs/src/*.ts"],
       "@surgijs/ui": ["../../packages/ui/src/index.ts"],
       "@surgijs/ui/button": ["../../packages/ui/src/button/index.ts"],
-      "@surgijs/ui/server": ["../../packages/ui/src/server.ts"]
+      "@surgijs/ui/server": ["../../packages/ui/src/server.ts"],
+      "@surgijs/ui/custom-elements.json": ["../../packages/ui/custom-elements.json"]
     }
   },
   "include": [".storybook", "stories", "e2e", "playwright.config.ts", "../../packages/ui/src/env.d.ts"]

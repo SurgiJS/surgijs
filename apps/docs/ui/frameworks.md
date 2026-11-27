@@ -11,6 +11,8 @@ Components are standard custom elements, so React, Vue and Angular render them w
 - properties, which reflect to the attributes;
 - slots, CSS parts and the `--s-*` custom properties the styles read.
 
+[Storybook](https://surgijs.github.io/surgijs/storybook/) reads it for the autodocs page and the Controls of every story (`setCustomElementsManifest` in `apps/storybook/.storybook/preview.ts`).
+
 The manifest comes from the `defineComponent` calls and the props interfaces in `packages/ui/src`, so it describes what the runtime observes: the attribute list matches `observedAttributes`.
 
 ## React
