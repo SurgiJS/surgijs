@@ -84,3 +84,8 @@ export const MyCounter = defineComponent('my-counter', Counter, { step: Number, 
 Props arrive as getters. Inside JSX and template literals the compiler inserts the call, so `{title}` reads the current title and subscribes to it. In plain TypeScript logic call the getter explicitly, as in `step()`.
 
 The shadow root renders `<div class="card"><h3>Counter</h3><p>Value: 0</p><button>Add</button></div>`. A click updates one text node.
+
+## Working with AI coding agents
+
+Point your agent at [`llms.txt`](https://surgijs.github.io/surgijs/llms.txt): a short list of the rules that differ from React and an index of every page as Markdown. [`llms-full.txt`](https://surgijs.github.io/surgijs/llms-full.txt) holds the whole documentation in one file. Every page is also available as Markdown by adding `.md` to its URL, for example [`guide/reactivity.md`](https://surgijs.github.io/surgijs/guide/reactivity.md).
+
