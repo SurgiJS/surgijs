@@ -26,3 +26,37 @@ jobs:
       - run: pnpm test
       - run: pnpm size
       - run: pnpm build
+
+  e2e:
+    # The image pins browsers and fonts, so screenshots match the baselines made with
+    # apps/storybook/e2e/docker.sh. Keep the tag in step with @playwright/test.
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble
+      options: --ipc=host
+    env:
+      # Firefox refuses to start when HOME belongs to another user than the container's root.
+      HOME: /root
+      PLAYWRIGHT_DOCKER: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm storybook:build
+      - name: Playwright (behavior, a11y, SSR, visual)
+        run: pnpm exec playwright test
+        working-directory: apps/storybook
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            apps/storybook/playwright-report
+            apps/storybook/test-results
+          retention-days: 14
+
