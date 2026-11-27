@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import { parseSync } from 'oxc-parser';
 import { describe, expect, it } from 'vitest';
 import { compile } from '../src/index.ts';
 
@@ -46,7 +46,7 @@ describe('compile', () => {
 
   it('keeps parentheses around comma expressions and object literals', () => {
     const syntaxErrors = (code: string) =>
-      ts.transpileModule(code, { reportDiagnostics: true, compilerOptions: { jsx: ts.JsxEmit.Preserve } }).diagnostics!.length;
+      parseSync('out.tsx', code, { lang: 'tsx' }).errors.length;
     const cases = [
       'const el = <span>{(log(), n())}</span>;',
       'const el = <p>a{(log(), n())}b</p>;',

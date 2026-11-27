@@ -1,4 +1,5 @@
-import ts from './typescript.ts';
+import type { Expression, JSXAttribute, JSXAttributeItem, JSXChild, JSXElement, JSXFragment } from 'oxc-parser';
+import { forEachChild, parse, type FunctionNode, type Node, type NodeOf } from './ast.ts';
 import { encodeMap, lineCol, lineStarts } from './map.ts';
 import { toOriginal, unwrapGetterReads } from './values.ts';
 
@@ -19,9 +20,11 @@ export interface CompileResult {
   map?: string;
 }
 
-type Jsx = ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment;
+type Jsx = JSXElement | JSXFragment;
 
-const isJsx = (n: ts.Node): n is Jsx => ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n) || ts.isJsxFragment(n);
+const isJsx = (n: Node): n is Jsx => n.type === 'JSXElement' || n.type === 'JSXFragment';
+
+const isComponentName = (name: string): boolean => /^[A-Z]/.test(name) || name.includes('.') || name === 'this';
 
 const VOID = new Set('area base br col embed hr img input link meta param source track wbr'.split(' '));
 
@@ -47,6 +50,7 @@ const SVG = new Set(
 
 const FLOW = new Set(['Show', 'Switch', 'Match', 'ErrorBoundary']);
 const FLOW_WHEN = new Set(['Show', 'Match']);
+
 const BUILTIN = new Set(['For', 'Show', 'Switch', 'Match', 'ErrorBoundary', 'Portal']);
 
 const TEXT_METHODS = new Set(['toString', 'toFixed', 'toPrecision', 'toLocaleString', 'toUpperCase', 'toLowerCase', 'trim', 'padStart', 'padEnd', 'join', 'repeat']);
@@ -91,106 +95,113 @@ const escText = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&
 const escAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 const kebab = (s: string): string => (s.startsWith('--') ? s : s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()));
 
-const strip = (e: ts.Expression): ts.Expression => {
-  while (ts.isParenthesizedExpression(e)) e = e.expression;
+const strip = (e: Expression): Expression => {
+  while (e.type === 'ParenthesizedExpression') e = e.expression;
   return e;
 };
 
 /** Expressions that change meaning without parentheses inside an argument list or an arrow body. */
-const needsParens = (x: ts.Expression): boolean =>
-  ts.isObjectLiteralExpression(x) || (ts.isBinaryExpression(x) && x.operatorToken.kind === ts.SyntaxKind.CommaToken);
+const needsParens = (x: Expression): boolean => x.type === 'ObjectExpression' || x.type === 'SequenceExpression';
 
-const isFn = (e: ts.Expression): e is ts.ArrowFunction | ts.FunctionExpression => {
+const isFn = (e: Expression): e is FunctionNode => {
   const x = strip(e);
-  return ts.isArrowFunction(x) || ts.isFunctionExpression(x);
+  return x.type === 'ArrowFunctionExpression' || x.type === 'FunctionExpression';
 };
 
 /** Zero-parameter arrow with an expression body: `() => c()`. */
-function getterBody(e: ts.Expression): ts.Expression | null {
+function getterBody(e: Expression): Expression | null {
   const x = strip(e);
-  if (ts.isArrowFunction(x) && x.parameters.length === 0 && !ts.isBlock(x.body)) return x.body;
+  if (x.type === 'ArrowFunctionExpression' && x.params.length === 0 && x.body.type !== 'BlockStatement') return x.body as Expression;
   return null;
 }
 
 type Literal = { v: string | number | boolean | null | undefined };
 
-function literal(e: ts.Expression): Literal | null {
+function literal(e: Expression): Literal | null {
   const x = strip(e);
-  if (ts.isStringLiteral(x) || ts.isNoSubstitutionTemplateLiteral(x)) return { v: x.text };
-  if (ts.isNumericLiteral(x)) return { v: Number(x.text) };
-  if (ts.isPrefixUnaryExpression(x) && x.operator === ts.SyntaxKind.MinusToken && ts.isNumericLiteral(x.operand))
-    return { v: -Number(x.operand.text) };
-  if (x.kind === ts.SyntaxKind.TrueKeyword) return { v: true };
-  if (x.kind === ts.SyntaxKind.FalseKeyword) return { v: false };
-  if (x.kind === ts.SyntaxKind.NullKeyword) return { v: null };
-  if (ts.isIdentifier(x) && x.text === 'undefined') return { v: undefined };
+  if (x.type === 'TemplateLiteral') return x.expressions.length === 0 ? { v: x.quasis[0]!.value.cooked ?? '' } : null;
+  if (x.type === 'Literal') {
+    const v = x.value;
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) return { v };
+    return null;
+  }
+  if (x.type === 'UnaryExpression' && x.operator === '-' && x.argument.type === 'Literal' && typeof x.argument.value === 'number')
+    return { v: -x.argument.value };
+  if (x.type === 'Identifier' && x.name === 'undefined') return { v: undefined };
   return null;
 }
 
 const litCode = (l: Literal): string => (l.v === undefined ? 'undefined' : JSON.stringify(l.v));
 
+const propName = (key: Node): string | null => {
+  if (key.type === 'Identifier') return key.name;
+  if (key.type === 'Literal' && typeof key.value === 'string') return key.value;
+  return null;
+};
+
 /** Contains a call evaluated together with the expression (nested functions and JSX excluded). */
-function isDynamic(e: ts.Node): boolean {
+function isDynamic(e: Node): boolean {
   let found = false;
-  const walk = (n: ts.Node): void => {
-    if (found || isJsx(n) || ts.isFunctionLike(n)) return;
-    if (ts.isCallExpression(n) || ts.isTaggedTemplateExpression(n)) {
+  const walk = (n: Node): void => {
+    if (found || isJsx(n) || isFunctionNode(n)) return;
+    if (n.type === 'CallExpression' || n.type === 'TaggedTemplateExpression') {
       found = true;
       return;
     }
-    ts.forEachChild(n, walk);
+    forEachChild(n, walk);
   };
   walk(e);
   return found;
 }
 
-function hasCall(e: ts.Node): boolean {
+const isFunctionNode = (n: Node): boolean =>
+  n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression' || n.type === 'ArrowFunctionExpression' ||
+  n.type === 'TSDeclareFunction' || n.type === 'TSEmptyBodyFunctionExpression';
+
+function hasCall(e: Node): boolean {
   let found = false;
-  const walk = (n: ts.Node): void => {
+  const walk = (n: Node): void => {
     if (found) return;
-    if (ts.isCallExpression(n) || ts.isTaggedTemplateExpression(n)) found = true;
-    else ts.forEachChild(n, walk);
+    if (n.type === 'CallExpression' || n.type === 'TaggedTemplateExpression') found = true;
+    else forEachChild(n, walk);
   };
   walk(e);
   return found;
 }
 
 /** Every call runs on every evaluation, so the first run sees all dependencies. */
-function isStable(e: ts.Node): boolean {
+function isStable(e: Node): boolean {
   let ok = true;
-  const walk = (n: ts.Node): void => {
+  const walk = (n: Node): void => {
     if (!ok) return;
-    if (ts.isConditionalExpression(n)) {
-      walk(n.condition);
-      if (hasCall(n.whenTrue) || hasCall(n.whenFalse)) ok = false;
+    if (n.type === 'ConditionalExpression') {
+      walk(n.test);
+      if (hasCall(n.consequent) || hasCall(n.alternate)) ok = false;
       return;
     }
-    if (ts.isBinaryExpression(n)) {
-      const op = n.operatorToken.kind;
-      if (op === ts.SyntaxKind.AmpersandAmpersandToken || op === ts.SyntaxKind.BarBarToken || op === ts.SyntaxKind.QuestionQuestionToken) {
-        walk(n.left);
-        if (hasCall(n.right)) ok = false;
-        return;
-      }
+    if (n.type === 'LogicalExpression') {
+      walk(n.left);
+      if (hasCall(n.right)) ok = false;
+      return;
     }
-    if (ts.isOptionalChain(n)) {
+    if (n.type === 'ChainExpression') {
       if (hasCall(n)) ok = false;
       return;
     }
-    if (ts.isFunctionLike(n) || isJsx(n)) {
+    if (isFunctionNode(n) || isJsx(n)) {
       if (hasCall(n)) ok = false;
       return;
     }
-    ts.forEachChild(n, walk);
+    forEachChild(n, walk);
   };
   walk(e);
   return ok;
 }
 
 /** `name()` with an identifier callee and no arguments. */
-function directRead(e: ts.Expression): string | null {
+function directRead(e: Expression): string | null {
   const x = strip(e);
-  if (ts.isCallExpression(x) && !x.arguments.length && ts.isIdentifier(x.expression) && !x.questionDotToken) return x.expression.text;
+  if (x.type === 'CallExpression' && !x.arguments.length && x.callee.type === 'Identifier' && !x.optional) return x.callee.name;
   return null;
 }
 
@@ -205,8 +216,8 @@ interface NodeRef {
 interface Item {
   k: 'text' | 'el' | 'dyn';
   text?: string;
-  node?: ts.JsxElement | ts.JsxSelfClosingElement;
-  expr?: ts.Expression | Jsx;
+  node?: JSXElement;
+  expr?: Expression | Jsx;
 }
 
 interface Setter {
@@ -214,6 +225,9 @@ interface Setter {
   direct: (node: string, value: string) => string;
   hoist?: string;
 }
+
+const attrName = (a: JSXAttribute): { ns: string; local: string } =>
+  a.name.type === 'JSXNamespacedName' ? { ns: a.name.namespace.name, local: a.name.name.name } : { ns: '', local: a.name.name };
 
 class Compiler {
   readonly helpers = new Map<string, string>();
@@ -224,13 +238,11 @@ class Compiler {
   readonly events = new Set<string>();
   uid = 0;
 
-  readonly sf: ts.SourceFile;
   readonly src: string;
   readonly ssr: boolean;
   readonly textual: ReadonlySet<string>;
 
-  constructor(sf: ts.SourceFile, src: string, ssr: boolean, textual: ReadonlySet<string>) {
-    this.sf = sf;
+  constructor(src: string, ssr: boolean, textual: ReadonlySet<string>) {
     this.src = src;
     this.ssr = ssr;
     this.textual = textual;
@@ -242,40 +254,47 @@ class Compiler {
     return alias;
   }
 
-  text(n: ts.Node): string {
-    return this.src.slice(n.getStart(this.sf), n.end);
+  text(n: Node): string {
+    return this.src.slice(n.start, n.end);
+  }
+
+  /** Raw content of a JSX string attribute, entities decoded. */
+  attrString(init: Node): string {
+    return decodeEntities(this.src.slice(init.start + 1, init.end - 1));
   }
 
   /** `rewrite(x)` for an expression placed in an argument list, an assignment or an arrow body. */
-  expr(x: ts.Expression): string {
+  expr(x: Expression): string {
     const code = this.rewrite(x);
     return needsParens(x) ? `(${code})` : code;
   }
 
   /** Source text of `node` with nested JSX compiled. */
-  rewrite(node: ts.Node): string {
+  rewrite(node: Node): string {
     if (isJsx(node)) return this.jsx(node);
-    const start = node.getStart(this.sf);
     let out = '';
-    let pos = start;
-    const walk = (n: ts.Node): void => {
+    let pos = node.start;
+    const walk = (n: Node): void => {
       if (isJsx(n)) {
-        out += this.src.slice(pos, n.getStart(this.sf)) + this.jsx(n);
+        out += this.src.slice(pos, n.start) + this.jsx(n);
         pos = n.end;
         return;
       }
-      ts.forEachChild(n, walk);
+      forEachChild(n, walk);
     };
-    ts.forEachChild(node, walk);
+    forEachChild(node, walk);
     return out + this.src.slice(pos, node.end);
   }
 
   jsx(node: Jsx): string {
-    if (ts.isJsxFragment(node)) return this.fragment(node.children);
-    const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
-    const name = tag.getText(this.sf);
-    if (/^[A-Z]/.test(name) || name.includes('.') || tag.kind === ts.SyntaxKind.ThisKeyword) return this.component(node, name);
+    if (node.type === 'JSXFragment') return this.fragment(node.children);
+    const name = this.tagName(node);
+    if (isComponentName(name)) return this.component(node, name);
     return this.ssr ? this.ssrElement(node) : this.element(node);
+  }
+
+  tagName(node: JSXElement): string {
+    return this.text(node.openingElement.name);
   }
 
   hoist(prefix: string, body: string): string {
@@ -288,58 +307,57 @@ class Compiler {
     return name;
   }
 
-  isTextual(e: ts.Expression): boolean {
+  isTextual(e: Expression): boolean {
     const x = strip(e);
-    if (ts.isStringLiteral(x) || ts.isNumericLiteral(x) || ts.isNoSubstitutionTemplateLiteral(x) || ts.isTemplateExpression(x)) return true;
-    if (ts.isPrefixUnaryExpression(x)) return x.operator === ts.SyntaxKind.MinusToken || x.operator === ts.SyntaxKind.PlusToken;
-    if (ts.isBinaryExpression(x)) {
-      const op = x.operatorToken.kind;
-      if (op === ts.SyntaxKind.PlusToken) return this.isTextual(x.left) || this.isTextual(x.right);
+    if (x.type === 'TemplateLiteral') return true;
+    if (x.type === 'Literal') return typeof x.value === 'string' || typeof x.value === 'number';
+    if (x.type === 'UnaryExpression') return x.operator === '-' || x.operator === '+';
+    if (x.type === 'BinaryExpression') {
+      const op = x.operator;
       return (
-        op === ts.SyntaxKind.MinusToken || op === ts.SyntaxKind.AsteriskToken || op === ts.SyntaxKind.SlashToken ||
-        op === ts.SyntaxKind.PercentToken || op === ts.SyntaxKind.AsteriskAsteriskToken
+        op === '-' || op === '*' || op === '/' || op === '%' || op === '**' ||
+        (op === '+' && (this.isTextual(x.left) || this.isTextual(x.right)))
       );
     }
-    if (ts.isConditionalExpression(x)) return this.isTextual(x.whenTrue) && this.isTextual(x.whenFalse);
-    if (ts.isPropertyAccessExpression(x)) return x.name.text === 'length';
-    if (ts.isCallExpression(x)) {
-      const c = x.expression;
-      if (ts.isIdentifier(c)) return (!x.arguments.length && this.textual.has(c.text)) || c.text === 'String' || c.text === 'Number';
-      if (ts.isPropertyAccessExpression(c)) return TEXT_METHODS.has(c.name.text);
+    if (x.type === 'ConditionalExpression') return this.isTextual(x.consequent) && this.isTextual(x.alternate);
+    if (x.type === 'MemberExpression' && !('computed' in x && x.computed) && x.property.type === 'Identifier') return x.property.name === 'length';
+    if (x.type === 'CallExpression') {
+      const c = x.callee;
+      if (c.type === 'Identifier') return (!x.arguments.length && this.textual.has(c.name)) || c.name === 'String' || c.name === 'Number';
+      if (c.type === 'MemberExpression' && !('computed' in c && c.computed) && c.property.type === 'Identifier') return TEXT_METHODS.has(c.property.name);
     }
     return false;
   }
 
   /** Reader for `bind`: a direct getter, a hoisted module-level function, or a closure. */
-  reader(e: ts.Expression): { read: string; args: string[] } {
+  reader(e: Expression): { read: string; args: string[] } {
     const direct = directRead(e);
     if (direct) return { read: direct, args: [] };
     const x = strip(e);
-    const start = x.getStart(this.sf);
+    const start = x.start;
     const params = new Map<string, string>();
     const edits: [number, number, string][] = [];
     let ok = true;
-    const walk = (n: ts.Node): void => {
+    const walk = (n: Node, p: Node | undefined): void => {
       if (!ok) return;
-      if (ts.isIdentifier(n)) {
-        const p = n.parent;
-        if (ts.isPropertyAccessExpression(p) && p.name === n) return;
-        if (ts.isCallExpression(p) && p.expression === n && !p.arguments.length) {
-          let name = params.get(n.text);
-          if (!name) params.set(n.text, (name = `p${params.size}`));
-          edits.push([n.getStart(this.sf) - start, n.end - start, name]);
+      if (n.type === 'Identifier') {
+        if (p?.type === 'MemberExpression' && p.property === n && !('computed' in p && p.computed)) return;
+        if (p?.type === 'CallExpression' && p.callee === n && !p.arguments.length) {
+          let name = params.get(n.name);
+          if (!name) params.set(n.name, (name = `p${params.size}`));
+          edits.push([n.start - start, n.end - start, name]);
           return;
         }
         ok = false;
         return;
       }
-      if (n.kind === ts.SyntaxKind.ThisKeyword || ts.isFunctionLike(n) || isJsx(n) || ts.isNewExpression(n) || ts.isObjectLiteralExpression(n)) {
+      if (n.type === 'ThisExpression' || isFunctionNode(n) || isJsx(n) || n.type === 'NewExpression' || n.type === 'ObjectExpression') {
         ok = false;
         return;
       }
-      ts.forEachChild(n, walk);
+      forEachChild(n, (c) => walk(c, n));
     };
-    walk(x);
+    walk(x, undefined);
     if (!ok || params.size !== 1) return { read: `() => ${this.expr(x)}`, args: [] };
     let body = this.text(x);
     for (let i = edits.length - 1; i >= 0; i--) {
@@ -356,7 +374,7 @@ class Compiler {
   }
 
   /** One DOM write per change: direct call, `bind` for stable reads, `effect` otherwise. */
-  watch(node: string, e: ts.Expression, s: Setter): string {
+  watch(node: string, e: Expression, s: Setter): string {
     const x = getterBody(e) ?? strip(e);
     if (!isDynamic(x)) return `${s.direct(node, this.expr(x))};`;
     if (isStable(x)) {
@@ -366,7 +384,7 @@ class Compiler {
     return `${this.h('effect')}(() => ${s.direct(node, this.expr(x))});`;
   }
 
-  children(list: readonly ts.JsxChild[]): Item[] {
+  children(list: readonly JSXChild[]): Item[] {
     const items: Item[] = [];
     const pushText = (t: string): void => {
       const last = items[items.length - 1];
@@ -374,29 +392,27 @@ class Compiler {
       else items.push({ k: 'text', text: t });
     };
     for (const c of list) {
-      if (ts.isJsxText(c)) {
-        const t = cleanText(c.text);
+      if (c.type === 'JSXText') {
+        const t = cleanText(this.text(c));
         if (t) pushText(decodeEntities(t));
-      } else if (ts.isJsxExpression(c)) {
-        if (!c.expression) continue;
+      } else if (c.type === 'JSXExpressionContainer') {
+        if (c.expression.type === 'JSXEmptyExpression') continue;
         const lit = literal(c.expression);
         if (lit && (typeof lit.v === 'string' || typeof lit.v === 'number')) pushText(String(lit.v));
         else if (lit && (lit.v == null || typeof lit.v === 'boolean')) continue;
         else items.push({ k: 'dyn', expr: c.expression });
-      } else if ((ts.isJsxElement(c) || ts.isJsxSelfClosingElement(c)) && !this.isComponentTag(c)) items.push({ k: 'el', node: c });
+      } else if (c.type === 'JSXElement' && !this.isComponentTag(c)) items.push({ k: 'el', node: c });
       else items.push({ k: 'dyn', expr: c as Jsx });
     }
     return items;
   }
 
-  isComponentTag(n: ts.JsxElement | ts.JsxSelfClosingElement): boolean {
-    const tag = ts.isJsxElement(n) ? n.openingElement.tagName : n.tagName;
-    const name = tag.getText(this.sf);
-    return /^[A-Z]/.test(name) || name.includes('.') || tag.kind === ts.SyntaxKind.ThisKeyword;
+  isComponentTag(n: JSXElement): boolean {
+    return isComponentName(this.tagName(n));
   }
 
   /** Value passed to `insert`: compiled JSX, a function for reactive expressions, or the value. */
-  childValue(e: ts.Expression | Jsx): string {
+  childValue(e: Expression | Jsx): string {
     if (isJsx(e)) return this.jsx(e);
     const x = strip(e);
     if (isJsx(x)) return this.jsx(x);
@@ -407,12 +423,11 @@ class Compiler {
 
   // ---------------------------------------------------------------- DOM elements
 
-  element(node: ts.JsxElement | ts.JsxSelfClosingElement): string {
+  element(node: JSXElement): string {
     const root: NodeRef = { parent: null, index: 0, children: [], needed: true, name: '' };
     const ops: (() => string)[] = [];
     let flags = 0;
-    const tagOf = (n: ts.JsxElement | ts.JsxSelfClosingElement) => (ts.isJsxElement(n) ? n.openingElement : n).tagName.getText(this.sf);
-    const rootTag = tagOf(node);
+    const rootTag = this.tagName(node);
     if (SVG.has(rootTag)) flags |= 2;
 
     const need = (r: NodeRef): (() => string) => {
@@ -420,17 +435,16 @@ class Compiler {
       return () => r.name;
     };
 
-    const build = (n: ts.JsxElement | ts.JsxSelfClosingElement, ref: NodeRef): string => {
-      const tag = tagOf(n);
+    const build = (n: JSXElement, ref: NodeRef): string => {
+      const tag = this.tagName(n);
       const custom = tag.includes('-');
       if (custom) flags |= 1;
       const el = need.bind(null, ref);
       let html = `<${tag}`;
-      const attrs = (ts.isJsxElement(n) ? n.openingElement : n).attributes.properties;
-      for (const a of attrs) html += this.attribute(a, tag, custom, el, ops);
+      for (const a of n.openingElement.attributes) html += this.attribute(a, tag, custom, el, ops);
       html += '>';
       if (VOID.has(tag)) return html;
-      const items = ts.isJsxElement(n) ? this.children(n.children) : [];
+      const items = this.children(n.children);
       let index = 0;
       const child = (): NodeRef => {
         const r: NodeRef = { parent: ref, index: index++, children: [], needed: false, name: '' };
@@ -447,10 +461,10 @@ class Compiler {
           const only = items.length === 1;
           const last = i === items.length - 1;
           const parent = el();
-          if (only && !isJsx(e) && isDynamic(strip(e as ts.Expression)) && this.isTextual(e as ts.Expression)) {
+          if (only && !isJsx(e) && isDynamic(strip(e as Expression)) && this.isTextual(e as Expression)) {
             html += ' ';
             const t = need(child());
-            ops.push(() => this.watch(t(), e as ts.Expression, { helper: this.h('setText'), direct: (nn, v) => `${this.h('setText')}(${nn}, ${v})` }));
+            ops.push(() => this.watch(t(), e as Expression, { helper: this.h('setText'), direct: (nn, v) => `${this.h('setText')}(${nn}, ${v})` }));
           } else if (only) ops.push(() => `${this.h('insert')}(${parent()}, ${this.childValue(e)});`);
           else if (last) ops.push(() => `${this.h('insert')}(${parent()}, ${this.childValue(e)}, null);`);
           else {
@@ -495,25 +509,24 @@ class Compiler {
     return `(() => { const ${decls.join(', ')}; ${body} return ${root.name}; })()`;
   }
 
-  attribute(a: ts.JsxAttributeLike, tag: string, custom: boolean, el: () => () => string, ops: (() => string)[]): string {
-    if (ts.isJsxSpreadAttribute(a)) {
+  attribute(a: JSXAttributeItem, tag: string, custom: boolean, el: () => () => string, ops: (() => string)[]): string {
+    if (a.type === 'JSXSpreadAttribute') {
       const node = el();
-      ops.push(() => `${this.h('spread')}(${node()}, ${this.rewrite(a.expression)});`);
+      ops.push(() => `${this.h('spread')}(${node()}, ${this.rewrite(a.argument)});`);
       return '';
     }
-    const ns = ts.isJsxNamespacedName(a.name) ? a.name.namespace.text : '';
-    const local = ts.isJsxNamespacedName(a.name) ? a.name.name.text : a.name.text;
+    const { ns, local } = attrName(a);
     const name = ns ? `${ns}:${local}` : local;
-    const init = a.initializer;
-    let expr: ts.Expression | null = null;
+    const init = a.value;
+    let expr: Expression | null = null;
     let lit: Literal | null = null;
     if (!init) lit = { v: true };
-    else if (ts.isStringLiteral(init)) lit = { v: decodeEntities(init.text) };
-    else if (ts.isJsxExpression(init)) {
-      if (!init.expression) return '';
+    else if (init.type === 'Literal') lit = { v: this.attrString(init) };
+    else if (init.type === 'JSXExpressionContainer') {
+      if (init.expression.type === 'JSXEmptyExpression') return '';
       expr = init.expression;
       lit = literal(expr);
-    } else expr = init as unknown as ts.Expression;
+    } else expr = init;
 
     const staticAttr = (attrName: string): string => {
       const v = lit!.v;
@@ -578,23 +591,28 @@ class Compiler {
     return watchAttr(attrSetter(name));
   }
 
-  styleAttr(expr: ts.Expression | null, lit: Literal | null, op: (fn: (node: string) => string) => string): string {
+  styleAttr(expr: Expression | null, lit: Literal | null, op: (fn: (node: string) => string) => string): string {
     if (lit) return typeof lit.v === 'string' && lit.v ? ` style="${escAttr(lit.v)}"` : '';
     const x = strip(expr!);
-    if (ts.isObjectLiteralExpression(x)) {
+    if (x.type === 'ObjectExpression') {
       let css = '';
-      const dyn: [string, ts.Expression][] = [];
+      const dyn: [string, Expression][] = [];
       let simple = true;
       for (const p of x.properties) {
-        if (!ts.isPropertyAssignment(p) || !(ts.isIdentifier(p.name) || ts.isStringLiteral(p.name))) {
+        if (p.type !== 'Property' || p.kind !== 'init' || p.method || p.shorthand || p.computed) {
           simple = false;
           break;
         }
-        const key = kebab(p.name.text);
-        const v = literal(p.initializer);
+        const name = propName(p.key);
+        if (name === null) {
+          simple = false;
+          break;
+        }
+        const key = kebab(name);
+        const v = literal(p.value);
         if (v) {
           if (v.v != null && v.v !== false) css += `${key}: ${v.v}; `;
-        } else dyn.push([key, p.initializer]);
+        } else dyn.push([key, p.value]);
       }
       if (simple) {
         for (const [key, value] of dyn)
@@ -620,30 +638,30 @@ class Compiler {
     });
   }
 
-  component(node: ts.JsxElement | ts.JsxSelfClosingElement, tag: string): string {
+  component(node: JSXElement, tag: string): string {
     if (this.ssr) return '""';
     const short = tag.split('.').pop()!;
     const provider = short === 'Provider';
     const builtin = BUILTIN.has(tag) || provider;
     const flow = FLOW.has(tag);
     const props: string[] = [];
-    const opening = ts.isJsxElement(node) ? node.openingElement : node;
-    const thunk = (e: ts.Expression): string => (isFn(e) ? this.rewrite(e) : `() => ${this.rewrite(e)}`);
+    const thunk = (e: Expression): string => (isFn(e) ? this.rewrite(e) : `() => ${this.rewrite(e)}`);
     const keyOf = (k: string): string => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k));
 
-    for (const a of opening.attributes.properties) {
-      if (ts.isJsxSpreadAttribute(a)) {
-        props.push(`...${this.rewrite(a.expression)}`);
+    for (const a of node.openingElement.attributes) {
+      if (a.type === 'JSXSpreadAttribute') {
+        props.push(`...${this.rewrite(a.argument)}`);
         continue;
       }
-      const name = ts.isJsxNamespacedName(a.name) ? `${a.name.namespace.text}:${a.name.name.text}` : a.name.text;
-      const init = a.initializer;
+      const { ns, local } = attrName(a);
+      const name = ns ? `${ns}:${local}` : local;
+      const init = a.value;
       let value: string;
-      let expr: ts.Expression | null = null;
+      let expr: Expression | null = null;
       if (!init) value = 'true';
-      else if (ts.isStringLiteral(init)) value = JSON.stringify(decodeEntities(init.text));
-      else if (ts.isJsxExpression(init)) {
-        if (!init.expression) continue;
+      else if (init.type === 'Literal') value = JSON.stringify(this.attrString(init));
+      else if (init.type === 'JSXExpressionContainer') {
+        if (init.expression.type === 'JSXEmptyExpression') continue;
         expr = init.expression;
         value = this.rewrite(expr);
       } else value = this.rewrite(init);
@@ -660,23 +678,21 @@ class Compiler {
       else props.push(`${key}: ${value}`);
     }
 
-    if (ts.isJsxElement(node)) {
-      const items = this.children(node.children);
-      if (items.length) {
-        const only = items.length === 1 ? items[0]! : null;
-        const fnChild = only && only.k === 'dyn' && !isJsx(only.expr!) && isFn(only.expr as ts.Expression);
-        const values = this.componentChildren(items);
-        const value = values.length === 1 ? values[0]! : `[${values.join(', ')}]`;
-        if (fnChild && (builtin || tag === 'For')) props.push(`children: ${value}`);
-        else if (builtin && (flow || provider)) props.push(`children: () => ${value}`);
-        else if (builtin) props.push(`children: ${value}`);
-        else props.push(`children: () => ${value}`);
-      }
+    const items = this.children(node.children);
+    if (items.length) {
+      const only = items.length === 1 ? items[0]! : null;
+      const fnChild = only && only.k === 'dyn' && !isJsx(only.expr!) && isFn(only.expr as Expression);
+      const values = this.componentChildren(items);
+      const value = values.length === 1 ? values[0]! : `[${values.join(', ')}]`;
+      if (fnChild && (builtin || tag === 'For')) props.push(`children: ${value}`);
+      else if (builtin && (flow || provider)) props.push(`children: () => ${value}`);
+      else if (builtin) props.push(`children: ${value}`);
+      else props.push(`children: () => ${value}`);
     }
     return `${this.h('createComponent')}(${tag}, { ${props.join(', ')} })`;
   }
 
-  fragment(children: readonly ts.JsxChild[]): string {
+  fragment(children: readonly JSXChild[]): string {
     const items = this.children(children);
     if (this.ssr) return this.ssrConcat(this.ssrItems(items));
     const values = items.map((it) => {
@@ -705,12 +721,12 @@ class Compiler {
     return out.length === 1 ? out[0]! : `(${out.join(' + ')})`;
   }
 
-  hasJsx(e: ts.Node): boolean {
+  hasJsx(e: Node): boolean {
     let found = false;
-    const walk = (n: ts.Node): void => {
+    const walk = (n: Node): void => {
       if (found) return;
       if (isJsx(n)) found = true;
-      else ts.forEachChild(n, walk);
+      else forEachChild(n, walk);
     };
     walk(e);
     return found;
@@ -725,10 +741,10 @@ class Compiler {
         const only = items.length === 1;
         const last = i === items.length - 1;
         const e = it.expr!;
-        const hole = isJsx(e) || this.hasJsx(e) || isFn(e as ts.Expression);
+        const hole = isJsx(e) || this.hasJsx(e) || isFn(e as Expression);
         if (!only && !last) parts.push('<!---->');
         else if (!hole) {
-          const x = getterBody(e as ts.Expression) ?? strip(e as ts.Expression);
+          const x = getterBody(e as Expression) ?? strip(e as Expression);
           const code = `${this.h('escape')}(${this.expr(x)})`;
           parts.push({ code: only && isDynamic(x) && this.isTextual(x) ? `(${code} || " ")` : code });
         }
@@ -737,40 +753,41 @@ class Compiler {
     return parts;
   }
 
-  ssrElement(node: ts.JsxElement | ts.JsxSelfClosingElement): string {
+  ssrElement(node: JSXElement): string {
     return this.ssrConcat(this.ssrParts(node));
   }
 
-  ssrParts(node: ts.JsxElement | ts.JsxSelfClosingElement): (string | { code: string })[] {
-    const opening = ts.isJsxElement(node) ? node.openingElement : node;
-    const tag = opening.tagName.getText(this.sf);
+  ssrParts(node: JSXElement): (string | { code: string })[] {
+    const opening = node.openingElement;
+    const tag = this.tagName(node);
     const custom = tag.includes('-');
     const parts: (string | { code: string })[] = [`<${tag}`];
-    for (const a of opening.attributes.properties) {
-      if (ts.isJsxSpreadAttribute(a)) continue;
-      const ns = ts.isJsxNamespacedName(a.name) ? a.name.namespace.text : '';
-      const local = ts.isJsxNamespacedName(a.name) ? a.name.name.text : a.name.text;
+    for (const a of opening.attributes) {
+      if (a.type === 'JSXSpreadAttribute') continue;
+      const { ns, local } = attrName(a);
       if (ns === 'on' || ns === 'prop' || local === 'ref' || /^on[A-Z]/.test(local)) continue;
       let name = ns && ns !== 'attr' ? `${ns}:${local}` : local;
       if (name === 'className') name = 'class';
       if (name === 'htmlFor' && !custom) name = 'for';
       if (name === 'innerHTML' || name === 'textContent' || name === 'innerText') continue;
-      const init = a.initializer;
-      let expr: ts.Expression | null = null;
+      const init = a.value;
+      let expr: Expression | null = null;
       let lit: Literal | null = null;
       if (!init) lit = { v: true };
-      else if (ts.isStringLiteral(init)) lit = { v: decodeEntities(init.text) };
-      else if (ts.isJsxExpression(init)) {
-        if (!init.expression) continue;
+      else if (init.type === 'Literal') lit = { v: this.attrString(init) };
+      else if (init.type === 'JSXExpressionContainer') {
+        if (init.expression.type === 'JSXEmptyExpression') continue;
         expr = init.expression;
         lit = literal(expr);
       } else continue;
-      if (name === 'style' && expr && ts.isObjectLiteralExpression(strip(expr))) {
+      if (name === 'style' && expr && strip(expr).type === 'ObjectExpression') {
         let css = '';
-        for (const p of (strip(expr) as ts.ObjectLiteralExpression).properties) {
-          if (!ts.isPropertyAssignment(p) || !(ts.isIdentifier(p.name) || ts.isStringLiteral(p.name))) continue;
-          const v = literal(p.initializer);
-          if (v && v.v != null && v.v !== false) css += `${kebab(p.name.text)}: ${v.v}; `;
+        for (const p of (strip(expr) as Extract<Expression, { type: 'ObjectExpression' }>).properties) {
+          if (p.type !== 'Property' || p.computed) continue;
+          const pn = propName(p.key);
+          if (pn === null) continue;
+          const v = literal(p.value);
+          if (v && v.v != null && v.v !== false) css += `${kebab(pn)}: ${v.v}; `;
         }
         css = css.trim();
         if (css) parts.push(` style="${escAttr(css)}"`);
@@ -787,14 +804,12 @@ class Compiler {
     }
     parts.push('>');
     if (!VOID.has(tag)) {
-      if (ts.isJsxElement(node)) parts.push(...this.ssrItems(this.children(node.children)));
+      parts.push(...this.ssrItems(this.children(node.children)));
       parts.push(`</${tag}>`);
     }
     return parts;
   }
 }
-
-const KIND = (filename: string): ts.ScriptKind => (/\.[mc]?jsx?$/.test(filename) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX);
 
 /**
  * Compiles JSX in `code` into hoisted templates and direct DOM writes (or, with
@@ -807,8 +822,8 @@ export function compile(code: string, options: CompileOptions = {}): CompileResu
   const moduleName = options.moduleName ?? '@surgijs/core';
   const unwrapped = unwrapGetterReads(code, filename);
   const src = unwrapped.code;
-  const sf = ts.createSourceFile(filename, src, ts.ScriptTarget.Latest, true, KIND(filename));
-  const c = new Compiler(sf, src, ssr, unwrapped.textual);
+  const program = parse(filename, src);
+  const c = new Compiler(src, ssr, unwrapped.textual);
 
   interface Chunk {
     text: string;
@@ -818,17 +833,16 @@ export function compile(code: string, options: CompileOptions = {}): CompileResu
   }
   const chunks: Chunk[] = [];
   let pos = 0;
-  const find = (n: ts.Node): void => {
+  const find = (n: Node): void => {
     if (isJsx(n)) {
-      const start = n.getStart(sf);
-      chunks.push({ text: src.slice(pos, start), at: pos, copy: true });
-      chunks.push({ text: c.jsx(n), at: start, copy: false });
+      chunks.push({ text: src.slice(pos, n.start), at: pos, copy: true });
+      chunks.push({ text: c.jsx(n), at: n.start, copy: false });
       pos = n.end;
       return;
     }
-    ts.forEachChild(n, find);
+    forEachChild(n, find);
   };
-  find(sf);
+  find(program);
   if (!chunks.length && !unwrapped.inserts.length) return { code, changed: false };
   chunks.push({ text: src.slice(pos), at: pos, copy: true });
 
