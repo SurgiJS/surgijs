@@ -1,3 +1,5 @@
+import { parseSync } from 'oxc-parser';
+import { children, type Node } from './ast.ts';
 import { compile } from './index.ts';
 
 export interface SurgiVitePluginOptions {
@@ -30,8 +32,18 @@ interface SurgiViteConfigContext {
 }
 
 const DEFAULT = /\.[jt]sx$/;
-/** A `defineComponent(` or `defineComponent<` call; the runtime's own declaration does not match. */
-const DEFINES = /(?<!function\s+)\bdefineComponent\s*[(<]/;
+
+/** Whether the module calls `defineComponent`; mentions in comments, strings or declarations do not count. */
+function definesComponent(file: string, code: string): boolean {
+  if (!code.includes('defineComponent')) return false;
+  const stack: Node[] = [parseSync(file, code, { sourceType: 'module' }).program as Node];
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (n.type === 'CallExpression' && n.callee.type === 'Identifier' && n.callee.name === 'defineComponent') return true;
+    stack.push(...children(n));
+  }
+  return false;
+}
 
 /** Vite / Rollup plugin: compiles SurgiJS JSX before other transforms. */
 export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePlugin {
@@ -62,7 +74,7 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
           })
         : null;
       const changed = result?.changed === true;
-      const refresh = generate !== 'ssr' && !file.startsWith('\0') && !file.includes('/node_modules/') && DEFINES.test(code);
+      const refresh = generate !== 'ssr' && !file.startsWith('\0') && !file.includes('/node_modules/') && definesComponent(file, code);
       if (!changed && !refresh) return null;
       const source = changed ? result!.code : code;
       const out = refresh ? `${source}\nif (import.meta.hot) import.meta.hot.accept();\n` : source;

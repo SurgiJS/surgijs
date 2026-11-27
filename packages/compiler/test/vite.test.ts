@@ -30,6 +30,7 @@ describe('vite plugin HMR', () => {
   it('leaves modules without a component definition alone', () => {
     expect(plugin.transform('export const n = 1;', '/src/n.ts')).toBeNull();
     expect(plugin.transform('export function defineComponent<P>(tag: string) {}', '/src/component.ts')).toBeNull();
+    expect(plugin.transform("// defineComponent('x', f)\nexport const s = 'defineComponent(';", '/src/labels.ts')).toBeNull();
   });
 
   it('skips SSR output and dependencies', () => {
