@@ -64,12 +64,18 @@ reviews:
         code samples match the current public API.
     - path: ".changeset/*.md"
       instructions: |
-        `surgijs` and `@surgijs/compiler` version as a fixed group. Below 1.0 breaking
+        `@surgijs/core` and `@surgijs/compiler` version as a fixed group; `@surgijs/store`
+        versions on its own. Below 1.0 breaking
         changes bump the minor version; check the bump matches the change.
     - path: ".github/workflows/**"
       instructions: |
         Check pinned actions, least-privilege `permissions`, and that CI still runs
         typecheck, test, size and build.
+    - path: ".github/workflows/release.yml"
+      instructions: |
+        npm publishing uses trusted publishing (OIDC): it needs `id-token: write` and
+        npm >= 11.5.1. Flag any `NPM_TOKEN`, `NODE_AUTH_TOKEN` or setup-node
+        `registry-url`, since they make npm skip the OIDC exchange.
 
   tools:
     actionlint:
@@ -83,7 +89,7 @@ reviews:
     gitleaks:
       enabled: true
     biome:
-      enabled: true
+      enabled: false
     eslint:
       enabled: false
     languagetool:
