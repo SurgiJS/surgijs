@@ -6,7 +6,8 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "custom-elements.json"
   ],
   "keywords": [
     "surgijs",
@@ -39,22 +40,47 @@
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js"
     },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "import": "./dist/vue.js"
+    },
     "./themes.css": "./dist/themes.css",
+    "./custom-elements.json": "./custom-elements.json",
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "customElements": "custom-elements.json",
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "generate": "node scripts/manifest.mjs"
   },
   "peerDependencies": {
-    "@surgijs/core": "workspace:^"
+    "@surgijs/core": "workspace:^",
+    "react": ">=19",
+    "vue": ">=3.4"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@surgijs/compiler": "workspace:*",
     "@surgijs/core": "workspace:*",
-    "happy-dom": "^20.0.10"
+    "@types/react": "^19.2.2",
+    "happy-dom": "^20.0.10",
+    "react": "^19.2.0",
+    "typescript": "~6.0.3",
+    "vue": "^3.5.45"
   }
 }

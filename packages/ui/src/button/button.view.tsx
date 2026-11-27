@@ -5,15 +5,30 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 export type ButtonType = 'button' | 'submit' | 'reset';
 
 export interface ButtonProps {
-  /** Visual style. Default `primary`. */
+  /**
+   * Visual style.
+   * @default 'primary'
+   */
   variant?: ButtonVariant;
-  /** Height, padding and font size. Default `md`. */
+  /**
+   * Height, padding and font size.
+   * @default 'md'
+   */
   size?: ButtonSize;
-  /** `submit` submits and `reset` resets the closest form. Default `button`. */
+  /**
+   * `submit` submits and `reset` resets the closest form.
+   * @default 'button'
+   */
   type?: ButtonType;
-  /** Removes the button from the tab order and blocks clicks. */
+  /**
+   * Removes the button from the tab order and blocks clicks.
+   * @default false
+   */
   disabled?: boolean;
-  /** Shows a spinner, sets `aria-busy` and blocks clicks while keeping focus. */
+  /**
+   * Shows a spinner, sets `aria-busy` and blocks clicks while keeping focus.
+   * @default false
+   */
   loading?: boolean;
   /** Accessible name for buttons without text, such as icon-only buttons. */
   label?: string;

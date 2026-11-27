@@ -53,6 +53,7 @@ export default defineConfig({
         items: [
           { text: 'Overview and theming', link: '/ui/' },
           { text: 'Button', link: '/ui/button' },
+          { text: 'Frameworks', link: '/ui/frameworks' },
         ],
       },
       {
