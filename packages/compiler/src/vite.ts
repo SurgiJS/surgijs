@@ -21,12 +21,12 @@ export interface SourceMapV3 {
 export interface SurgiVitePlugin {
   name: string;
   enforce: 'pre';
-  config(this: SurgiViteConfigContext | void): { esbuild: { jsx: 'preserve' } } | { oxc: { jsx: 'preserve' } };
+  config(this: SurgiViteConfigContext | void): { esbuild: { jsx: 'preserve' } };
   transform(code: string, id: string): { code: string; map: SourceMapV3 | null } | null;
 }
 
 interface SurgiViteConfigContext {
-  meta?: { rolldownVersion?: string };
+  meta?: object;
 }
 
 const DEFAULT = /\.[jt]sx$/;
@@ -44,8 +44,10 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
     name: 'surgijs',
     enforce: 'pre',
     config() {
-      // Vite 8 runs on Rolldown and Oxc: the `esbuild` option is deprecated there.
-      return this?.meta?.rolldownVersion ? { oxc: { jsx: 'preserve' } } : { esbuild: { jsx: 'preserve' } };
+      // Vite 8 runs on Rolldown and Oxc: the `esbuild` option is deprecated there. Vite 7 types
+      // have no `oxc` key, so the Vite 8 branch is cast to the declared shape.
+      const rolldown = (this?.meta as { rolldownVersion?: string } | undefined)?.rolldownVersion;
+      return rolldown ? ({ oxc: { jsx: 'preserve' } } as unknown as { esbuild: { jsx: 'preserve' } }) : { esbuild: { jsx: 'preserve' } };
     },
     transform(code, id) {
       if (!matches(id)) return null;
