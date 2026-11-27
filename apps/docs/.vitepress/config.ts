@@ -29,6 +29,7 @@ export default defineConfig({
         text: 'Guide',
         items: [
           { text: 'Getting started', link: '/guide/getting-started' },
+          { text: 'For React developers', link: '/guide/from-react' },
           { text: 'JSX to DOM', link: '/guide/jsx' },
           { text: 'Reactivity and hooks', link: '/guide/reactivity' },
           { text: 'Store', link: '/guide/store' },

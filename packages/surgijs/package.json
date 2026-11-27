@@ -32,6 +32,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./internal": {
+      "@surgijs/source": "./src/internal.ts",
+      "types": "./dist/internal.d.ts",
+      "import": "./dist/internal.js"
+    },
     "./jsx-runtime": {
       "@surgijs/source": "./src/jsx-runtime.ts",
       "types": "./dist/jsx-runtime.d.ts",
