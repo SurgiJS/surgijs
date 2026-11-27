@@ -1,8 +1,18 @@
 <script>
-  let items = $state([]);
+  let items = $state.raw([]);
+
+  class Item {
+    label = $state.raw('');
+    on = $state.raw(false);
+
+    constructor(id, label) {
+      this.id = id;
+      this.label = label;
+    }
+  }
 
   export function init(data) {
-    items = data.map((d) => ({ ...d, on: false }));
+    items = data.map((d) => new Item(d.id, d.label));
   }
 
   export function label(i, value) {
