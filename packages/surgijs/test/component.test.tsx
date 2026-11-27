@@ -275,6 +275,23 @@ describe('defineComponent', () => {
     expect(renders).toBe(2);
   });
 
+  it('does not render a host that a cleanup detaches during redefine', () => {
+    let renders = 0;
+    defineComponent('x-hot-cleanup', (_props, host) => {
+      onCleanup(() => host.remove());
+      return <p>one</p>;
+    });
+    const el = document.createElement('x-hot-cleanup');
+    document.body.appendChild(el);
+    defineComponent('x-hot-cleanup', () => (renders++, <p>two</p>));
+    expect(el.isConnected).toBe(false);
+    expect(renders).toBe(0);
+    expect(el.shadowRoot!.childNodes.length).toBe(0);
+    document.body.appendChild(el);
+    expect(el.shadowRoot!.innerHTML).toBe('<p>two</p>');
+    expect(renders).toBe(1);
+  });
+
   it('runs effects after the shadow root holds the nodes', () => {
     let inRoot = false;
     defineComponent('x-effect', (_props, host) => {

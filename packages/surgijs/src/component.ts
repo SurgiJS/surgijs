@@ -229,11 +229,11 @@ export function defineComponent<P extends object = {}>(
     for (const el of [...hosts]) {
       const self = el as unknown as Host;
       if (!self.__d) continue;
+      if (el.isConnected) self.__d();
       if (!el.isConnected) {
         unmount(self);
         continue;
       }
-      self.__d();
       self.__r!.replaceChildren();
       mount(el, self.__r!, self.__o);
     }
