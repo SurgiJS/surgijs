@@ -30,7 +30,7 @@ export interface SurgiVitePlugin {
   enforce: 'pre';
   config(this: SurgiViteConfigContext | void): { esbuild: { jsx: 'preserve' } };
   configResolved(config: { command: string }): void;
-  transform(code: string, id: string): { code: string; map: SourceMapV3 | null } | null;
+  transform(code: string, id: string, options?: { ssr?: boolean }): { code: string; map: SourceMapV3 | null } | null;
   transformIndexHtml: {
     order: 'pre';
     handler(): { tag: string; attrs: { type: string }; children: string; injectTo: 'head-prepend' }[] | undefined;
@@ -108,7 +108,7 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
         ];
       },
     },
-    transform(code, id) {
+    transform(code, id, transformOptions) {
       const [file, query = ''] = id.split('?') as [string, string?];
       const generate = /(^|&)ssr(&|=|$)/.test(query) ? 'ssr' : options.generate;
       const result = matches(id)
@@ -119,7 +119,7 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
           })
         : null;
       const changed = result?.changed === true;
-      const refresh = generate !== 'ssr' && !file.startsWith('\0') && !file.includes('/node_modules/') && definesComponent(file, code);
+      const refresh = generate !== 'ssr' && !transformOptions?.ssr && !file.startsWith('\0') && !file.includes('/node_modules/') && definesComponent(file, code);
       if (!changed && !refresh) return null;
       const source = changed ? result!.code : code;
       const out = refresh ? `${source}\nif (import.meta.hot) import.meta.hot.accept();\n` : source;

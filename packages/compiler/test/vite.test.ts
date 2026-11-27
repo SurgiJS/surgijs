@@ -67,5 +67,8 @@ describe('vite plugin HMR', () => {
   it('skips SSR output and dependencies', () => {
     expect(plugin.transform(source, '/src/a.tsx?ssr')?.code ?? '').not.toContain(accept);
     expect(plugin.transform(source, '/node_modules/lib/a.tsx')).toBeNull();
+    const plain = "export const B = defineComponent('x-b', () => null);";
+    expect(plugin.transform(plain, '/src/b.ts', { ssr: true })).toBeNull();
+    expect(plugin.transform(plain, '/src/b.ts', { ssr: false })?.code).toContain(accept);
   });
 });
