@@ -87,11 +87,13 @@ Run it locally with `pnpm bench` (`pnpm bench surgijs solid --rows 10000` for a 
 | [`@surgijs/core`](packages/surgijs) | runtime: `@surgijs/core`, `@surgijs/core/server`, `@surgijs/core/hydrate`, `@surgijs/core/jsx-runtime` |
 | [`@surgijs/compiler`](packages/compiler) | `compile()`, `@surgijs/compiler/vite`, `@surgijs/compiler/esbuild` |
 | [`@surgijs/store`](packages/store) | framework-agnostic store: one object, lazy remotes, deep-equal watches |
+| [`@surgijs/ui`](packages/ui) | accessible web components themed with CSS custom properties, with SSR (not published yet) |
 
 ## Links
 
 - Documentation: https://surgijs.github.io/surgijs/
-- Examples: [`apps/playground`](apps/playground)
+- Playground: https://surgijs.github.io/surgijs/playground/ ([`apps/playground`](apps/playground))
+- Storybook: https://surgijs.github.io/surgijs/storybook/ ([`apps/storybook`](apps/storybook))
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License

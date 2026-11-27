@@ -10,6 +10,7 @@
   "devDependencies": {
     "@surgijs/compiler": "workspace:*",
     "@surgijs/core": "workspace:*",
+    "@surgijs/ui": "workspace:*",
     "vitepress": "^1.6.4",
     "vue": "^3.5.45"
   }

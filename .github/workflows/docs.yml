@@ -29,6 +29,12 @@ jobs:
         env:
           # Project site lives at /surgijs/; a custom domain sets DOCS_BASE to '/'.
           DOCS_BASE: ${{ vars.DOCS_BASE || '/surgijs/' }}
+      - name: Storybook under /storybook/, playground under /playground/
+        run: |
+          pnpm storybook:build
+          cp -r apps/storybook/storybook-static apps/docs/.vitepress/dist/storybook
+          pnpm --filter @surgijs/playground build --base ./
+          cp -r apps/playground/dist apps/docs/.vitepress/dist/playground
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/docs/.vitepress/dist
