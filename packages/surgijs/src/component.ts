@@ -121,6 +121,7 @@ export function defineComponent<P extends object = {}>(
     if (closed) undelegateRoot(root);
     self.__d!();
     self.__d = undefined;
+    self.__o = null;
     hosts.delete(self);
     root.replaceChildren();
   };
