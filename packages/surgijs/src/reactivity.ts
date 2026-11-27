@@ -41,13 +41,8 @@ export interface OwnerNode {
 
 let Owner: OwnerNode | null = null;
 let Listener: Comp | null = null;
-let devRun: ((owner: OwnerNode | null) => void) | null = null;
 let devOwn: ((owner: OwnerNode) => void) | null = null;
 let devFlush: (() => void) | null = null;
-
-export function setDevRun(fn: typeof devRun): void {
-  devRun = fn;
-}
 
 export function setDevOwn(fn: typeof devOwn): void {
   devOwn = fn;
@@ -56,6 +51,7 @@ export function setDevOwn(fn: typeof devOwn): void {
 export function setDevFlush(fn: typeof devFlush): void {
   devFlush = fn;
 }
+
 /** Set while `bind` collects sources: the first goes to `First`; with more, `More` lists all of them. */
 let Collect: true | null = null;
 let First: Source | null = null;
@@ -209,7 +205,7 @@ class Comp implements OwnerNode, Source, Observer {
     this.v = v;
     this.t = t;
     own(this);
-    if (t === 0 && devOwn) devOwn(this);
+    if (devOwn) devOwn(this);
   }
 
   run(): void {
@@ -225,13 +221,11 @@ class Comp implements OwnerNode, Source, Observer {
     this.st = 0;
     let v: unknown;
     let error: [unknown] | undefined;
-    if (devRun) devRun(this);
     try {
       v = this.f(this.v);
     } catch (err) {
       error = [err];
     }
-    if (devRun) devRun(null);
     const s = this.s;
     if (s) {
       for (let i = Index; i < s.length; i++) unlink(s[i]!, this);

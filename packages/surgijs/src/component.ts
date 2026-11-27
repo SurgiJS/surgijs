@@ -144,14 +144,7 @@ export function defineComponent<P extends object = {}>(
         createRoot((dispose) => {
           self.__d = dispose;
           deferMount(() =>
-            insert(
-              root,
-              devRender
-                ? devRender(this, render as (props: object, host: HTMLElement) => unknown, self.__p, () =>
-                    render(self.__p as ReactiveProps<P>, this),
-                  )
-                : render(self.__p as ReactiveProps<P>, this),
-            ),
+            insert(root, devRender ? devRender(this, render, self.__p) : render(self.__p as ReactiveProps<P>, this)),
           );
         });
       } finally {
@@ -165,8 +158,8 @@ export function defineComponent<P extends object = {}>(
         const root = self.__r;
         if (!root || !self.__d || this.isConnected) return;
         if (closed) undelegateRoot(root);
-        devUnmount?.(this);
         self.__d();
+        devUnmount?.(this);
         self.__d = undefined;
         root.replaceChildren();
       });

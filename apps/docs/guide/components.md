@@ -32,7 +32,7 @@ Disconnecting disposes the render root and clears it in the next microtask. An e
 
 ## React DevTools
 
-With the React DevTools extension installed, each custom element shows up while `vite` is serving: the element, its render function, and nested components (`Show`, `For`, `Switch`, and your own). Props are the current getter values. `useState`, `useMemo`, `useRef` and `useId` show as hooks. The Vite plugin loads `@surgijs/core/devtools` for that session. A production build does not include it.
+With the React DevTools extension installed, each custom element shows up while `vite` is serving: the element, its render function, nested components (`Show`, `For`, `Switch`, and your own), and their DOM elements. Props are the values the component last read. `useState`, `useMemo`, `useRef` and `useId` values show under "state". Picking an element on the page selects it in the tree. The Vite plugin loads `@surgijs/core/devtools` for that session. A production build does not include it.
 
 ## Forms
 

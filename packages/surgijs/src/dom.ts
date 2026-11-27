@@ -361,6 +361,6 @@ export function spread(el: Element, props: Record<string, unknown>): void {
 }
 
 export function createComponent<P, R>(fn: (props: P) => R, props: P): R {
-  if (devComponent) return devComponent(fn, props, () => untrack(() => fn(props)));
+  if (devComponent) return devComponent(fn, props);
   return untrack(() => fn(props));
 }

@@ -1,23 +1,13 @@
 import { setDevComponent, setDevNode, setDevRender, setDevUnmount } from './dev';
 import { setDevHook } from './hooks';
-import { setDevFlush, setDevOwn, setDevRun, untrack, type OwnerNode } from './reactivity';
+import { getOwner, onCleanup, setDevFlush, setDevOwn, untrack, type OwnerNode } from './reactivity';
 
-const FunctionComponent = 0;
+// Work tags of React 17+. Components are published as class fibers: DevTools then lists hook
+// values under "state" instead of re-running the component to inspect React hooks.
+const ClassComponent = 1;
 const HostRoot = 3;
 const HostComponent = 5;
-
-interface HookRec {
-  kind: string;
-  read: () => unknown;
-}
-
-interface DevHook {
-  memoizedState: unknown;
-  baseState: unknown;
-  baseQueue: null;
-  queue: null;
-  next: DevHook | null;
-}
+const PerformedWork = 1;
 
 interface Fiber {
   tag: number;
@@ -38,7 +28,7 @@ interface Fiber {
   mode: number;
   flags: number;
   subtreeFlags: number;
-  deletions: Fiber[] | null;
+  deletions: null;
   lanes: number;
   childLanes: number;
   alternate: Fiber | null;
@@ -46,51 +36,59 @@ interface Fiber {
   actualStartTime: number;
   selfBaseDuration: number;
   treeBaseDuration: number;
-  _debugSource: null;
-  _debugOwner: Fiber | null;
-  _debugHookTypes: string[] | null;
-  props: object | null;
-  hooks: HookRec[];
-  kids: Fiber[];
-  cursor: number;
-  root: DevRoot;
+  _debugOwner: null;
 }
 
-interface DevRoot {
-  current: Fiber;
+interface Root {
+  current: Fiber | null;
   containerInfo: Node;
   pendingChildren: null;
   tag: number;
   memoizedUpdaters: Set<Fiber>;
+  inst: Inst;
+}
+
+/** One rendered component or DOM node. `pub` is the fiber DevTools saw last; `spare` the one before. */
+interface Inst {
+  tag: number;
+  type: unknown;
+  node: Node | null;
+  at: OwnerNode | null;
+  parent: Inst | null;
+  kids: Inst[];
+  props: Record<string, unknown>;
+  hooks: [kind: string, read: () => unknown][];
+  rendering: boolean;
+  root: Root;
+  pub: Fiber | null;
+  spare: Fiber | null;
 }
 
 interface HookApi {
   isDisabled?: boolean;
   supportsFiber?: boolean;
   inject: (renderer: object) => number;
-  onCommitFiberRoot: (id: number, root: DevRoot, priority: number, didError: boolean) => void;
-  onCommitFiberUnmount: (id: number, fiber: Fiber) => void;
+  onCommitFiberRoot: (id: number, root: Root, priority?: number, didError?: boolean) => void;
+  onCommitFiberUnmount?: (id: number, fiber: Fiber) => void;
 }
 
 let api: HookApi | null = null;
 let rendererID = 0;
-let installed = false;
-let current: Fiber | null = null;
-let peeking = false;
-let painting = false;
-const roots = new Set<DevRoot>();
-const byNode = new WeakMap<Node, Fiber>();
-const owners = new WeakMap<OwnerNode, Fiber>();
-const stack: { prev: Fiber | null; fiber: Fiber | null; pass: boolean }[] = [];
+let current: Inst | null = null;
+let scheduled = false;
+const roots = new Set<Root>();
+const pending = new Set<Root>();
+const byHost = new WeakMap<Node, Root>();
+const owners = new WeakMap<OwnerNode, Inst>();
 
-function makeFiber(tag: number, type: unknown, parent: Fiber | null): Fiber {
+function makeFiber(): Fiber {
   return {
-    tag,
+    tag: 0,
     key: null,
-    elementType: type,
-    type,
+    elementType: null,
+    type: null,
     stateNode: null,
-    return: parent,
+    return: null,
     child: null,
     sibling: null,
     index: 0,
@@ -111,315 +109,263 @@ function makeFiber(tag: number, type: unknown, parent: Fiber | null): Fiber {
     actualStartTime: 0,
     selfBaseDuration: 0,
     treeBaseDuration: 0,
-    _debugSource: null,
-    _debugOwner: parent,
-    _debugHookTypes: null,
-    props: null,
-    hooks: [],
-    kids: [],
-    cursor: 0,
-    root: parent ? parent.root : (undefined as unknown as DevRoot),
+    _debugOwner: null,
   };
 }
 
-/** Reads accessor props once. Skips `children` so a child render is not run again. */
-function readProps(props: object): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  const prev = peeking;
-  peeking = true;
-  try {
-    untrack(() => {
-      for (const key in props) {
-        if (key === 'children' || key === '~props') continue;
-        const value = (props as Record<string, unknown>)[key];
-        if (typeof value === 'function' && value.length === 0) {
-          try {
-            const next = (value as () => unknown)();
-            if (typeof next !== 'function') out[key] = next;
-          } catch {
-            /* getter threw */
-          }
-        } else if (typeof value !== 'function') out[key] = value;
-      }
-    });
-  } finally {
-    peeking = prev;
+function make(tag: number, type: unknown, parent: Inst | null, node: Node | null): Inst {
+  const inst: Inst = {
+    tag,
+    type,
+    node,
+    at: null,
+    parent,
+    kids: [],
+    props: {},
+    hooks: [],
+    rendering: false,
+    root: parent ? parent.root : (null as unknown as Root),
+    pub: null,
+    spare: null,
+  };
+  if (parent) parent.kids.push(inst);
+  return inst;
+}
+
+/** The component that owns work created now: the one rendering, or the one whose computation runs. */
+function ownerInst(): Inst | null {
+  for (let o = getOwner(); o; o = o.p) {
+    if (current && o === current.at) return current;
+    const inst = owners.get(o);
+    if (inst) return inst;
+  }
+  return current;
+}
+
+function dirty(root: Root): void {
+  pending.add(root);
+  if (scheduled) return;
+  scheduled = true;
+  queueMicrotask(() => {
+    scheduled = false;
+    for (const r of pending) if (roots.has(r)) commit(r);
+    pending.clear();
+  });
+}
+
+function note<T>(inst: Inst, key: string, value: T): T {
+  if (!Object.is(inst.props[key], value)) {
+    inst.props[key] = value;
+    dirty(inst.root);
+  }
+  return value;
+}
+
+/** Copies `props`, recording each value when the component reads it. Nothing is called here. */
+function watch(inst: Inst, props: object): object {
+  const out = {};
+  for (const key of Reflect.ownKeys(props)) {
+    const d = Object.getOwnPropertyDescriptor(props, key)!;
+    if (typeof key === 'string' && key !== 'children') {
+      if (d.get) {
+        const get = d.get;
+        d.get = function (this: unknown) {
+          return note(inst, key, get.call(this));
+        };
+      } else if (typeof d.value === 'function' && d.value.length === 0) {
+        const fn = d.value as (...args: unknown[]) => unknown;
+        inst.props[key] = fn;
+        d.value = function (this: unknown, ...args: unknown[]) {
+          return note(inst, key, fn.apply(this, args));
+        };
+      } else inst.props[key] = d.value;
+    }
+    Object.defineProperty(out, key, d);
   }
   return out;
 }
 
-function applyHooks(fiber: Fiber): void {
-  if (fiber.tag !== FunctionComponent) return;
-  const list = fiber.hooks;
-  if (!list.length) {
-    fiber.memoizedState = null;
-    fiber._debugHookTypes = null;
-    return;
+function render<T>(inst: Inst, fn: () => T): T {
+  const prev = current;
+  current = inst;
+  inst.rendering = true;
+  try {
+    return fn();
+  } finally {
+    inst.rendering = false;
+    current = prev;
+    dirty(inst.root);
   }
-  const types: string[] = [];
-  let head: DevHook | null = null;
-  let prev: DevHook | null = null;
-  for (const hook of list) {
-    types.push(hook.kind);
+}
+
+function forget(inst: Inst): void {
+  for (const kid of inst.kids) forget(kid);
+  if (inst.pub)
+    try {
+      api?.onCommitFiberUnmount?.(rendererID, inst.pub);
+    } catch {
+      /* extension */
+    }
+}
+
+function drop(inst: Inst): void {
+  const kids = inst.parent?.kids;
+  const i = kids ? kids.indexOf(inst) : -1;
+  if (i < 0) return;
+  kids!.splice(i, 1);
+  forget(inst);
+  dirty(inst.root);
+}
+
+function hookState(inst: Inst): Record<string, unknown> | null {
+  if (!inst.hooks.length) return null;
+  const out: Record<string, unknown> = {};
+  const seen: Record<string, number> = {};
+  for (const [kind, read] of inst.hooks) {
+    const n = (seen[kind] = (seen[kind] ?? 0) + 1);
     let value: unknown;
     try {
-      value = untrack(hook.read);
-    } catch {
-      value = undefined;
+      value = untrack(read);
+    } catch (err) {
+      value = err;
     }
-    const node: DevHook = { memoizedState: value, baseState: value, baseQueue: null, queue: null, next: null };
-    if (prev) prev.next = node;
-    else head = node;
-    prev = node;
+    out[n > 1 ? `${kind} ${n}` : kind] = value;
   }
-  fiber.memoizedState = head;
-  fiber._debugHookTypes = types;
+  return out;
 }
 
-function unmount(fiber: Fiber): void {
-  let child = fiber.child;
-  while (child) {
-    const next = child.sibling;
-    unmount(child);
-    child = next;
+function same(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  return ka.every((k) => Object.is((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}
+
+/** Writes `inst` into its spare fiber, so the fiber DevTools holds from the last commit stays intact. */
+function publish(inst: Inst, parent: Fiber | null, index: number): Fiber {
+  const prev = inst.pub;
+  const f = inst.spare ?? makeFiber();
+  f.tag = inst.tag;
+  f.type = f.elementType = inst.type;
+  f.return = parent;
+  f.sibling = null;
+  f.index = index;
+  f.alternate = prev;
+  if (prev) prev.alternate = f;
+  if (inst.tag === HostRoot) {
+    f.stateNode = inst.root;
+    f.memoizedProps = f.pendingProps = null;
+    f.memoizedState = { element: inst.kids.length ? inst.kids[0]!.type : null };
+  } else {
+    f.stateNode = inst.node;
+    f.memoizedProps = f.pendingProps = inst.tag === HostComponent ? {} : { ...inst.props };
+    f.memoizedState = inst.tag === ClassComponent ? hookState(inst) : null;
   }
+  f.flags = !prev || !same(prev.memoizedProps, f.memoizedProps) || !same(prev.memoizedState, f.memoizedState) ? PerformedWork : 0;
+  let last: Fiber | null = null;
+  f.child = null;
+  inst.kids.forEach((kid, i) => {
+    const child = publish(kid, f, i);
+    if (last) last.sibling = child;
+    else f.child = child;
+    last = child;
+  });
+  inst.spare = prev;
+  inst.pub = f;
+  return f;
+}
+
+function commit(root: Root): void {
+  root.current = publish(root.inst, null, 0);
   try {
-    api?.onCommitFiberUnmount(rendererID, fiber);
+    api?.onCommitFiberRoot(rendererID, root, undefined, false);
   } catch {
     /* extension */
   }
 }
 
-function link(parent: Fiber): void {
-  const removed = parent.kids.splice(parent.cursor);
-  parent.deletions = removed.length ? removed : null;
-  for (const fiber of removed) unmount(fiber);
-  let prev: Fiber | null = null;
-  parent.child = parent.kids[0] ?? null;
-  for (const kid of parent.kids) {
-    kid.sibling = null;
-    kid.return = parent;
-    if (prev) prev.sibling = kid;
-    prev = kid;
-  }
-}
-
-function commit(root: DevRoot): void {
-  try {
-    api?.onCommitFiberRoot(rendererID, root, 0, false);
-  } catch {
-    /* extension */
-  }
-  remember(root.current);
-}
-
-/** Points `alternate` at the tree DevTools just saw, so the next commit is an update. */
-function remember(fiber: Fiber | null): void {
-  while (fiber) {
-    const alt = fiber.alternate ?? (fiber.alternate = makeFiber(fiber.tag, fiber.type, fiber.return));
-    alt.memoizedProps = fiber.memoizedProps;
-    alt.pendingProps = fiber.pendingProps;
-    alt.memoizedState = fiber.memoizedState;
-    alt.child = fiber.child;
-    alt.sibling = fiber.sibling;
-    alt.stateNode = fiber.stateNode;
-    alt._debugHookTypes = fiber._debugHookTypes;
-    alt.alternate = fiber;
-    remember(fiber.child);
-    fiber = fiber.sibling;
-  }
-}
-
-function place(parent: Fiber, type: unknown, props: object): Fiber {
-  const index = parent.cursor++;
-  let fiber = parent.kids[index];
-  if (!fiber || fiber.type !== type) {
-    if (fiber) unmount(fiber);
-    fiber = makeFiber(FunctionComponent, type, parent);
-    fiber.root = parent.root;
-    parent.kids[index] = fiber;
-  }
-  fiber.props = props;
-  fiber.pendingProps = fiber.memoizedProps = readProps(props);
-  fiber.hooks = [];
-  fiber.return = parent;
-  fiber.index = index;
-  fiber._debugOwner = parent;
-  return fiber;
-}
-
-function refresh(fiber: Fiber | null): void {
-  while (fiber) {
-    if (fiber.tag === FunctionComponent && fiber.props) {
-      const next = readProps(fiber.props);
-      fiber.pendingProps = next;
-      fiber.memoizedProps = next;
-      applyHooks(fiber);
-    }
-    refresh(fiber.child);
-    fiber = fiber.sibling;
-  }
-}
-
-function devRender(host: HTMLElement, type: (props: object, host: HTMLElement) => unknown, props: object, run: () => unknown): unknown {
-  const rootFiber = makeFiber(HostRoot, null, null);
-  const root: DevRoot = {
-    current: rootFiber,
-    containerInfo: host,
-    pendingChildren: null,
-    tag: 1,
-    memoizedUpdaters: new Set(),
-  };
-  rootFiber.root = root;
-  rootFiber.stateNode = root;
-  rootFiber.memoizedState = { element: type };
-
-  const hostFiber = makeFiber(HostComponent, host.localName, rootFiber);
-  hostFiber.root = root;
-  hostFiber.stateNode = host;
-  rootFiber.child = hostFiber;
-  rootFiber.kids = [hostFiber];
-  rootFiber.cursor = 1;
-
-  const comp = makeFiber(FunctionComponent, type, hostFiber);
-  comp.root = root;
-  comp.props = props;
-  comp.pendingProps = comp.memoizedProps = readProps(props);
-  comp.stateNode = host;
-  hostFiber.child = comp;
-  hostFiber.kids = [comp];
-  hostFiber.cursor = 1;
-
-  byNode.set(host, comp);
+function onRender(host: HTMLElement, fn: (props: any, host: HTMLElement) => unknown, props: object): unknown {
+  const top = make(HostRoot, null, null, null);
+  const root: Root = { current: null, containerInfo: host, pendingChildren: null, tag: 1, memoizedUpdaters: new Set(), inst: top };
+  top.root = root;
+  const comp = make(ClassComponent, fn, make(HostComponent, host.localName, top, host), null);
+  comp.at = getOwner();
+  if (comp.at) owners.set(comp.at, comp);
   roots.add(root);
-  const prev = current;
-  current = comp;
-  try {
-    return run();
-  } finally {
-    link(comp);
-    applyHooks(comp);
-    current = prev;
-    commit(root);
-  }
+  byHost.set(host, root);
+  const wrapped = watch(comp, props);
+  return render(comp, () => fn(wrapped, host));
 }
 
-function devComponent<P, R>(type: (props: P) => R, props: P, run: () => R): R {
-  if (peeking || !current) return run();
-  const fiber = place(current, type, props as object);
-  const prev = current;
-  current = fiber;
-  try {
-    return run();
-  } finally {
-    link(fiber);
-    applyHooks(fiber);
-    current = prev;
-  }
-}
-
-function onRun(owner: OwnerNode | null): void {
-  if (!owner) {
-    const frame = stack.pop();
-    if (!frame) return;
-    if (frame.pass && frame.fiber) {
-      link(frame.fiber);
-      applyHooks(frame.fiber);
-    }
-    current = frame.prev;
-    return;
-  }
-  const mapped = owners.get(owner) ?? null;
-  const pass = mapped != null && mapped !== current;
-  if (pass && mapped) {
-    stack.push({ prev: current, fiber: mapped, pass: true });
-    mapped.cursor = 0;
-    current = mapped;
-    return;
-  }
-  stack.push({ prev: current, fiber: null, pass: false });
-}
-
-function onOwn(owner: OwnerNode): void {
-  if (peeking || !current || typeof current.type !== 'function') return;
-  const name = current.type.name;
-  // shortcut: only For/Show/Switch re-sync children after the first render. Other memos (and ErrorBoundary reset) keep the first tree until the element reconnects.
-  if (name !== 'For' && name !== 'Show' && name !== 'Switch') return;
-  owners.set(owner, current);
+function onComponent<P, R>(fn: (props: P) => R, props: P): R {
+  const parent = ownerInst();
+  if (!parent) return untrack(() => fn(props));
+  const inst = make(ClassComponent, fn, parent, null);
+  inst.at = getOwner();
+  if (inst.at) onCleanup(() => drop(inst));
+  const wrapped = watch(inst, props as object) as P;
+  return render(inst, () => untrack(() => fn(wrapped)));
 }
 
 function onNode(node: Node): void {
-  if (!current || peeking || node.nodeType !== 1) return;
-  const el = node as Element;
-  byNode.set(el, current);
-  const all = el.querySelectorAll('*');
-  for (let i = 0; i < all.length; i++) byNode.set(all[i]!, current);
+  if (node.nodeType !== 1) return;
+  const parent = ownerInst();
+  if (!parent) return;
+  const inst = make(HostComponent, (node as Element).localName, parent, node);
+  if (getOwner()) onCleanup(() => drop(inst));
+  dirty(parent.root);
 }
 
-function onUnmount(host: Node): void {
-  const comp = byNode.get(host);
-  if (!comp) return;
-  const root = comp.root;
-  if (root.current.child) unmount(root.current.child);
-  root.current.memoizedState = { element: null };
-  root.current.child = null;
-  commit(root);
-  roots.delete(root);
-  byNode.delete(host);
-}
-
-function onFlush(): void {
-  if (painting || !roots.size) return;
-  painting = true;
-  try {
-    for (const root of roots) {
-      refresh(root.current);
-      commit(root);
-    }
-  } finally {
-    painting = false;
-  }
+function onOwn(owner: OwnerNode): void {
+  if (current && owner.p === current.at) owners.set(owner, current);
 }
 
 function onHook(kind: string, read: () => unknown): void {
-  if (peeking || !current) return;
-  current.hooks.push({ kind, read });
+  if (current && current.rendering) current.hooks.push([kind, read]);
+}
+
+function onFlush(): void {
+  for (const root of roots) dirty(root);
+}
+
+function onUnmount(host: Node): void {
+  const root = byHost.get(host);
+  if (!root) return;
+  for (const kid of root.inst.kids) forget(kid);
+  root.inst.kids = [];
+  commit(root);
+  roots.delete(root);
+  byHost.delete(host);
 }
 
 function findFiberByHostInstance(node: Node): Fiber | null {
-  let n: Node | null = node;
-  while (n) {
-    const fiber = byNode.get(n);
-    if (fiber) return fiber;
-    const next: Node | null = n.parentNode ?? (n.nodeType === 11 ? (n as ShadowRoot).host : null);
-    n = next;
+  for (let n: Node | null = node; n; n = n.parentNode ?? (n.nodeType === 11 ? (n as ShadowRoot).host : null)) {
+    const root = byHost.get(n);
+    if (root) return root.inst.kids[0]?.kids[0]?.pub ?? null;
   }
   return null;
 }
 
 /** Registers the runtime with React DevTools when the extension is installed. */
 export function installDevtools(): void {
-  if (installed) return;
+  if (api) return;
   const hook = (globalThis as { __REACT_DEVTOOLS_GLOBAL_HOOK__?: HookApi }).__REACT_DEVTOOLS_GLOBAL_HOOK__;
   if (!hook || hook.isDisabled || hook.supportsFiber === false || typeof hook.inject !== 'function') return;
-  installed = true;
   api = hook;
   rendererID = hook.inject({
     bundleType: 1,
     version: '0.3.0',
-    rendererPackageName: 'surgijs',
-    reconcilerVersion: '0.3.0',
+    rendererPackageName: '@surgijs/core',
+    reconcilerVersion: '19.0.0',
     findFiberByHostInstance,
-    findHostInstanceByFiber(fiber: Fiber) {
-      return fiber.stateNode instanceof Node ? fiber.stateNode : fiber.root.containerInfo;
-    },
-    getCurrentFiber: () => current,
+    findHostInstanceByFiber: (fiber: Fiber) => (fiber.stateNode instanceof Node ? fiber.stateNode : null),
+    getCurrentFiber: () => current?.pub ?? null,
   });
-  setDevRender(devRender);
+  setDevRender(onRender);
   setDevUnmount(onUnmount);
-  setDevComponent(devComponent);
+  setDevComponent(onComponent);
   setDevNode(onNode);
-  setDevRun(onRun);
   setDevOwn(onOwn);
   setDevFlush(onFlush);
   setDevHook(onHook);
@@ -427,19 +373,15 @@ export function installDevtools(): void {
 
 /** Drops the adapter. Tests use this so later files keep the production path. */
 export function uninstallDevtools(): void {
-  installed = false;
   api = null;
   current = null;
-  stack.length = 0;
   roots.clear();
+  pending.clear();
   setDevRender(null);
   setDevUnmount(null);
   setDevComponent(null);
   setDevNode(null);
-  setDevRun(null);
   setDevOwn(null);
   setDevFlush(null);
   setDevHook(null);
 }
-
-installDevtools();
