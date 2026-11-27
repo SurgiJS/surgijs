@@ -14,14 +14,15 @@ describe('vite plugin config', () => {
   it('loads React DevTools while Vite is serving and skips a production build', () => {
     const dev = surgi();
     dev.configResolved({ command: 'serve' });
-    expect(dev.transformIndexHtml()?.[0]?.children).toContain('import { installDevtools } from "@surgijs/core/devtools"');
+    expect(dev.transformIndexHtml.order).toBe('pre');
+    expect(dev.transformIndexHtml.handler()?.[0]?.children).toContain('import { installDevtools } from "@surgijs/core/devtools"');
 
     const named = surgi({ moduleName: 'my-runtime' });
     named.configResolved({ command: 'serve' });
-    expect(named.transformIndexHtml()?.[0]?.children).toContain('my-runtime/devtools');
+    expect(named.transformIndexHtml.handler()?.[0]?.children).toContain('my-runtime/devtools');
 
     const build = surgi();
     build.configResolved({ command: 'build' });
-    expect(build.transformIndexHtml()).toBeUndefined();
+    expect(build.transformIndexHtml.handler()).toBeUndefined();
   });
 });

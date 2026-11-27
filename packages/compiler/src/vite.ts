@@ -24,7 +24,10 @@ export interface SurgiVitePlugin {
   config(this: SurgiViteConfigContext | void): { esbuild: { jsx: 'preserve' } };
   configResolved(config: { command: string }): void;
   transform(code: string, id: string): { code: string; map: SourceMapV3 | null } | null;
-  transformIndexHtml(): { tag: string; attrs: { type: string }; children: string; injectTo: 'head-prepend' }[] | undefined;
+  transformIndexHtml: {
+    order: 'pre';
+    handler(): { tag: string; attrs: { type: string }; children: string; injectTo: 'head-prepend' }[] | undefined;
+  };
 }
 
 interface SurgiViteConfigContext {
@@ -56,16 +59,20 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
     configResolved(config) {
       serve = config.command === 'serve';
     },
-    transformIndexHtml() {
-      if (!serve) return;
-      return [
-        {
-          tag: 'script',
-          attrs: { type: 'module' },
-          children: `import { installDevtools } from ${JSON.stringify(`${runtime}/devtools`)};\ninstallDevtools();`,
-          injectTo: 'head-prepend',
-        },
-      ];
+    // Pre-order: Vite only resolves inline module imports for tags injected before its own HTML pass.
+    transformIndexHtml: {
+      order: 'pre',
+      handler() {
+        if (!serve) return;
+        return [
+          {
+            tag: 'script',
+            attrs: { type: 'module' },
+            children: `import { installDevtools } from ${JSON.stringify(`${runtime}/devtools`)};\ninstallDevtools();`,
+            injectTo: 'head-prepend',
+          },
+        ];
+      },
     },
     transform(code, id) {
       if (!matches(id)) return null;
