@@ -1,10 +1,10 @@
-# surgijs
+# @surgijs/core
 
 Runtime of [SurgiJS](https://github.com/SurgiJS/surgijs): compiled Web Components on JSX/TSX with signals and direct DOM bindings. Zero dependencies, about 5.9 KB gzip for the whole runtime.
 
 ```bash
-npm i surgijs
-npm i -D @surgijs/compiler typescript
+npm i @surgijs/core
+npm i -D @surgijs/compiler typescript@6
 ```
 
 ```tsx

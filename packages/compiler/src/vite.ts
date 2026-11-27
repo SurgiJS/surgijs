@@ -21,8 +21,12 @@ export interface SourceMapV3 {
 export interface SurgiVitePlugin {
   name: string;
   enforce: 'pre';
-  config(): { esbuild: { jsx: 'preserve' } };
+  config(this: SurgiViteConfigContext | void): { esbuild: { jsx: 'preserve' } } | { oxc: { jsx: 'preserve' } };
   transform(code: string, id: string): { code: string; map: SourceMapV3 | null } | null;
+}
+
+interface SurgiViteConfigContext {
+  meta?: { rolldownVersion?: string };
 }
 
 const DEFAULT = /\.[jt]sx$/;
@@ -39,7 +43,10 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
   return {
     name: 'surgijs',
     enforce: 'pre',
-    config: () => ({ esbuild: { jsx: 'preserve' } }),
+    config() {
+      // Vite 8 runs on Rolldown and Oxc: the `esbuild` option is deprecated there.
+      return this?.meta?.rolldownVersion ? { oxc: { jsx: 'preserve' } } : { esbuild: { jsx: 'preserve' } };
+    },
     transform(code, id) {
       if (!matches(id)) return null;
       const [file, query = ''] = id.split('?') as [string, string?];

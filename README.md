@@ -11,8 +11,8 @@ Compiled Web Components on JSX/TSX. The compiler hoists static HTML into templat
 ## Install
 
 ```bash
-npm i surgijs
-npm i -D @surgijs/compiler typescript
+npm i @surgijs/core
+npm i -D @surgijs/compiler typescript@6
 ```
 
 ```ts

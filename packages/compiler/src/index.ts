@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import ts from './typescript.ts';
 import { encodeMap, lineCol, lineStarts } from './map.ts';
 import { toOriginal, unwrapGetterReads } from './values.ts';
 
