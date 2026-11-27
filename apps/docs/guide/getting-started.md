@@ -84,3 +84,17 @@ export const MyCounter = defineComponent('my-counter', Counter, { step: Number, 
 Props arrive as getters. Inside JSX and template literals the compiler inserts the call, so `{title}` reads the current title and subscribes to it. In plain TypeScript logic call the getter explicitly, as in `step()`.
 
 The shadow root renders `<div class="card"><h3>Counter</h3><p>Value: 0</p><button>Add</button></div>`. A click updates one text node.
+
+## Development warnings
+
+The runtime prints `console.warn` messages prefixed with `[surgijs]` for mistakes that otherwise fail silently:
+
+| Warning | Cause | Fix |
+| --- | --- | --- |
+| `<tag> is already defined by another copy of @surgijs/core` | Two versions of the library, or a plain `customElements.define`, own the tag. The first definition stays. | Load one copy of `@surgijs/core`. |
+| `A signal was written inside createMemo or a binding` | A memo or a JSX expression calls a setter. | Write in `createEffect` or an event handler. |
+| `<For> keys rows by object identity` | `For` has object items and no `by`. Replacing an object with a copy re-creates its row. | Pass `by={(item) => item.id}`, or `by={(item) => item}` to confirm identity keys. |
+| `Prop "x" of <tag> was read in the component body` | The component function reads a prop outside JSX, `createMemo` and `createEffect`, so the value never updates. | Read the prop where it is used, or wrap the read in `untrack()` when the first value is intended. |
+| `An effect ran 100 times in one update` | A computation writes a signal it reads, so each run schedules the next. | Read the signal with `untrack()`, or move the write out. |
+
+Each warning appears once per signal, `For`, component mount or computation. The checks sit behind `process.env.NODE_ENV !== 'production'`, which Vite, esbuild, Rollup and webpack replace with a constant: production bundles drop the checks and the messages. Without a bundler, define `process.env.NODE_ENV` yourself.

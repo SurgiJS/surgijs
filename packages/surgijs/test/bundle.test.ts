@@ -24,6 +24,14 @@ describe('bundle', () => {
     expect(code).not.toContain('installDevtools');
   });
 
+  it('strips dev warnings from production bundles', async () => {
+    for (const name of ['full runtime', 'counter', 'dropdown']) {
+      const { code } = await bundle(entry(name));
+      expect(code).not.toContain('[surgijs]');
+      expect(code).not.toContain('console.warn');
+    }
+  });
+
   it('compiled counter detects events without startsWith', async () => {
     const { code } = await bundle(entry('counter'));
     expect(code).not.toContain('startsWith("on")');
