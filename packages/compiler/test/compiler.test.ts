@@ -15,11 +15,11 @@ describe('compile', () => {
     const out = dom('const el = <div class="a"><span>hi</span></div>;');
     expect(out).toContain('const _tmpl$1 = /*#__PURE__*/ _$template("<div class=\\"a\\"><span>hi</span></div>");');
     expect(out).toContain('const el = _tmpl$1();');
-    expect(out).toContain('import { template as _$template } from "@surgijs/core";');
+    expect(out).toContain('import { template as _$template } from "@surgijs/core/internal";');
   });
 
   it('honours moduleName', () => {
-    expect(compile('const el = <div />;', { moduleName: 'my-runtime' }).code).toContain('from "my-runtime"');
+    expect(compile('const el = <div />;', { moduleName: 'my-runtime' }).code).toContain('from "my-runtime/internal"');
     expect(compile('const el = <div />;', { moduleName: 'my-runtime', generate: 'ssr' }).code).toContain('from "my-runtime/server"');
   });
 

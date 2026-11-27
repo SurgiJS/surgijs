@@ -17,7 +17,7 @@ const page = (body: string): string => `<!doctype html>
   <title>SSR</title>
   <link rel="stylesheet" href="/ui/themes.css">
   <script type="importmap">${JSON.stringify({
-    imports: { '@surgijs/core': '/core/index.js', '@surgijs/core/hydrate': '/core/hydrate.js', '@surgijs/ui/button': '/ui/button.js' },
+    imports: { '@surgijs/core': '/core/index.js', '@surgijs/core/internal': '/core/internal.js', '@surgijs/core/hydrate': '/core/hydrate.js', '@surgijs/ui/button': '/ui/button.js' },
   })}</script>
   <style>body { margin: 24px; font-family: var(--s-font-family); } form { display: flex; gap: 12px; }</style>
 </head>

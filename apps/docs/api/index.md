@@ -51,7 +51,7 @@ Types: `ReactiveProps<P>`, `Accessor`, `Setter`, `Signal`, `Resource`, `Ref`, `S
 
 ## `@surgijs/core/internal`
 
-Helpers that compiled JSX calls. They are not covered by semver; import them from here only for hand-written integrations. The compiler's output imports the same names from `@surgijs/core`, where they are marked deprecated so that editors steer hand-written code here.
+Compiled JSX imports these helpers from `@surgijs/core/internal`, so `@surgijs/core` holds only the application API. They are not covered by semver; import them only for hand-written integrations. Keep `@surgijs/compiler` and `@surgijs/core` on the same version: they are released together.
 
 | Export | Purpose |
 | --- | --- |

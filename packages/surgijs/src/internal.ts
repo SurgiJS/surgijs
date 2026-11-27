@@ -1,6 +1,6 @@
 /**
- * Helpers that compiled JSX calls: DOM writes, bindings and delegation. For hand-written
- * integrations; application code uses `@surgijs/core`. Not covered by semver.
+ * Helpers that compiled JSX imports: DOM writes, bindings and delegation. Application code uses
+ * `@surgijs/core`; import from here only for hand-written integrations. Not covered by semver.
  */
 export { bind, effect } from './reactivity';
 export {
