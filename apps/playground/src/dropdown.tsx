@@ -1,4 +1,4 @@
-import { createMemo, defineComponent, For, Show, useId, useState, type ReactiveProps } from '@surgijs/core';
+import { createMemo, defineComponent, defineEvent, For, Show, useId, useState, type Emit, type ReactiveProps } from '@surgijs/core';
 
 export interface DropdownOption {
   value: string;
@@ -21,7 +21,13 @@ const css = `
   .option[aria-selected="true"] { font-weight: 600; }
 `;
 
-export const Dropdown = (props: ReactiveProps<DropdownProps>, host: HTMLElement) => {
+export const dropdownEvents = {
+  change: defineEvent<string>(),
+};
+
+export type DropdownEvents = typeof dropdownEvents;
+
+export const Dropdown = (props: ReactiveProps<DropdownProps>, host: HTMLElement, emit: Emit<DropdownEvents>) => {
   const { placeholder, options, value } = props;
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -31,7 +37,7 @@ export const Dropdown = (props: ReactiveProps<DropdownProps>, host: HTMLElement)
 
   const choose = (option: DropdownOption) => {
     (host as HTMLElement & DropdownProps).value = option.value;
-    host.dispatchEvent(new CustomEvent('change', { detail: option.value, bubbles: true, composed: true }));
+    emit('change', option.value);
     setOpen(false);
   };
 
@@ -115,8 +121,21 @@ export const Dropdown = (props: ReactiveProps<DropdownProps>, host: HTMLElement)
   );
 };
 
-export const UiDropdown = defineComponent<DropdownProps>('ui-dropdown', Dropdown, {
-  placeholder: String,
-  options: Array,
-  value: String,
-});
+export const UiDropdown = defineComponent<DropdownProps, DropdownEvents>(
+  'ui-dropdown',
+  Dropdown,
+  {
+    placeholder: String,
+    options: Array,
+    value: String,
+  },
+  { events: dropdownEvents },
+);
+
+export type UiDropdownElement = InstanceType<typeof UiDropdown>;
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'ui-dropdown': UiDropdownElement;
+  }
+}

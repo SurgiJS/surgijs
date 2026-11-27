@@ -5,7 +5,7 @@ import '../../../apps/playground/src/dropdown.tsx';
 const OPTIONS = '[{"value":"ts","label":"TypeScript"},{"value":"go","label":"Go"}]';
 
 function setup() {
-  const el = document.createElement('ui-dropdown') as HTMLElement & { value?: string };
+  const el = document.createElement('ui-dropdown');
   el.setAttribute('placeholder', 'Choose a language');
   el.setAttribute('options', OPTIONS);
   document.body.appendChild(el);
@@ -32,7 +32,7 @@ describe('ui-dropdown', () => {
   it('opens, moves and selects with the keyboard', () => {
     const { el, trigger, key, options, root } = setup();
     const changes: string[] = [];
-    el.addEventListener('change', (e) => changes.push((e as CustomEvent<string>).detail));
+    el.addEventListener('change', (e) => changes.push(e.detail));
     key('ArrowDown');
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     expect(options().map((li) => li.textContent)).toEqual(['TypeScript', 'Go']);

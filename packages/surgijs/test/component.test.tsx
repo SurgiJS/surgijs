@@ -1,5 +1,16 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { defineComponent, flush, onCleanup, useEffect, useRef, useState, type FormHost, type ReactiveProps } from '@surgijs/core';
+import {
+  defineComponent,
+  defineEvent,
+  flush,
+  onCleanup,
+  useEffect,
+  useRef,
+  useState,
+  type Emit,
+  type FormHost,
+  type ReactiveProps,
+} from '@surgijs/core';
 import { MyCounter } from '../../../apps/playground/src/counter.tsx';
 
 interface FakeInternals {
@@ -210,6 +221,63 @@ describe('defineComponent', () => {
     expect(el.value).toBe('a');
     expect(internals.value).toBe('a');
     expect(input.value).toBe('a');
+  });
+
+  it('emits declared events with typed detail and default flags', () => {
+    const events = { pick: defineEvent<number>(), reset: defineEvent() };
+    let emit!: Emit<typeof events>;
+    const Emitter = defineComponent<{}, typeof events>('x-emit', (_props, _host, e) => {
+      emit = e;
+      return null;
+    }, {}, { events });
+    const el = document.createElement('x-emit') as InstanceType<typeof Emitter>;
+    document.body.appendChild(el);
+    const seen: CustomEvent[] = [];
+    const details: number[] = [];
+    document.addEventListener('pick', (e) => seen.push(e as CustomEvent));
+    el.addEventListener('pick', (e) => details.push(e.detail));
+    expect(emit('pick', 3)).toBe(true);
+    emit('reset');
+    const typeErrors = () => {
+      // @ts-expect-error the detail must be a number
+      emit('pick', 'three');
+      // @ts-expect-error an undeclared event name
+      emit('missing');
+      // @ts-expect-error a void event takes no detail
+      emit('reset', 1);
+      el.addEventListener('pick', (e) => {
+        // @ts-expect-error the typed listener receives a number, so `detail` is not a string
+        const text: string = e.detail;
+        return text;
+      });
+      el.addEventListener('click', (e: MouseEvent) => e.button);
+    };
+    expect(typeErrors).toBeTypeOf('function');
+    expect(details).toEqual([3]);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.detail).toBe(3);
+    expect(seen[0]!.bubbles).toBe(true);
+    expect(seen[0]!.composed).toBe(true);
+    expect(seen[0]!.cancelable).toBe(false);
+  });
+
+  it('reports cancelled events from emit when the event is cancelable', () => {
+    const events = { close: defineEvent({ cancelable: true, bubbles: false, composed: false }) };
+    let emit!: Emit<typeof events>;
+    const Canceller = defineComponent<{}, typeof events>('x-cancel', (_props, _host, e) => {
+      emit = e;
+      return null;
+    }, {}, { events });
+    const el = document.createElement('x-cancel') as InstanceType<typeof Canceller>;
+    document.body.appendChild(el);
+    const seen: CustomEvent[] = [];
+    el.addEventListener('close', (e) => {
+      seen.push(e);
+      e.preventDefault();
+    });
+    expect(emit('close')).toBe(false);
+    expect(seen[0]!.bubbles).toBe(false);
+    expect(seen[0]!.composed).toBe(false);
   });
 
   it('runs effects after the shadow root holds the nodes', () => {

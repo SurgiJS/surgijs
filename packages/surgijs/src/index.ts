@@ -55,8 +55,13 @@ export {
 } from './flow';
 export {
   defineComponent,
+  defineEvent,
   type ComponentClass,
   type ComponentOptions,
+  type Emit,
+  type EventDecl,
+  type EventDecls,
+  type EventOptions,
   type FormHost,
   type PropType,
   type ReactiveProps,

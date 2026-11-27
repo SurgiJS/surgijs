@@ -36,14 +36,15 @@
 
 | Export | Props |
 | --- | --- |
-| `defineComponent` | `(tag, render, schema?, { shadow?, form? })` |
+| `defineComponent` | `(tag, render, schema?, { shadow?, form?, events? })` |
+| `defineEvent` | `<T = void>({ bubbles?, composed?, cancelable? }?)` for `events` |
 | `For` | `each`, `by?`, `children: (item, index) => JSX` |
 | `Show` | `when`, `fallback?`, `children` (node or `(value) => JSX`) |
 | `Switch` / `Match` | `fallback?` / `when`, `children` |
 | `Portal` | `mount?`, `children` |
 | `ErrorBoundary` | `fallback: JSX | (err, reset) => JSX`, `children` |
 
-Types: `ReactiveProps<P>`, `Accessor`, `Setter`, `Signal`, `Resource`, `Ref`, `Schema`, `PropType`, `ComponentOptions`, `ComponentClass`, `FormHost`, `JSX`.
+Types: `ReactiveProps<P>`, `Accessor`, `Setter`, `Signal`, `Resource`, `Ref`, `Schema`, `PropType`, `ComponentOptions`, `ComponentClass`, `EventDecl`, `EventOptions`, `Emit`, `FormHost`, `JSX`.
 
 ## DOM helpers
 
