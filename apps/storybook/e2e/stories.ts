@@ -15,6 +15,8 @@ export const stories: Entry[] = Object.values(
 
 export const themes = ['light', 'dark'] as const;
 
+export const directions = ['ltr', 'rtl'] as const;
+
 /** Story iframe URL. `a11y.manual` stops the addon's own axe run, which would collide with ours. */
-export const storyUrl = (id: string, theme: string = 'light'): string =>
-  `/iframe.html?id=${id}&viewMode=story&globals=theme:${theme};a11y.manual:!true`;
+export const storyUrl = (id: string, theme: string = 'light', dir: string = 'ltr'): string =>
+  `/iframe.html?id=${id}&viewMode=story&globals=theme:${theme};dir:${dir};a11y.manual:!true`;

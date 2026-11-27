@@ -60,12 +60,12 @@ Budgets live in `packages/surgijs/scripts/bundle.mjs`. Raise a limit only when t
 Each component in `packages/ui/src/<name>/` has a view (`<name>.view.tsx`) shared by the client and the server, its CSS in `<name>.styles.ts`, and registration in `index.ts`; `src/server.ts` renders it with the view imported as `?ssr`. A new component comes with:
 
 - unit and SSR tests in `packages/ui/test`;
-- stories in `apps/storybook/stories`, which the Playwright suite picks up for axe audits and screenshots in both themes;
+- stories in `apps/storybook/stories`, which the Playwright suite picks up for axe audits and screenshots in both themes, plus RTL screenshots for the stories listed in `visual.spec.ts`;
 - a docs page in `apps/docs/ui`.
 
 `packages/ui/custom-elements.json`, `src/react.ts` and `src/vue.ts` are generated from the `defineComponent` calls and props interfaces: run `pnpm --filter @surgijs/ui generate` after a change. The `manifest` test fails while they are stale.
 
-Every visual value goes through a `--s-<component>-*` custom property that defaults to a token from `themes.css`. Component CSS avoids `<`, `>`, `&` and `"`, which the SSR compiler escapes inside `<style>`.
+Every visual value goes through a `--s-<component>-*` custom property that defaults to a token from `themes.css`. Component CSS uses logical properties (`padding-inline`, `inset-inline-start`, `text-align: start`, `border-inline-end`) instead of `left`/`right`, so `dir="rtl"` works without overrides; the Storybook toolbar has a direction switch, and the Playwright suite checks RTL screenshots and layout. Component CSS avoids `<`, `>`, `&` and `"`, which the SSR compiler escapes inside `<style>`.
 
 Screenshots come from the official Playwright image, so they only match when taken there: run `pnpm test:e2e` (Docker or Podman) rather than Playwright on the host. After an intended visual change, run `pnpm test:e2e:update`, look at the new images in `apps/storybook/e2e/__screenshots__`, and commit them.
 

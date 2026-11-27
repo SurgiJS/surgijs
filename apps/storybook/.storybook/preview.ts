@@ -16,9 +16,10 @@ const documentationOnly = Object.fromEntries(
     .map((item) => [item.name, { control: false as const }]),
 );
 
-/** Sets `data-theme` on the root, so tokens from themes.css switch for the whole canvas. */
+/** Sets `data-theme` and `dir` on the root: tokens from themes.css and text direction switch for the whole canvas. */
 const withTheme: Decorator = (story, context) => {
   document.documentElement.dataset.theme = context.globals.theme ?? 'light';
+  document.documentElement.dir = context.globals.dir ?? 'ltr';
   return story();
 };
 
@@ -38,8 +39,20 @@ const preview: Preview = {
         dynamicTitle: true,
       },
     },
+    dir: {
+      description: 'Text direction: rtl mirrors layout through logical CSS properties',
+      toolbar: {
+        title: 'Direction',
+        icon: 'transfer',
+        items: [
+          { value: 'ltr', title: 'Left to right' },
+          { value: 'rtl', title: 'Right to left' },
+        ],
+        dynamicTitle: true,
+      },
+    },
   },
-  initialGlobals: { theme: 'light' },
+  initialGlobals: { theme: 'light', dir: 'ltr' },
   parameters: {
     layout: 'centered',
     // Accessibility violations fail story tests, not just show up in the panel.
