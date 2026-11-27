@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SurgiJS playground</title>
     <style>
-      body { font-family: system-ui, sans-serif; margin: 2rem; color: #1c1f26; }
+      body { font-family: var(--s-font-family); margin: 2rem; color: var(--s-color-text); background: var(--s-color-surface); }
+      .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+      .brand { --s-button-bg: #0b7285; --s-button-bg-hover: #095c6b; --s-button-bg-active: #074652; --s-button-radius: 999px; }
       section { margin-bottom: 2rem; }
       my-counter { display: block; max-width: 16rem; }
       ui-virtual-table, ui-tile-grid { max-width: 60rem; }
@@ -13,6 +15,42 @@
   </head>
   <body>
     <h1>SurgiJS playground</h1>
+    <label>Theme
+      <select id="theme">
+        <option value="">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
+    <section>
+      <h2>Button</h2>
+      <div class="row">
+        <s-button>Primary</s-button>
+        <s-button variant="secondary">Secondary</s-button>
+        <s-button variant="ghost">Ghost</s-button>
+        <s-button variant="danger">Danger</s-button>
+        <s-button disabled>Disabled</s-button>
+        <s-button id="save" variant="secondary">Save (loads 1.5s)</s-button>
+      </div>
+      <div class="row">
+        <s-button size="sm">Small</s-button>
+        <s-button size="md">Medium</s-button>
+        <s-button size="lg">Large</s-button>
+        <s-button variant="secondary" label="Add item">
+          <svg slot="start" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M3 8h10" /></svg>
+        </s-button>
+      </div>
+      <div class="row brand">
+        <s-button>Overridden with --s-button-*</s-button>
+        <s-button variant="danger">Danger keeps its bg override too</s-button>
+      </div>
+      <form id="button-form" class="row">
+        <input name="q" placeholder="Type and press the button" required />
+        <s-button type="submit">Submit</s-button>
+        <s-button type="reset" variant="ghost">Reset</s-button>
+        <output id="submitted"></output>
+      </form>
+    </section>
     <section>
       <h2>Counter</h2>
       <my-counter title="Clicks" step="2"></my-counter>
