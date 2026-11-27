@@ -39,7 +39,7 @@ Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit
 
 ## Changesets
 
-Every change to `@surgijs/core`, `@surgijs/compiler`, or `@surgijs/store` comes with a changeset:
+Every change to `@surgijs/core`, `@surgijs/compiler`, `@surgijs/store` or `@surgijs/ui` comes with a changeset:
 
 ```bash
 pnpm changeset
