@@ -1,5 +1,5 @@
 import { setHydrateRoot } from './component';
-import { setClaim, setHydrating } from './dom';
+import { parseTemplate, setClaim, setHydrating } from './dom';
 
 let cursor: Node | null = null;
 const shapes = new Map<string, Node>();
@@ -7,10 +7,7 @@ const shapes = new Map<string, Node>();
 function shape(html: string, flags: number): Node {
   let node = shapes.get(html);
   if (!node) {
-    const t = document.createElement('template');
-    t.innerHTML = flags & 2 ? `<svg>${html}</svg>` : html;
-    node = t.content.firstChild!;
-    if (flags & 2) node = node.firstChild!;
+    node = parseTemplate(html, flags);
     shapes.set(html, node);
   }
   return node;
