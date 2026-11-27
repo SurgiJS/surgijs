@@ -20,7 +20,7 @@ export {
   type Setter,
   type Signal,
 } from './reactivity';
-export { createResource, useEffect, useId, useMemo, useRef, useState, type Ref, type Resource } from './hooks';
+export { createResource, useEffect, useId, useMemo, useReducer, useRef, useState, type Ref, type Resource } from './hooks';
 export { createContext, useContext, type Context, type ProviderProps } from './context';
 export {
   attr,

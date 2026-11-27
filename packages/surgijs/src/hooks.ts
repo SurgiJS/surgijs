@@ -16,6 +16,15 @@ export function useState<T>(value?: T): Signal<T | undefined> {
 }
 
 /**
+ * `[state, dispatch]`: each `dispatch(action)` stores `reducer(state, action)`. Like `useState`,
+ * the compiler reads `state` as a value inside JSX and component bodies.
+ */
+export function useReducer<S, A>(reducer: (state: S, action: A) => S, init: S): [Accessor<S>, (action: A) => void] {
+  const [state, setState] = useState(init);
+  return [state, (action) => setState((prev) => reducer(prev, action))];
+}
+
+/**
  * Runs after mount and again when a dependency changes. Without `deps` every signal read in
  * `fn` is tracked; with `deps` only the signals read by `deps()` are. A returned function
  * runs as cleanup before the next run and on unmount.
