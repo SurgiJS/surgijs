@@ -109,10 +109,16 @@ describe('compile', () => {
 
   it('keeps style and script text raw, guarding only the closing tag', () => {
     expect(ssr('const el = <style>a &gt; b &amp; c</style>;')).toContain('"<style>a > b & c</style>"');
-    expect(ssr('const el = <style>{css}</style>;')).toContain('_$escapeRaw(css, "style")');
+    expect(ssr('const el = <style>{css}</style>;')).toContain('_$escapeRaw([css], "style")');
     expect(ssr('const el = <p>{css}</p>;')).toContain('_$escape(css)');
     expect(dom('const el = <style>a &gt; b &amp; c</style>;')).toContain('<style>a > b & c</style>');
     expect(ssr('const el = <style>a &lt;/style&gt; b</style>;')).toContain('"<style>a <\\\\/style> b</style>"');
+  });
+
+  it('escapes dynamic raw text as a whole', () => {
+    const out = ssr('const el = <style>&lt;{tail}</style>;');
+    expect(out).toContain('_$escapeRaw(["<", tail], "style")');
+    expect(out).not.toContain('<!---->');
   });
 
   it('keeps xlink, xml and xmlns prefixes', () => {

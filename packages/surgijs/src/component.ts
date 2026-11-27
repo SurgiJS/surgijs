@@ -108,7 +108,8 @@ export function defineComponent<P extends object = {}>(
   const form = !!options.form;
   const light = !shadow && !('children' in types);
   const css = shadow && options.styles ? ([] as string[]).concat(options.styles) : null;
-  const adopt = typeof CSSStyleSheet != 'undefined' && 'replaceSync' in CSSStyleSheet.prototype;
+  // replaceSync drops @import rules, so such CSS keeps a <style> element.
+  const adopt = typeof CSSStyleSheet != 'undefined' && 'replaceSync' in CSSStyleSheet.prototype && !css?.some((c) => /@imp/i.test(c));
   let sheets: CSSStyleSheet[] | undefined;
 
   class Element extends HTMLElement {
@@ -162,7 +163,7 @@ export function defineComponent<P extends object = {}>(
       try {
         createRoot((dispose) => {
           self.__d = dispose;
-          deferMount(() => insert(root, render(self.__p as ReactiveProps<P>, this)));
+          deferMount(() => insert(root, render(self.__p as ReactiveProps<P>, this), css && !adopt ? null : undefined));
         });
       } finally {
         if (end) end();

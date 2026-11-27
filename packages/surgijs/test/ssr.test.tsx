@@ -39,6 +39,11 @@ describe('server helpers', () => {
   it('keeps raw text elements literal and renders styles unescaped', () => {
     expect(escapeRaw('a > b & "c"</STYLE>', 'style')).toBe('a > b & "c"<\\/STYLE>');
     expect(escapeRaw(null, 'style')).toBe('');
+    expect(escapeRaw(['<', '/style><img>'], 'style')).toBe('<\\/style><img>');
+    expect(escapeRaw(['</sty', 'le>'], 'style')).toBe('<\\/style>');
+    expect(escapeRaw('{"t":"<!--<script>"}</script>', 'script')).toBe('{"t":"\\u003c!--\\u003cscript>"}<\\/script>');
+    expect(JSON.parse(escapeRaw('{"t":"<!--<script>"}', 'script'))).toEqual({ t: '<!--<script>' });
+    expect(escapeRaw('<!--', 'style')).toBe('<!--');
     expect(shadowHTML('x-a', '<b></b>', {}, { styles: ['a > b { color: red }', 'i { x: "&" }'] })).toBe(
       '<x-a><template shadowrootmode="open"><style data-s>a > b { color: red }</style><style data-s>i { x: "&" }</style><b></b></template></x-a>',
     );

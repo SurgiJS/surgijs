@@ -22,7 +22,9 @@ export interface ButtonProps {
 /**
  * The view behind `<s-button>`: a native `<button>` in the shadow root, so keyboard,
  * focus and the accessible role come from the platform. The label comes from slotted
- * content or the `label` prop. On the server `host` is undefined.
+ * content or the `label` prop. On the server `host` is undefined. The view has no CSS of
+ * its own: `<s-button>` and `renderButton` apply `buttonStyles`, so anything rendering
+ * `Button` directly must adopt `buttonStyles` too.
  */
 export const Button = (props: ReactiveProps<ButtonProps>, host?: HTMLElement) => {
   const { disabled, loading, label, type } = props;

@@ -93,7 +93,8 @@ function cleanText(value: string): string {
 
 const escText = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const RAW = new Set(['style', 'script']);
-const escRaw = (s: string, tag: string): string => s.replace(new RegExp(`</(${tag})`, 'gi'), '<\\/$1');
+const escRaw = (s: string, tag: string): string =>
+  s.replace(tag === 'script' ? /<(\/)?(script|!--)/gi : /<(\/)(style)/gi, (_, slash, word) => (slash ? `<\\/${word}` : `\\u003c${word}`));
 const escAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 const kebab = (s: string): string => (s.startsWith('--') ? s : s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()));
 
@@ -735,10 +736,10 @@ class Compiler {
   }
 
   ssrItems(items: Item[], tag = ''): (string | { code: string })[] {
+    if (RAW.has(tag) && items.some((it) => it.k === 'dyn')) return this.ssrRaw(items, tag);
     const parts: (string | { code: string })[] = [];
-    const raw = RAW.has(tag);
     items.forEach((it, i) => {
-      if (it.k === 'text') parts.push(raw ? escRaw(it.text!, tag) : escText(it.text!));
+      if (it.k === 'text') parts.push(RAW.has(tag) ? escRaw(it.text!, tag) : escText(it.text!));
       else if (it.k === 'el') parts.push(...this.ssrParts(it.node!));
       else {
         const only = items.length === 1;
@@ -748,14 +749,27 @@ class Compiler {
         if (!only && !last) parts.push('<!---->');
         else if (!hole) {
           const x = getterBody(e as Expression) ?? strip(e as Expression);
-          const code = raw
-            ? `${this.h('escapeRaw')}(${this.expr(x)}, ${JSON.stringify(tag)})`
-            : `${this.h('escape')}(${this.expr(x)})`;
+          const code = `${this.h('escape')}(${this.expr(x)})`;
           parts.push({ code: only && isDynamic(x) && this.isTextual(x) ? `(${code} || " ")` : code });
         }
       }
     });
     return parts;
+  }
+
+  /** `<style>`/`<script>` with dynamic text: escaped as a whole, since a closing tag can span fragments. */
+  ssrRaw(items: Item[], tag: string): (string | { code: string })[] {
+    const values: string[] = [];
+    for (const it of items) {
+      if (it.k === 'text') values.push(JSON.stringify(it.text));
+      else if (it.k === 'dyn') {
+        const e = it.expr!;
+        if (isJsx(e) || this.hasJsx(e) || isFn(e as Expression)) continue;
+        values.push(this.expr(getterBody(e as Expression) ?? strip(e as Expression)));
+      }
+    }
+    const code = `${this.h('escapeRaw')}([${values.join(', ')}], ${JSON.stringify(tag)})`;
+    return [{ code: `(${code} || " ")` }];
   }
 
   ssrElement(node: JSXElement): string {

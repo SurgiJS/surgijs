@@ -10,13 +10,17 @@ export function escape(value: unknown): string {
 }
 
 /**
- * Text for raw text elements (`<style>`, `<script>`), where entities are not decoded: only
- * the closing tag is neutralised, so `a > b` and `&` survive as written.
+ * Text for raw text elements (`<style>`, `<script>`), where entities are not decoded: the
+ * pieces are joined first, then only sequences that would end the element are neutralised
+ * (`</style`, `</script`, and for scripts `<script` and `<!--`, which enter the double-escaped
+ * state). `<` becomes `\u003c`, valid inside JS and JSON strings, so `a > b` and `&` survive.
  */
 export function escapeRaw(value: unknown, tag: string): string {
-  if (value == null || typeof value === 'boolean') return '';
-  if (Array.isArray(value)) return value.map((v) => escapeRaw(v, tag)).join('');
-  return ('' + (value as string)).replace(new RegExp(`</(${tag})`, 'gi'), '<\\/$1');
+  const text = (v: unknown): string =>
+    v == null || typeof v === 'boolean' ? '' : Array.isArray(v) ? v.map(text).join('') : '' + (v as string);
+  return text(value).replace(tag === 'script' ? /<(\/)?(script|!--)/gi : /<(\/)(style)/gi, (_, slash, word) =>
+    slash ? `<\\/${word}` : `\\u003c${word}`,
+  );
 }
 
 /** ` name="value"`, ` name` for `true`, `''` for `null`/`false`. */

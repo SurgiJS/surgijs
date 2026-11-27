@@ -255,6 +255,23 @@ describe('styles option', () => {
     expect(root.adoptedStyleSheets).toHaveLength(1);
   });
 
+  it('keeps @import CSS in a style element that survives re-renders', () => {
+    const [show, setShow] = useState(true);
+    const imp = '@import url("/t.css");';
+    defineComponent('sty-import', () => (() => (show() ? 'a' : null)) as never, {}, { styles: imp });
+    document.body.innerHTML = '<sty-import></sty-import>';
+    flush();
+    const root = document.querySelector('sty-import')!.shadowRoot!;
+    expect(root.adoptedStyleSheets).toHaveLength(0);
+    expect(root.querySelector('style')!.textContent).toBe(imp);
+    setShow(false);
+    flush();
+    expect(root.querySelector('style')!.textContent).toBe(imp);
+    setShow(true);
+    flush();
+    expect(root.textContent).toContain('a');
+  });
+
   it('falls back to a style element without constructable stylesheets', () => {
     vi.stubGlobal('CSSStyleSheet', class {});
     try {

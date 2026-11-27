@@ -32,7 +32,7 @@ Disconnecting disposes the render root and clears it in the next microtask. An e
 
 ## Styles
 
-`{ styles: css }` (a string or an array of strings) is parsed once per `defineComponent` into a `CSSStyleSheet` and adopted by every instance through `adoptedStyleSheets`, so a hundred elements share one copy of the CSS. Without constructable stylesheets each root gets a `<style>` element instead. The option applies to shadow roots only.
+`{ styles: css }` (a string or an array of strings) is parsed once per `defineComponent` into a `CSSStyleSheet` and adopted by every instance through `adoptedStyleSheets`, so a hundred elements share one copy of the CSS. Without constructable stylesheets, or when the CSS contains `@import` (which `replaceSync` drops), each root gets a `<style>` element instead. The option applies to shadow roots only.
 
 ```ts
 defineComponent('ui-badge', Badge, {}, { styles: ':host { display: inline-block } .dot > b { color: red }' });
