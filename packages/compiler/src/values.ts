@@ -7,6 +7,8 @@ type Fn = FunctionNode;
 /** Calls whose result (or first tuple element) is a getter read as a value. */
 export const GETTER_FNS: ReadonlySet<string> = new Set(['useState', 'useReducer', 'createSignal', 'createMemo', 'useMemo', 'useContext']);
 const TUPLE_FNS = new Set(['useState', 'useReducer', 'createSignal']);
+/** Hooks whose second argument lists dependencies; an array literal there becomes a tracked thunk. */
+const DEPS_FNS = new Set(['useEffect', 'useMemo']);
 const PROPS_TYPE = /(^|\.)ReactiveProps$/;
 
 export interface Insert {
@@ -341,6 +343,13 @@ export function unwrapGetterReads(code: string, filename = 'input.tsx'): UnwrapR
       visitPattern(node.id, node, scope);
       if (node.init) visit(node.init, node, scope);
       return;
+    }
+
+    // React-style deps: `useEffect(fn, [a, b])` becomes `useEffect(fn, () => [a(), b()])`, so the
+    // listed getters are read inside the effect and tracked instead of being read once here.
+    if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && DEPS_FNS.has(node.callee.name)) {
+      const deps = node.arguments[1];
+      if (deps?.type === 'ArrayExpression') inserts.push({ pos: deps.start, text: '() => ' });
     }
 
     forEachChild(node, (c) => visit(c, node, scope));

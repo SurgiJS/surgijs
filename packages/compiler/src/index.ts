@@ -7,7 +7,10 @@ export { unwrapGetterReads, GETTER_FNS, toOriginal, type Insert, type ShorthandR
 
 export interface CompileOptions {
   filename?: string;
-  /** Runtime module the output imports from. `@surgijs/core` by default; SSR uses `<moduleName>/server`. */
+  /**
+   * Runtime package the output imports from, `@surgijs/core` by default. Client output imports
+   * `<moduleName>/internal`, SSR output `<moduleName>/server`.
+   */
   moduleName?: string;
   generate?: 'dom' | 'ssr';
   /** Emit a source map (default `true`). */
@@ -918,7 +921,7 @@ export function compile(code: string, options: CompileOptions = {}): CompileResu
   const head: string[] = [];
   if (c.helpers.size) {
     const names = [...c.helpers].map(([name, alias]) => `${name} as ${alias}`).join(', ');
-    head.push(`import { ${names} } from ${JSON.stringify(ssr ? `${moduleName}/server` : moduleName)};`);
+    head.push(`import { ${names} } from ${JSON.stringify(`${moduleName}/${ssr ? 'server' : 'internal'}`)};`);
   }
   head.push(...c.templates, ...c.hoistedLines);
   const prefix = head.length ? head.join('\n') + '\n' : '';

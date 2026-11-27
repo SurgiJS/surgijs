@@ -1,0 +1,23 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "SurgiJS",
+  "description": "Compiled Web Components on JSX/TSX: a compiler that hoists static HTML into templates and turns each dynamic expression into a direct binding, a zero-dependency signals runtime, SSR with hydration, a store and accessible UI components.",
+  "folders": ["apps/docs", "packages"],
+  "excludeFolders": [
+    "apps/docs/.vitepress",
+    "**/node_modules",
+    "**/dist",
+    "**/test",
+    "**/bench"
+  ],
+  "excludeFiles": ["CHANGELOG.md", "LICENSE"],
+  "rules": [
+    "Install @surgijs/core for the runtime and @surgijs/compiler as a dev dependency; add the plugin from @surgijs/compiler/vite to vite.config.ts.",
+    "Set \"jsx\": \"react-jsx\" and \"jsxImportSource\": \"@surgijs/core\" in tsconfig.json.",
+    "Components are plain functions that take props and return JSX; defineComponent(tag, render, schema) registers them as custom elements.",
+    "Props are getters: read them in JSX as {title} and call them in plain TypeScript as step().",
+    "Use useState, useMemo and useEffect from @surgijs/core for reactivity; use For, Show, Switch, Portal and ErrorBoundary for control flow instead of array.map and ternaries over elements.",
+    "Server rendering comes from @surgijs/core/server (renderToString, renderToStream); the client adopts the server markup with enableHydration from @surgijs/core/hydrate.",
+    "@surgijs/store is independent of the runtime; @surgijs/ui components need @surgijs/core as a peer."
+  ]
+}

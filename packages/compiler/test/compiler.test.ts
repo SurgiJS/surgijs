@@ -15,12 +15,33 @@ describe('compile', () => {
     const out = dom('const el = <div class="a"><span>hi</span></div>;');
     expect(out).toContain('const _tmpl$1 = /*#__PURE__*/ _$template("<div class=\\"a\\"><span>hi</span></div>");');
     expect(out).toContain('const el = _tmpl$1();');
-    expect(out).toContain('import { template as _$template } from "@surgijs/core";');
+    expect(out).toContain('import { template as _$template } from "@surgijs/core/internal";');
   });
 
   it('honours moduleName', () => {
-    expect(compile('const el = <div />;', { moduleName: 'my-runtime' }).code).toContain('from "my-runtime"');
+    expect(compile('const el = <div />;', { moduleName: 'my-runtime' }).code).toContain('from "my-runtime/internal"');
     expect(compile('const el = <div />;', { moduleName: 'my-runtime', generate: 'ssr' }).code).toContain('from "my-runtime/server"');
+  });
+
+  it('turns React-style deps arrays into tracked thunks', () => {
+    const out = dom(`
+      const C = (props: ReactiveProps<{ step: number }>) => {
+        const { step } = props;
+        const [count] = useState(0);
+        const label = 'x';
+        useEffect(() => console.log(count), [count, step, label]);
+        useEffect(() => console.log('mounted'), []);
+        const double = useMemo(() => count * 2, [count]);
+        useEffect(() => {}, () => [count]);
+        other(() => {}, [count]);
+        return <p>{double}</p>;
+      };
+    `);
+    expect(out).toContain('useEffect(() => console.log(count()), () => [count(), step(), label]);');
+    expect(out).toContain("useEffect(() => console.log('mounted'), () => []);");
+    expect(out).toContain('useMemo(() => count() * 2, () => [count()]);');
+    expect(out).toContain('useEffect(() => {}, () => [count()]);');
+    expect(out).toContain('other(() => {}, [count()]);');
   });
 
   it('resolves every path before the first mutation', () => {
