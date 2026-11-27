@@ -82,6 +82,21 @@ describe('nested components on the server', () => {
     );
   });
 
+  it('keeps the markup of a fragment inside a component before the next sibling', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const html = renderToString('x-nested', app.Nested as never);
+    const el = document.createElement('x-nested');
+    el.attachShadow({ mode: 'open' }).innerHTML = html.replace(/^<[^>]*><template shadowrootmode="open">/, '').replace(/<\/template>.*$/, '');
+    document.body.appendChild(el);
+    const button = el.shadowRoot!.querySelector('button');
+    enableHydration();
+    defineComponent('x-nested', dom.Nested, {});
+    expect(el.shadowRoot!.innerHTML).toBe('<div>x<i>inside</i><!----><button>Save</button></div>');
+    expect(el.shadowRoot!.querySelector('button')).toBe(button);
+    disableHydration();
+    log.mockRestore();
+  });
+
   it('renders the fallback of an error boundary and nothing for a portal', () => {
     expect(render('Guarded')).toBe('<x-guarded><template shadowrootmode="open"><p>failed</p></template></x-guarded>');
     expect(render('Portaled')).toBe('<x-portaled><template shadowrootmode="open"><div></div></template></x-portaled>');
@@ -90,6 +105,12 @@ describe('nested components on the server', () => {
   it('projects children and escapes text at every level', () => {
     expect(render('Page', { title: 'A & B' })).toBe(
       '<x-page title="A &amp; B"><template shadowrootmode="open"><main><section><h2>A &amp; B</h2><b class="badge">A &amp; B</b><!----><em>A &amp; B</em></section><!----><p class="dark">themed</p><!----><div><i>shown</i><!----><ul><li>x</li><li>&lt;y&gt;</li></ul><span>B</span></div></main></template></x-page>',
+    );
+  });
+
+  it('escapes values that rows and branches return', () => {
+    expect(render('Items', { items: ['<b>'] })).toBe(
+      '<x-items items="[&quot;&lt;b&gt;&quot;]"><template shadowrootmode="open"><div><b>Items</b>&lt;b&gt;</div></template></x-items>',
     );
   });
 
@@ -124,6 +145,23 @@ describe('streaming', () => {
   it('waits for a promise in a text hole', async () => {
     const chunks = await collect(renderToStream('x-await', tree.Await as never, { value: Promise.resolve('a & b') }));
     expect(chunks.join('')).toContain('<template shadowrootmode="open"><p>a &amp; b</p></template></x-await>');
+  });
+
+  it('renders the fallback when an async child rejects', async () => {
+    const chunks = await collect(renderToStream('x-guarded', tree.AsyncGuarded as never));
+    expect(chunks.join('')).toBe('<x-guarded><template shadowrootmode="open"><div><p>failed</p></div></template></x-guarded>');
+  });
+
+  it('starts sibling async components before the first one resolves', async () => {
+    const fixture = app as unknown as { started: string[]; gate: { open: () => void } };
+    fixture.started.length = 0;
+    const reader = renderToStream('x-pair', tree.Pair as never).getReader();
+    const chunks: string[] = [];
+    for (let i = 0; i < 2; i++) chunks.push((await reader.read()).value!);
+    expect(fixture.started).toEqual(['a', 'b']);
+    fixture.gate.open();
+    for (let next = await reader.read(); !next.done; next = await reader.read()) chunks.push(next.value);
+    expect(chunks.join('')).toBe('<x-pair><template shadowrootmode="open"><section><q>a</q><!----><q>b</q></section></template></x-pair>');
   });
 
   it('works as a Web Response body', async () => {
@@ -166,6 +204,21 @@ describe('hydration', () => {
     el.setAttribute('items', '["x"]');
     flush();
     expect(el.shadowRoot!.innerHTML).toBe('<div><!----><ul><li>x</li></ul><em>other</em></div>');
+    log.mockRestore();
+  });
+
+  it('does not duplicate text that an array-valued region renders', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const html = renderToString('x-items-hyd', app.Items as never, { items: ['a'] });
+    const el = document.createElement('x-items-hyd');
+    el.attachShadow({ mode: 'open' }).innerHTML = html.replace(/^<[^>]*><template shadowrootmode="open">/, '').replace(/<\/template>.*$/, '');
+    document.body.appendChild(el);
+    enableHydration();
+    defineComponent('x-items-hyd', dom.Items, { items: Array });
+    el.setAttribute('items', '["a"]');
+    flush();
+    expect(el.shadowRoot!.innerHTML).toBe('<div><b>Items</b>a</div>');
+    disableHydration();
     log.mockRestore();
   });
 

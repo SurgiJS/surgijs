@@ -72,7 +72,7 @@ export const Portaled = () => (
 // Async components are typed loosely: JSX cannot type a promise as an element.
 export const Later = (async (props: ReactiveProps<{ value?: string }>) => {
   const { value } = props;
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await Promise.resolve();
   return <q>{value}</q>;
 }) as unknown as (props: { value?: string }) => JSX.Element;
 
@@ -117,3 +117,65 @@ export const Await = (props: ReactiveProps<{ value?: Promise<string> }>) => {
   const { value } = props;
   return <p>{value}</p>;
 };
+
+export const Items = (props: ReactiveProps<{ items?: string[] }>) => {
+  const { items } = props;
+  return (
+    <div>
+      <b>Items</b>
+      <For each={items() ?? []}>{(item) => item as unknown as JSX.Element}</For>
+    </div>
+  );
+};
+
+export const Frag = (props: ReactiveProps<{ label?: string }>) => {
+  const { label } = props;
+  return (
+    <>
+      {label}
+      <i>inside</i>
+    </>
+  );
+};
+
+export const Nested = () => (
+  <div>
+    <Frag label="x" />
+    <button>Save</button>
+  </div>
+);
+
+export const Failing = (async () => {
+  await Promise.resolve();
+  throw new Error('async boom');
+}) as unknown as () => JSX.Element;
+
+export const AsyncGuarded = () => (
+  <div>
+    <ErrorBoundary fallback={<p>failed</p>}>
+      <Failing />
+    </ErrorBoundary>
+  </div>
+);
+
+export const started: string[] = [];
+
+const gateState: { open: () => void } = { open: () => {} };
+export const gate = gateState;
+const closed = new Promise<void>((resolve) => {
+  gateState.open = resolve;
+});
+
+export const Probe = (async (props: ReactiveProps<{ id?: string }>) => {
+  const { id } = props;
+  started.push(id() ?? '');
+  await closed;
+  return <q>{id}</q>;
+}) as unknown as (props: { id?: string }) => JSX.Element;
+
+export const Pair = () => (
+  <section>
+    <Probe id="a" />
+    <Probe id="b" />
+  </section>
+);

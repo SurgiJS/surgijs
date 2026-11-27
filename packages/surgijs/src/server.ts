@@ -42,10 +42,11 @@ export function shadowHTML(tag: string, inner: string, attrs: Record<string, unk
 }
 
 /*
- * Server output is a tree of parts that is walked once: a string is HTML, an `Html` node holds
- * parts, an array is a list of parts, a function is a deferred part (a nested component or a
- * branch), and a promise is an async value that only `renderToStream` waits for. Text holes
- * escape values on the way in, so every string in the tree is safe to write as is.
+ * Server output is a tree of parts, walked once. A string is static HTML written by the
+ * compiler, an `Html` node holds parts, an array is a list of parts, a function is a deferred
+ * part (a nested component or a branch) and a promise is an async value that only
+ * `renderToStream` waits for. Values that come from user code pass through `text`, which
+ * escapes them, so a bare string in the tree is always raw HTML.
  */
 type Part = string | Html | Part[] | Promise<Part> | (() => Part);
 
@@ -60,41 +61,60 @@ export function element(parts: Part[]): Html {
   return new Html(parts);
 }
 
-/** A text hole: escapes primitives, keeps elements, maps arrays, calls accessors, waits on promises. */
+/** A text hole: escapes values, keeps elements, maps arrays, calls accessors, waits on promises. */
 export function text(value: unknown): Part {
-  if (value == null || typeof value === 'boolean') return '';
-  if (value instanceof Html) return value;
+  if (value == null || typeof value === 'boolean' || value === '') return '';
+  if (value instanceof Html || (value as Partial<MatchCase>)[MATCH]) return value as Part;
   if (Array.isArray(value)) return value.map(text);
   if (typeof value === 'function') return text((value as () => unknown)());
   if (isPromise(value)) return value.then(text) as Promise<Part>;
-  return escape(value);
+  return new Html([escape(value)]);
 }
 
 /** Runs `fn` in a root under the owner that is current where the thunk is created, so contexts reach it. */
-function later<T>(fn: () => T): () => T {
+function later(fn: () => unknown): () => Part {
   const owner: OwnerNode | null = getOwner();
   return () =>
-    createRoot((dispose) => {
-      const out = fn();
-      dispose();
-      return out;
-    }, owner);
+    text(
+      createRoot((dispose) => {
+        const out = fn();
+        dispose();
+        return out;
+      }, owner),
+    );
 }
 
 /** Renders a component as a deferred part. Async components return a promise, which streams wait for. */
 export function component<P>(fn: (props: P) => unknown, props: P): () => Part {
-  return later(() => fn(props)) as () => Part;
+  return later(() => fn(props));
 }
 
 const read = <T>(v: T | (() => T)): T => (typeof v === 'function' ? (v as () => T)() : v);
 const truthy = (v: unknown): boolean => v != null && v !== false;
 const resolve = (c: unknown, value?: unknown): unknown => (typeof c === 'function' ? (c as (v?: unknown) => unknown)(value) : c);
 
-/** Evaluates every deferred part, keeping promises for later. Used where errors must be caught. */
+/** Evaluates every deferred part now, keeping the structure and promises. Used where errors must be caught. */
 function settle(p: unknown): unknown {
   if (typeof p === 'function') return settle((p as () => unknown)());
-  if (p instanceof Html) return p.parts.map(settle);
+  if (p instanceof Html) return new Html(p.parts.map(settle) as Part[]);
   if (Array.isArray(p)) return p.map(settle);
+  return p;
+}
+
+/** Wraps promises and deferred parts so that a failure inside them becomes `fail(err)`. */
+function guard(p: unknown, fail: (err: unknown) => Part): unknown {
+  if (isPromise(p)) return (p as Promise<unknown>).then((v) => guard(v, fail), (err) => fail(err));
+  if (p instanceof Html) return new Html(p.parts.map((x) => guard(x, fail)) as Part[]);
+  if (Array.isArray(p)) return p.map((x) => guard(x, fail));
+  if (typeof p === 'function') {
+    return () => {
+      try {
+        return guard((p as () => unknown)(), fail) as Part;
+      } catch (err) {
+        return fail(err);
+      }
+    };
+  }
   return p;
 }
 
@@ -108,7 +128,7 @@ export function Show<T>(props: ShowProps<T>): () => Part {
   return later(() => {
     const v = read(props.when);
     return truthy(v) ? resolve(props.children, v) : resolve(props.fallback);
-  }) as () => Part;
+  });
 }
 
 interface ForProps<T> {
@@ -119,8 +139,8 @@ interface ForProps<T> {
 export function For<T>(props: ForProps<T>): () => Part {
   return later(() => {
     const items = read(props.each) || [];
-    return items.map((item, i) => later(() => props.children(item, () => i)) as () => Part);
-  }) as () => Part;
+    return items.map((item, i) => later(() => props.children(item, () => i)));
+  });
 }
 
 const MATCH = Symbol('match');
@@ -157,7 +177,7 @@ export function Switch(props: SwitchProps): () => Part {
     collectCases(resolve(props.children), cases);
     const hit = cases.find((c) => truthy(read(c.when)));
     return hit ? resolve(hit.children, read(hit.when)) : resolve(props.fallback);
-  }) as () => Part;
+  });
 }
 
 /** Portals mount into the live document, so nothing is rendered in place on the server. */
@@ -170,20 +190,27 @@ interface ErrorBoundaryProps {
   children: unknown;
 }
 
+/** Renders `fallback` for a failure in its children, synchronous or async, before or during streaming. */
 export function ErrorBoundary(props: ErrorBoundaryProps): () => Part {
   return later(() => {
-    try {
-      return settle(resolve(props.children)) as Part;
-    } catch (err) {
+    const fail = (err: unknown): Part => {
       const f = props.fallback;
-      return (typeof f === 'function' ? (f as (e: unknown, reset: () => void) => unknown)(err, () => {}) : f) as Part;
+      return text(typeof f === 'function' ? (f as (e: unknown, reset: () => void) => unknown)(err, () => {}) : f);
+    };
+    try {
+      return guard(settle(resolve(props.children)), fail) as Part;
+    } catch (err) {
+      return fail(err);
     }
-  }) as () => Part;
+  });
 }
 
 const pushReversed = (stack: unknown[], items: readonly unknown[]): void => {
   for (let i = items.length - 1; i >= 0; i--) stack.push(items[i]);
 };
+
+/** Calls the deferred parts among `items`, so async siblings start before any of them is awaited. */
+const expand = (items: readonly unknown[]): unknown[] => items.map((x) => (typeof x === 'function' ? (x as () => unknown)() : x));
 
 /** Concatenates a part tree. Throws if it reaches a promise: use `renderToStream` for async parts. */
 function toHtml(root: unknown): string {
@@ -208,8 +235,8 @@ async function* streamHtml(root: unknown): AsyncGenerator<string> {
   while (stack.length) {
     const p = stack.pop();
     if (typeof p === 'string') buf += p;
-    else if (p instanceof Html) pushReversed(stack, p.parts);
-    else if (Array.isArray(p)) pushReversed(stack, p);
+    else if (p instanceof Html) pushReversed(stack, expand(p.parts));
+    else if (Array.isArray(p)) pushReversed(stack, expand(p));
     else if (typeof p === 'function') stack.push((p as () => unknown)());
     else if (isPromise(p)) {
       if (buf) {
@@ -229,11 +256,13 @@ function mount<P extends Record<string, unknown>>(view: View<P>, props: P): unkn
   const bag = new Proxy({} as { [K in keyof P]: () => P[K] }, {
     get: (_, k) => () => props[k as keyof P],
   });
-  return createRoot((dispose) => {
-    const out = view(bag);
-    dispose();
-    return out;
-  });
+  return text(
+    createRoot((dispose) => {
+      const out = view(bag);
+      dispose();
+      return out;
+    }),
+  );
 }
 
 /**
@@ -265,7 +294,7 @@ async function* streamShadow<P extends Record<string, unknown>>(
 /**
  * Streams the markup of `renderToString` as it is produced. The shell goes out first, then
  * each run of HTML up to an async value (a promise in a hole, or an async component), which
- * is sent when it resolves.
+ * is sent when it resolves. Siblings that are async components start together.
  */
 export function renderToStream<P extends Record<string, unknown>>(
   tag: string,
@@ -280,8 +309,8 @@ export function renderToStream<P extends Record<string, unknown>>(
       if (next.done) controller.close();
       else controller.enqueue(next.value);
     },
-    async cancel() {
-      await chunks.return(undefined);
+    cancel() {
+      void chunks.return(undefined);
     },
   });
 }

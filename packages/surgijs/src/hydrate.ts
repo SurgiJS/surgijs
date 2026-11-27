@@ -53,11 +53,10 @@ function align(node: Node, tmpl: Node): void {
     t = t.nextSibling;
     n = n ? n.nextSibling : null;
   }
-  // Server content that the template does not place is a dynamic child: the client renders it again.
-  // Text stays so that a value text can adopt it.
+  // Server content after the last template child belongs to a dynamic child, which the client renders again.
   while (n) {
     const next: ChildNode | null = n.nextSibling;
-    if (n.nodeType !== 3) node.removeChild(n);
+    node.removeChild(n);
     n = next;
   }
 }
