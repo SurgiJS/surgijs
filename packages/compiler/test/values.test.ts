@@ -20,6 +20,13 @@ describe('unwrapGetterReads', () => {
     expect(unwrap('const [a] = useState(1); const o = { a };')).toBe('const [a] = useState(1); const o = { a: a() };');
   });
 
+  it('reports each shorthand property it expands', () => {
+    const code = 'const [a] = useState(1);\nconst o = { a, b: a, c: a() };';
+    const { shorthand } = unwrapGetterReads(code);
+    expect(shorthand).toEqual([{ name: 'a', pos: code.indexOf('{ a,') + 2 }]);
+    expect(unwrapGetterReads('const [a] = useState(1); const o = { a: a() };').shorthand).toEqual([]);
+  });
+
   it('reads props destructured from ReactiveProps', () => {
     const code = `const C = (props: ReactiveProps<P>) => { const { title, step } = props; return title ?? props.label + step(); };`;
     expect(unwrap(code)).toBe(

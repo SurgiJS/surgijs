@@ -2,10 +2,6 @@
 
 `@surgijs/ui` is a set of accessible web components built with SurgiJS. Each one wraps native elements in a shadow root, takes its look from CSS custom properties, and renders on the server with declarative shadow DOM.
 
-::: warning Not published yet
-The package lives in `packages/ui` and is not on npm yet. The API below is what the first release will ship.
-:::
-
 ## Install and register
 
 ```bash

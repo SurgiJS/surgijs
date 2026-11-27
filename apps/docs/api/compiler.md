@@ -39,6 +39,10 @@ surgi({ include, moduleName, generate });
 
 Loads `.jsx` / `.tsx` files, compiles them and attaches an inline source map.
 
+## Warnings
+
+In a file with JSX, a shorthand property that names a getter (`{ label }`) compiles to `label: label()`: the object holds the value read at creation and later updates do not reach it. `compile()` returns such cases in `warnings` (`message`, `line`, `column`); the Vite plugin reports them through `this.warn` and the esbuild plugin through `warnings`. Write `label: () => label()` to keep the value live, or `label: label()` when the snapshot is intended; neither form warns.
+
 ## unwrapGetterReads(code, filename)
 
 The pass that inserts `()` after getter reads (`useState`/`createSignal` values, memos, context values, props). The compiler runs it first; it is exported for tools that need the same rewrite.

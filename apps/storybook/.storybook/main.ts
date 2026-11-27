@@ -21,6 +21,7 @@ const config: StorybookConfig = {
         { find: /^@surgijs\/core\/(.*)$/, replacement: `${core}$1.ts` },
         { find: /^@surgijs\/ui$/, replacement: `${ui}index.ts` },
         { find: /^@surgijs\/ui\/themes\.css$/, replacement: `${ui}themes.css` },
+        { find: /^@surgijs\/ui\/custom-elements\.json$/, replacement: `${ui}../custom-elements.json` },
         { find: /^@surgijs\/ui\/(.*)$/, replacement: `${ui}$1/index.ts` },
       ],
     },

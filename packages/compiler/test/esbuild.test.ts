@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import surgi, { type SurgiEsbuildPluginOptions } from '../src/esbuild.ts';
 
-type Load = (args: { path: string; suffix?: string }) => Promise<{ contents: string; loader: 'ts' | 'js' } | undefined>;
+type Load = (args: { path: string; suffix?: string }) => Promise<{ contents: string; loader: 'ts' | 'js'; warnings: { text: string; location: unknown }[] } | undefined>;
 type Resolve = (args: { path: string; resolveDir: string }) => { path: string; suffix: string };
 
 function plugin(options?: SurgiEsbuildPluginOptions): { load: Load; resolve: Resolve } {
@@ -28,6 +28,14 @@ describe('esbuild plugin', () => {
     const load = loader();
     expect((await load({ path: app }))?.contents).toContain('_$template("<div></div>")');
     expect(await load({ path: dep })).toBeUndefined();
+  });
+
+  it('reports shorthand signal reads as warnings', async () => {
+    const file = join(dir, 'row.tsx');
+    writeFileSync(file, 'const [a] = useState(1);\nconst o = { a }; <i />;');
+    const [w] = (await loader()({ path: file }))!.warnings;
+    expect(w?.text).toContain('a: () => a()');
+    expect(w?.location).toMatchObject({ file, line: 2, column: 12, lineText: 'const o = { a }; <i />;' });
   });
 
   it('compiles what include selects', async () => {

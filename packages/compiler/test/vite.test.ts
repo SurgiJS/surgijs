@@ -33,42 +33,50 @@ describe('vite plugin config', () => {
     build.configResolved({ command: 'build' });
     expect(build.transformIndexHtml.handler()).toBeUndefined();
   });
+
+  it('forwards compiler warnings to Vite', () => {
+    const warnings: unknown[] = [];
+    const ctx = { warn: (message: string, position: unknown) => warnings.push([message, position]) };
+    surgi().transform.call(ctx, 'const [a] = useState(1);\nconst o = { a }; <i />;', 'app.tsx');
+    expect(warnings).toEqual([[expect.stringContaining('a: () => a()'), { line: 2, column: 12 }]]);
+  });
 });
 
 describe('vite plugin HMR', () => {
   const plugin = surgi();
+  const transform = (code: string, id: string, options?: { ssr?: boolean }) => plugin.transform.call(undefined, code, id, options);
   const source = "import { defineComponent } from '@surgijs/core';\nexport const A = defineComponent('x-a', () => <b>a</b>);\n";
   const accept = 'if (import.meta.hot) import.meta.hot.accept();';
 
   it('accepts hot updates in compiled modules that define components', () => {
-    const out = plugin.transform(source, '/src/a.tsx');
+    const out = transform(source, '/src/a.tsx');
     expect(out?.code).toContain(accept);
   });
 
   it('accepts hot updates in plain TypeScript modules that define components', () => {
-    const out = plugin.transform("export const B = defineComponent('x-b', () => null);", '/src/b.ts');
+    const out = transform("export const B = defineComponent('x-b', () => null);", '/src/b.ts');
     expect(out?.code).toContain(accept);
   });
 
   it('accepts aliased imports and namespace calls', () => {
     const alias = "import { defineComponent as define } from '@surgijs/core';\ndefine('x-c', () => null);";
     const ns = "import * as core from '@surgijs/core';\ncore.defineComponent('x-d', () => null);";
-    expect(plugin.transform(alias, '/src/c.ts')?.code).toContain(accept);
-    expect(plugin.transform(ns, '/src/d.ts')?.code).toContain(accept);
-    expect(plugin.transform("import { define } from './x';\ndefine('x-e');", '/src/e.ts')).toBeNull();
+    expect(transform(alias, '/src/c.ts')?.code).toContain(accept);
+    expect(transform(ns, '/src/d.ts')?.code).toContain(accept);
+    expect(transform("import { define } from './x';\ndefine('x-e');", '/src/e.ts')).toBeNull();
   });
 
   it('leaves modules without a component definition alone', () => {
-    expect(plugin.transform('export const n = 1;', '/src/n.ts')).toBeNull();
-    expect(plugin.transform('export function defineComponent<P>(tag: string) {}', '/src/component.ts')).toBeNull();
-    expect(plugin.transform("// defineComponent('x', f)\nexport const s = 'defineComponent(';", '/src/labels.ts')).toBeNull();
+    expect(transform('export const n = 1;', '/src/n.ts')).toBeNull();
+    expect(transform('export function defineComponent<P>(tag: string) {}', '/src/component.ts')).toBeNull();
+    expect(transform("// defineComponent('x', f)\nexport const s = 'defineComponent(';", '/src/labels.ts')).toBeNull();
   });
 
   it('skips SSR output and dependencies', () => {
-    expect(plugin.transform(source, '/src/a.tsx?ssr')?.code ?? '').not.toContain(accept);
-    expect(plugin.transform(source, '/node_modules/lib/a.tsx')).toBeNull();
+    expect(transform(source, '/src/a.tsx?ssr')?.code ?? '').not.toContain(accept);
+    expect(transform(source, '/node_modules/lib/a.tsx')).toBeNull();
     const plain = "export const B = defineComponent('x-b', () => null);";
-    expect(plugin.transform(plain, '/src/b.ts', { ssr: true })).toBeNull();
-    expect(plugin.transform(plain, '/src/b.ts', { ssr: false })?.code).toContain(accept);
+    expect(transform(plain, '/src/b.ts', { ssr: true })).toBeNull();
+    expect(transform(plain, '/src/b.ts', { ssr: false })?.code).toContain(accept);
   });
 });
