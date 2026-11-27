@@ -1,6 +1,6 @@
 {
   "name": "@surgijs/store",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Framework-agnostic store: one object, lazy remote data, deep equality subscriptions, unload when unused.",
   "license": "MIT",
   "type": "module",
@@ -51,7 +51,7 @@
   },
   "peerDependencies": {
     "react": ">=18",
-    "@surgijs/core": ">=0.3.1"
+    "@surgijs/core": ">=0.4.0"
   },
   "peerDependenciesMeta": {
     "react": {
