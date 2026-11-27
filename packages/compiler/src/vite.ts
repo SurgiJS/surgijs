@@ -30,6 +30,8 @@ interface SurgiViteConfigContext {
 }
 
 const DEFAULT = /\.[jt]sx$/;
+/** A `defineComponent(` or `defineComponent<` call; the runtime's own declaration does not match. */
+const DEFINES = /(?<!function\s+)\bdefineComponent\s*[(<]/;
 
 /** Vite / Rollup plugin: compiles SurgiJS JSX before other transforms. */
 export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePlugin {
@@ -50,16 +52,21 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
       return rolldown ? ({ oxc: { jsx: 'preserve' } } as unknown as { esbuild: { jsx: 'preserve' } }) : { esbuild: { jsx: 'preserve' } };
     },
     transform(code, id) {
-      if (!matches(id)) return null;
       const [file, query = ''] = id.split('?') as [string, string?];
       const generate = /(^|&)ssr(&|=|$)/.test(query) ? 'ssr' : options.generate;
-      const result = compile(code, {
-        filename: file,
-        ...(options.moduleName ? { moduleName: options.moduleName } : {}),
-        ...(generate ? { generate } : {}),
-      });
-      if (!result.changed) return null;
-      return { code: result.code, map: result.map ? (JSON.parse(result.map) as SourceMapV3) : null };
+      const result = matches(id)
+        ? compile(code, {
+            filename: file,
+            ...(options.moduleName ? { moduleName: options.moduleName } : {}),
+            ...(generate ? { generate } : {}),
+          })
+        : null;
+      const changed = result?.changed === true;
+      const refresh = generate !== 'ssr' && !file.startsWith('\0') && !file.includes('/node_modules/') && DEFINES.test(code);
+      if (!changed && !refresh) return null;
+      const source = changed ? result!.code : code;
+      const out = refresh ? `${source}\nif (import.meta.hot) import.meta.hot.accept();\n` : source;
+      return { code: out, map: changed && result!.map ? (JSON.parse(result!.map) as SourceMapV3) : null };
     },
   };
 }
