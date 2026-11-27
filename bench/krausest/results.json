@@ -1,0 +1,247 @@
+{
+  "tool": "js-framework-benchmark (krausest), CPU benchmarks 01-09, medians in ms",
+  "browser": "Chrome/157.0.8103.50 headless",
+  "machine": "Linux VM, 8 vCPU",
+  "frameworks": {
+    "surgijs": "surgijs-v0.3.0-keyed",
+    "svelte": "svelte-v5.42.1-keyed",
+    "vanillajs": "vanillajs-keyed",
+    "vue": "vue-v3.5.39-keyed"
+  },
+  "benchmarks": {
+    "01_run1k": {
+      "surgijs": {
+        "median": 49.4,
+        "script": 6.3,
+        "paint": 42.2,
+        "runs": 15
+      },
+      "svelte": {
+        "median": 49.6,
+        "script": 6.9,
+        "paint": 41.1,
+        "runs": 15
+      },
+      "vanillajs": {
+        "median": 45.7,
+        "script": 3,
+        "paint": 42.1,
+        "runs": 15
+      },
+      "vue": {
+        "median": 56.4,
+        "script": 11.4,
+        "paint": 44.3,
+        "runs": 15
+      }
+    },
+    "02_replace1k": {
+      "surgijs": {
+        "median": 52.4,
+        "script": 10.2,
+        "paint": 41,
+        "runs": 15
+      },
+      "svelte": {
+        "median": 55.7,
+        "script": 12.1,
+        "paint": 43,
+        "runs": 15
+      },
+      "vanillajs": {
+        "median": 47.8,
+        "script": 6,
+        "paint": 41,
+        "runs": 15
+      },
+      "vue": {
+        "median": 59.5,
+        "script": 16.2,
+        "paint": 42.5,
+        "runs": 15
+      }
+    },
+    "03_update10th1k_x16": {
+      "surgijs": {
+        "median": 24.6,
+        "script": 1.6,
+        "paint": 21.4,
+        "runs": 15
+      },
+      "svelte": {
+        "median": 24.6,
+        "script": 2,
+        "paint": 21,
+        "runs": 15
+      },
+      "vanillajs": {
+        "median": 23.1,
+        "script": 0.8,
+        "paint": 20.2,
+        "runs": 15
+      },
+      "vue": {
+        "median": 27.6,
+        "script": 4.2,
+        "paint": 21.6,
+        "runs": 15
+      }
+    },
+    "04_select1k": {
+      "surgijs": {
+        "median": 6.9,
+        "script": 1.4,
+        "paint": 4.5,
+        "runs": 25
+      },
+      "svelte": {
+        "median": 9.5,
+        "script": 4.1,
+        "paint": 4.4,
+        "runs": 25
+      },
+      "vanillajs": {
+        "median": 5.8,
+        "script": 0.4,
+        "paint": 4.5,
+        "runs": 25
+      },
+      "vue": {
+        "median": 7.5,
+        "script": 1.8,
+        "paint": 4.8,
+        "runs": 25
+      }
+    },
+    "05_swap1k": {
+      "surgijs": {
+        "median": 29.7,
+        "script": 1.6,
+        "paint": 26.1,
+        "runs": 15
+      },
+      "svelte": {
+        "median": 31.3,
+        "script": 2.3,
+        "paint": 26.3,
+        "runs": 15
+      },
+      "vanillajs": {
+        "median": 28.8,
+        "script": 0.4,
+        "paint": 26.3,
+        "runs": 15
+      },
+      "vue": {
+        "median": 34.6,
+        "script": 2.2,
+        "paint": 29,
+        "runs": 15
+      }
+    },
+    "06_remove-one-1k": {
+      "surgijs": {
+        "median": 25.5,
+        "script": 1,
+        "paint": 23.3,
+        "runs": 15
+      },
+      "svelte": {
+        "median": 25.9,
+        "script": 1,
+        "paint": 23.5,
+        "runs": 15
+      },
+      "vanillajs": {
+        "median": 26.3,
+        "script": 0.6,
+        "paint": 24.7,
+        "runs": 15
+      },
+      "vue": {
+        "median": 30.1,
+        "script": 5.5,
+        "paint": 23.2,
+        "runs": 15
+      }
+    },
+    "07_create10k": {
+      "surgijs": {
+        "median": 544.1,
+        "script": 51.1,
+        "paint": 482.9,
+        "runs": 15
+      },
+      "svelte": {
+        "median": 531.4,
+        "script": 57.6,
+        "paint": 468.2,
+        "runs": 15
+      },
+      "vanillajs": {
+        "median": 482.1,
+        "script": 29.8,
+        "paint": 445.5,
+        "runs": 15
+      },
+      "vue": {
+        "median": 569.7,
+        "script": 91.9,
+        "paint": 471.3,
+        "runs": 15
+      }
+    },
+    "08_create1k-after1k_x2": {
+      "surgijs": {
+        "median": 55.9,
+        "script": 6.4,
+        "paint": 48.1,
+        "runs": 15
+      },
+      "svelte": {
+        "median": 53.3,
+        "script": 6.8,
+        "paint": 44.9,
+        "runs": 15
+      },
+      "vanillajs": {
+        "median": 48.9,
+        "script": 3.3,
+        "paint": 44.8,
+        "runs": 15
+      },
+      "vue": {
+        "median": 58.1,
+        "script": 11.1,
+        "paint": 45.6,
+        "runs": 15
+      }
+    },
+    "09_clear1k_x8": {
+      "surgijs": {
+        "median": 19.6,
+        "script": 15.3,
+        "paint": 2.8,
+        "runs": 15
+      },
+      "svelte": {
+        "median": 19.7,
+        "script": 16.2,
+        "paint": 2.5,
+        "runs": 15
+      },
+      "vanillajs": {
+        "median": 17.8,
+        "script": 13.6,
+        "paint": 2.7,
+        "runs": 15
+      },
+      "vue": {
+        "median": 22.6,
+        "script": 19.1,
+        "paint": 2.7,
+        "runs": 15
+      }
+    }
+  }
+}

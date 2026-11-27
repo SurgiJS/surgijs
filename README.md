@@ -68,15 +68,15 @@ Changing every label, ms, headless Chrome 157 ([method and full results](https:/
 
 | Library | 1 000 rows | 10 000 rows |
 | --- | ---: | ---: |
-| Native | 0.34 | 3.38 |
-| **SurgiJS** | **0.41** | **3.97** |
-| lit-html 3.3 | 0.54 | 5.02 |
-| FAST Element 3.1 | 0.58 | 5.67 |
-| Solid 1.9 | 0.83 | 6.98 |
-| Inferno 10 | 0.77 | 7.58 |
-| React 19 | 1.21 | 11.32 |
-| Svelte 5 | 2.69 | 14.65 |
-| Vue 3 | 2.18 | 30.61 |
+| Native | 0.34 | 3.48 |
+| **SurgiJS** | **0.44** | **4.25** |
+| lit-html 3.3 | 0.53 | 4.90 |
+| FAST Element 3.1 | 0.58 | 6.83 |
+| Inferno 10 | 0.75 | 7.76 |
+| Solid 1.9 | 0.77 | 7.45 |
+| React 19 | 1.23 | 11.19 |
+| Svelte 5 | 1.36 | 8.83 |
+| Vue 3 | 1.71 | 18.52 |
 
 Run it locally with `pnpm bench` (`pnpm bench surgijs solid --rows 10000` for a subset).
 

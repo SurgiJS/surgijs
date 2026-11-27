@@ -28,30 +28,36 @@ Change every label, ms:
 
 | Library | 1 000 | 10 000 |
 | --- | ---: | ---: |
-| Native | 0.34 | 3.38 |
-| **SurgiJS 0.1.0** | **0.41** | **3.97** |
-| lit-html 3.3 | 0.54 | 5.02 |
-| FAST Element 3.1 | 0.58 | 5.67 |
-| Solid 1.9 | 0.83 | 6.98 |
-| Inferno 10 | 0.77 | 7.58 |
-| React 19 | 1.21 | 11.32 |
-| Svelte 5 | 2.69 | 14.65 |
-| Vue 3 | 2.18 | 30.61 |
+| Native | 0.34 | 3.48 |
+| **SurgiJS 0.3.0** | **0.44** | **4.25** |
+| lit-html 3.3 | 0.53 | 4.90 |
+| FAST Element 3.1 | 0.58 | 6.83 |
+| Inferno 10 | 0.75 | 7.76 |
+| Solid 1.9 | 0.77 | 7.45 |
+| React 19 | 1.23 | 11.19 |
+| Svelte 5 | 1.36 | 8.83 |
+| Vue 3 | 1.71 | 18.52 |
 
 10 000 rows:
 
 | Library | init, ms | toggle all, ms | heap, MB | case bundle, KB gzip |
 | --- | ---: | ---: | ---: | ---: |
-| Native | 12.1 | 2.8 | 0.9 | 0.4 |
-| Solid | 14.4 | 4.6 | 6.8 | 5.4 |
-| **SurgiJS** | **14.7** | **2.4** | **1.8** | **2.9** |
-| Inferno | 16.8 | 5.5 | 3.9 | 9.4 |
-| Vue | 29.6 | 25.3 | 20.5 | 22.0 |
-| lit-html | 34.0 | 3.1 | 4.6 | 4.1 |
-| FAST Element | 43.8 | 4.4 | 0.5 | 18.5 |
-| React | 204.0 | 9.1 | 6.9 | 67.4 |
-| Svelte | 336.9 | 12.6 | 11.2 | 19.3 |
+| Native | 12.1 | 2.9 | 0.9 | 0.4 |
+| **SurgiJS 0.3.0** | **14.9** | **2.7** | **1.9** | **3.1** |
+| Solid | 15.3 | 4.6 | 6.8 | 5.4 |
+| Inferno | 16.7 | 5.2 | 3.9 | 9.4 |
+| Vue | 21.1 | 14.9 | 2.3 | 22.5 |
+| Svelte | 26.6 | 7.4 | 10.7 | 19.3 |
+| lit-html | 33.4 | 3.3 | 4.6 | 4.1 |
+| FAST Element | 42.6 | 4.8 | 0.5 | 18.5 |
+| React | 205.6 | 9.1 | 6.9 | 67.4 |
 
+### Framework idioms
+
+Each case uses the keyed-list pattern that the framework documents for this job, the same one the [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) implementations use:
+
+- Svelte: the list and each row's fields are `$state.raw`. Deep `$state` proxies every row on first access and made `init` 13 times slower (328 ms at 10 000 rows before the change).
+- Vue: one component renders the list with `v-for`, `v-memo` and `shallowRef`. A component per row is faster for a single label change (0.07 ms against 4.0 ms here), but `redrawAll` is about twice as slow (35.9 ms against 18.5 ms at 10 000 rows), so the single-component form is what the bench reports.
 ## Bundle size
 
 | Bundle | min + gzip |
