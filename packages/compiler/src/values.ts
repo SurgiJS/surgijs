@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import ts from './typescript.ts';
 
 /** Calls whose result (or first tuple element) is a getter read as a value. */
 export const GETTER_FNS: ReadonlySet<string> = new Set(['useState', 'createSignal', 'createMemo', 'useMemo', 'useContext']);

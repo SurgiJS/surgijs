@@ -35,6 +35,10 @@
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"
     },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",
@@ -46,14 +50,19 @@
     "bench": "node bench/run.mjs"
   },
   "peerDependencies": {
-    "react": ">=18"
+    "react": ">=18",
+    "@surgijs/core": ">=0.2.1"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
+    },
+    "@surgijs/core": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@surgijs/core": "workspace:*",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.3.0",
     "jotai": "^2.15.0",

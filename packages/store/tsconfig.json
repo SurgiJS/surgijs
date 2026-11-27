@@ -6,7 +6,9 @@
     "jsxImportSource": "react",
     "paths": {
       "@surgijs/store": ["./src/index.ts"],
-      "@surgijs/store/react": ["./src/react.ts"]
+      "@surgijs/store/react": ["./src/react.ts"],
+      "@surgijs/store/core": ["./src/core.ts"],
+      "@surgijs/core": ["../surgijs/src/index.ts"]
     }
   },
   "include": ["src", "test", "tsup.config.ts", "vitest.config.ts"]

@@ -5,6 +5,7 @@ import {
   DEFAULT_GC_TIME,
   DEFAULT_STALE_TIME,
   createRemoteGet,
+  defaultRetryDelay,
   isEmptyData,
   isRemote,
   resolvePlaceholder,
@@ -13,6 +14,7 @@ import {
   type RemoteKey,
   type RemoteKeys,
   type RemoteMeta,
+  type RetryDelay,
   type StoreState,
   type SyncKeys,
 } from './remote';
@@ -35,6 +37,8 @@ type RemoteEntry = {
   fetching: boolean;
   lastStatus: 'success' | 'error' | undefined;
   key: RemoteKey | undefined;
+  dataKey: RemoteKey | undefined;
+  timer: ReturnType<typeof setTimeout> | null;
   depKeys: Set<string> | null;
   refs: number;
   seq: number;
@@ -100,6 +104,8 @@ export interface CreateStoreOptions {
   staleTime?: number;
   /** Default retry count after the first attempt. Default: `2`. */
   retry?: number | false;
+  /** Default `retryDelay`. Default: exponential backoff (1s, 2s, 4s, … up to 30s). */
+  retryDelay?: RetryDelay;
   /** Default `refetchOnFocus`. Default: `true`. */
   refetchOnFocus?: boolean;
   /** Default `refetchOnReconnect`. Default: `true`. */
@@ -153,6 +159,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
   const defaultGc = options?.gcTime ?? DEFAULT_GC_TIME;
   const defaultStale = options?.staleTime ?? DEFAULT_STALE_TIME;
   const defaultRetry = options?.retry === false ? 0 : (options?.retry ?? 2);
+  const defaultDelay = options?.retryDelay ?? defaultRetryDelay;
   const defaultFocus = options?.refetchOnFocus ?? true;
   const defaultOnline = options?.refetchOnReconnect ?? true;
 
@@ -177,6 +184,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         gcTime: value.gcTime ?? defaultGc,
         staleTime: value.staleTime ?? defaultStale,
         retry: value.retry === undefined ? defaultRetry : value.retry,
+        retryDelay: value.retryDelay ?? defaultDelay,
         refetchOnFocus: value.refetchOnFocus ?? defaultFocus,
         refetchOnReconnect: value.refetchOnReconnect ?? defaultOnline,
       };
@@ -188,6 +196,8 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         fetching: false,
         lastStatus: undefined,
         key: undefined,
+        dataKey: undefined,
+        timer: null,
         depKeys: null,
         refs: 0,
         seq: 0,
@@ -357,11 +367,19 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     }, ttl);
   };
 
+  const clearTimer = (entry: RemoteEntry): void => {
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = null;
+    }
+  };
+
   const unload = (name: string, entry: RemoteEntry): void => {
     if (entry.gc) {
       clearTimeout(entry.gc);
       entry.gc = null;
     }
+    clearTimer(entry);
     entry.ctrl?.abort();
     entry.ctrl = null;
     entry.seq++;
@@ -371,6 +389,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     entry.fetching = false;
     entry.lastStatus = undefined;
     entry.key = undefined;
+    entry.dataKey = undefined;
     entry.depKeys = null;
     entry.dataUpdatedAt = 0;
     entry.errorUpdatedAt = 0;
@@ -472,6 +491,9 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       isStale: isStale(entry),
       isActive: entry.refs > 0,
       deps: entry.key,
+      dataDeps: entry.dataKey,
+      isPreviousData:
+        entry.lastStatus === 'success' && entry.dataKey !== undefined && !deepEqual(entry.dataKey, entry.key),
       source: entry.source,
       httpStatus: entry.httpStatus,
       code: entry.code,
@@ -488,6 +510,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     entry.error = undefined;
     entry.lastStatus = 'success';
     entry.data = data;
+    entry.dataKey = entry.key;
     entry.dataUpdatedAt = Date.now();
     entry.source = 'network';
     // Drop prior error codes; keep httpStatus if report() set it during fetch.
@@ -522,21 +545,34 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     report: (info: { status?: number; code?: string | number }) => void,
     signal: AbortSignal,
   ): Promise<unknown> => {
-    const maxRetry = entry.def.retry;
+    const maxRetry = entry.def.retry ?? 0;
     let attempt = 0;
     for (;;) {
       try {
         return await entry.def.fetch(get, { signal, deps, get, report });
       } catch (err) {
         if (isAbortError(err) || attempt >= maxRetry) throw err;
-        const delay =
-          typeof entry.def.retryDelay === 'function'
-            ? entry.def.retryDelay(attempt, err)
-            : entry.def.retryDelay;
+        const retryDelay = entry.def.retryDelay ?? defaultDelay;
+        const delay = typeof retryDelay === 'function' ? retryDelay(attempt, err) : retryDelay;
         attempt++;
         await sleep(delay, signal);
       }
     }
+  };
+
+  /** New deps: drop data fetched for the old ones unless `keepPreviousData` is set. */
+  const resetForDeps = (entry: RemoteEntry): void => {
+    if (entry.def.keepPreviousData) return;
+    const placeholder = resolvePlaceholder(entry.def.placeholderData);
+    entry.data = placeholder;
+    entry.error = undefined;
+    entry.lastStatus = undefined;
+    entry.dataKey = undefined;
+    entry.dataUpdatedAt = 0;
+    entry.errorUpdatedAt = 0;
+    entry.source = placeholder !== undefined ? 'cache' : undefined;
+    entry.httpStatus = undefined;
+    entry.code = undefined;
   };
 
   const load = (name: string, entry: RemoteEntry, force: boolean): Promise<unknown> => {
@@ -550,9 +586,11 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       return Promise.resolve(entry.data);
     }
 
+    clearTimer(entry);
     entry.ctrl?.abort();
     const ctrl = new AbortController();
     entry.ctrl = ctrl;
+    if (entry.key !== undefined && !deepEqual(entry.key, nextDeps)) resetForDeps(entry);
     entry.key = nextDeps;
     entry.fetching = true;
     entry.fetchStartedAt = Date.now();
@@ -623,6 +661,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     if (entry.refs !== 0) return;
 
     unregisterFocus(name);
+    clearTimer(entry);
 
     if (entry.fetching) {
       entry.ctrl?.abort();
@@ -685,7 +724,25 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         }
       }
       const nextDeps = readDeps(entry);
-      if (!deepEqual(entry.key, nextDeps)) void load(name, entry, true).catch(() => {});
+      if (deepEqual(entry.key, nextDeps)) continue;
+      const wait = entry.def.debounce ?? 0;
+      if (wait > 0 && entry.key !== undefined) {
+        clearTimer(entry);
+        entry.ctrl?.abort();
+        entry.ctrl = null;
+        entry.seq++;
+        entry.fetching = false;
+        resetForDeps(entry);
+        entry.key = nextDeps;
+        bump();
+        notifyKey(name);
+        entry.timer = setTimeout(() => {
+          entry.timer = null;
+          if (entry.refs > 0) void load(name, entry, true).catch(() => {});
+        }, wait);
+        continue;
+      }
+      void load(name, entry, true).catch(() => {});
     }
   };
 

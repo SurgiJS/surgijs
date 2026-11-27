@@ -3,7 +3,7 @@
 JSX compiler for [SurgiJS](https://github.com/SurgiJS/surgijs). It hoists static markup into templates, turns dynamic expressions into direct bindings and emits source maps. `typescript` (5.x or 6.x) is its only peer dependency.
 
 ```bash
-npm i -D @surgijs/compiler typescript
+npm i -D @surgijs/compiler typescript@6
 ```
 
 ```ts
