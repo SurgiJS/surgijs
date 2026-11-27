@@ -18,21 +18,31 @@ export function attrPart(name: string, value: unknown): string {
 
 const kebab = (s: string): string => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
 
-/** `<tag a="1"><template shadowrootmode="open">inner</template></tag>`. */
-export function shadowHTML(tag: string, inner: string, attrs: Record<string, unknown> = {}): string {
+export interface ShadowOptions {
+  /** Light DOM markup after the template, projected into the shadow root's slots. Not escaped. */
+  children?: string;
+  /** Adds `shadowrootdelegatesfocus`, matching `attachShadow({ delegatesFocus: true })`. */
+  delegatesFocus?: boolean;
+}
+
+/** `<tag a="1"><template shadowrootmode="open">inner</template>children</tag>`. */
+export function shadowHTML(tag: string, inner: string, attrs: Record<string, unknown> = {}, options: ShadowOptions = {}): string {
   let a = '';
   for (const k in attrs) a += attrPart(kebab(k), attrs[k]);
-  return `<${tag}${a}><template shadowrootmode="open">${inner}</template></${tag}>`;
+  const focus = options.delegatesFocus ? ' shadowrootdelegatesfocus' : '';
+  return `<${tag}${a}><template shadowrootmode="open"${focus}>${inner}</template>${options.children ?? ''}</${tag}>`;
 }
 
 /**
  * Renders a component compiled with `generate: 'ssr'` into its host tag with a declarative
- * shadow root. `props` become getters, like attributes on the client.
+ * shadow root. `props` become getters, like attributes on the client; `options` adds light
+ * DOM children and focus delegation.
  */
 export function renderToString<P extends Record<string, unknown>>(
   tag: string,
   view: (props: { [K in keyof P]: () => P[K] }, host?: unknown) => unknown,
   props: P = {} as P,
+  options: ShadowOptions = {},
 ): string {
   const bag = new Proxy({} as { [K in keyof P]: () => P[K] }, {
     get: (_, k) => () => props[k as keyof P],
@@ -42,5 +52,5 @@ export function renderToString<P extends Record<string, unknown>>(
     html = '' + (view(bag) ?? '');
     dispose();
   });
-  return shadowHTML(tag, html, props);
+  return shadowHTML(tag, html, props, options);
 }
