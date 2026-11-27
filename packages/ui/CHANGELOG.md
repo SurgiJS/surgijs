@@ -1,5 +1,12 @@
 # @surgijs/ui
 
+## 3.0.0
+
+### Patch Changes
+
+- Updated dependencies [[`2ea1a7d`](https://github.com/SurgiJS/surgijs/commit/2ea1a7db0049c1a36eaee711a927d7978dadd31c)]:
+  - @surgijs/core@0.6.0
+
 ## 2.0.0
 
 ### Patch Changes

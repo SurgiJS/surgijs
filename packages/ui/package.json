@@ -1,6 +1,6 @@
 {
   "name": "@surgijs/ui",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Accessible SurgiJS web components, themed with CSS custom properties and ready for SSR.",
   "license": "MIT",
   "type": "module",
