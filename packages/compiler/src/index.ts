@@ -22,6 +22,9 @@ export interface CompileResult {
 
 type Jsx = JSXElement | JSXFragment;
 
+/** A piece of server output: static HTML, or a code expression. */
+type SsrPart = string | { code: string };
+
 const isJsx = (n: Node): n is Jsx => n.type === 'JSXElement' || n.type === 'JSXFragment';
 
 const isComponentName = (name: string): boolean => /^[A-Z]/.test(name) || name.includes('.') || name === 'this';
@@ -627,6 +630,17 @@ class Compiler {
   // ---------------------------------------------------------------- components
 
   componentChildren(items: Item[]): string[] {
+    if (this.ssr) {
+      return items.map((it) => {
+        if (it.k === 'text') return `${this.h('element')}([${JSON.stringify(escText(it.text!))}])`;
+        if (it.k === 'el') return this.jsx(it.node!);
+        const e = it.expr!;
+        if (isJsx(e)) return this.jsx(e);
+        const x = strip(e);
+        if (isFn(x)) return this.expr(x);
+        return `${this.h('text')}(${this.expr(x)})`;
+      });
+    }
     return items.map((it) => {
       if (it.k === 'text') return JSON.stringify(it.text);
       if (it.k === 'el') return this.jsx(it.node!);
@@ -639,7 +653,6 @@ class Compiler {
   }
 
   component(node: JSXElement, tag: string): string {
-    if (this.ssr) return '""';
     const short = tag.split('.').pop()!;
     const provider = short === 'Provider';
     const builtin = BUILTIN.has(tag) || provider;
@@ -689,12 +702,13 @@ class Compiler {
       else if (builtin) props.push(`children: ${value}`);
       else props.push(`children: () => ${value}`);
     }
+    if (this.ssr) return `${this.h('component')}(${BUILTIN.has(tag) ? this.h(tag) : tag}, { ${props.join(', ')} })`;
     return `${this.h('createComponent')}(${tag}, { ${props.join(', ')} })`;
   }
 
   fragment(children: readonly JSXChild[]): string {
     const items = this.children(children);
-    if (this.ssr) return this.ssrConcat(this.ssrItems(items));
+    if (this.ssr) return this.ssrNode(this.ssrItems(items));
     const values = items.map((it) => {
       if (it.k === 'text') return JSON.stringify(it.text);
       if (it.k === 'el') return this.jsx(it.node!);
@@ -706,7 +720,11 @@ class Compiler {
 
   // ---------------------------------------------------------------- SSR
 
-  ssrConcat(parts: (string | { code: string })[]): string {
+  /**
+   * `element([...])`: a string part is HTML already, a `{ code }` part evaluates to an attribute
+   * string, a text hole (`text(value)`), a nested component thunk or a child element.
+   */
+  ssrNode(parts: SsrPart[]): string {
     const out: string[] = [];
     let buf = '';
     for (const p of parts) {
@@ -718,50 +736,42 @@ class Compiler {
       }
     }
     if (buf || !out.length) out.push(JSON.stringify(buf));
-    return out.length === 1 ? out[0]! : `(${out.join(' + ')})`;
+    return `${this.h('element')}([${out.join(', ')}])`;
   }
 
-  hasJsx(e: Node): boolean {
-    let found = false;
-    const walk = (n: Node): void => {
-      if (found) return;
-      if (isJsx(n)) found = true;
-      else forEachChild(n, walk);
-    };
-    walk(e);
-    return found;
-  }
-
-  ssrItems(items: Item[]): (string | { code: string })[] {
-    const parts: (string | { code: string })[] = [];
+  ssrItems(items: Item[]): SsrPart[] {
+    const parts: SsrPart[] = [];
+    const only = items.length === 1;
     items.forEach((it, i) => {
-      if (it.k === 'text') parts.push(escText(it.text!));
-      else if (it.k === 'el') parts.push(...this.ssrParts(it.node!));
-      else {
-        const only = items.length === 1;
-        const last = i === items.length - 1;
-        const e = it.expr!;
-        const hole = isJsx(e) || this.hasJsx(e) || isFn(e as Expression);
-        if (!only && !last) parts.push('<!---->');
-        else if (!hole) {
-          const x = getterBody(e as Expression) ?? strip(e as Expression);
-          const code = `${this.h('escape')}(${this.expr(x)})`;
-          parts.push({ code: only && isDynamic(x) && this.isTextual(x) ? `(${code} || " ")` : code });
-        }
+      if (it.k === 'text') {
+        parts.push(escText(it.text!));
+        return;
       }
+      if (it.k === 'el') {
+        parts.push(...this.ssrParts(it.node!));
+        return;
+      }
+      const e = it.expr!;
+      if (isJsx(e)) parts.push({ code: this.jsx(e) });
+      else {
+        const x = getterBody(e as Expression) ?? strip(e as Expression);
+        const code = `${this.h('text')}(${this.expr(x)})`;
+        parts.push({ code: only && isDynamic(x) && this.isTextual(x) ? `(${code} || " ")` : code });
+      }
+      if (i < items.length - 1) parts.push('<!---->');
     });
     return parts;
   }
 
   ssrElement(node: JSXElement): string {
-    return this.ssrConcat(this.ssrParts(node));
+    return this.ssrNode(this.ssrParts(node));
   }
 
-  ssrParts(node: JSXElement): (string | { code: string })[] {
+  ssrParts(node: JSXElement): SsrPart[] {
     const opening = node.openingElement;
     const tag = this.tagName(node);
     const custom = tag.includes('-');
-    const parts: (string | { code: string })[] = [`<${tag}`];
+    const parts: SsrPart[] = [`<${tag}`];
     for (const a of opening.attributes) {
       if (a.type === 'JSXSpreadAttribute') continue;
       const { ns, local } = attrName(a);

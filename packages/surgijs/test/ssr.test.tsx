@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, flush } from '@surgijs/core';
 import { disableHydration, enableHydration } from '@surgijs/core/hydrate';
-import { attrPart, escape, renderToString, shadowHTML } from '@surgijs/core/server';
+import { attrPart, escape, renderToStream, renderToString, shadowHTML } from '@surgijs/core/server';
 import { Counter } from '../../../apps/playground/src/counter.tsx';
 import * as server from '../../../apps/playground/src/counter.tsx?ssr';
+import * as app from './fixtures/ssr-app.tsx?ssr';
 
 const ServerCounter = server.Counter!;
 
@@ -43,6 +44,90 @@ describe('server helpers', () => {
       '<my-counter title="A &amp; B" step="2"><template shadowrootmode="open"><div class="card"><h3>A &amp; B</h3><p>Value: 0</p><button>Add</button></div></template></my-counter>',
     );
     log.mockRestore();
+  });
+});
+
+describe('nested components on the server', () => {
+  const tree = app as unknown as Record<string, (props: Record<string, () => unknown>) => unknown>;
+  const render = (view: string, props: Record<string, unknown> = {}) =>
+    renderToString(`x-${view.toLowerCase()}`, tree[view] as never, props);
+
+  it('renders child components with their props', () => {
+    expect(render('Badge', { label: 'A & B' })).toBe(
+      '<x-badge label="A &amp; B"><template shadowrootmode="open"><b class="badge">A &amp; B</b></template></x-badge>',
+    );
+    expect(render('Panel', { title: 'T' })).toBe(
+      '<x-panel title="T"><template shadowrootmode="open"><section><h2>T</h2><b class="badge">T</b><!----></section></template></x-panel>',
+    );
+  });
+
+  it('reads context from the nearest provider and falls back to the default', () => {
+    expect(render('Themed')).toBe('<x-themed><template shadowrootmode="open"><p class="light">themed</p></template></x-themed>');
+    expect(render('Page', { title: 'A & B' })).toContain('<p class="dark">themed</p>');
+  });
+
+  it('renders control flow on the server', () => {
+    expect(render('List', { items: ['x', '<y>'], mode: 'b', show: true })).toBe(
+      '<x-list items="[&quot;x&quot;,&quot;&lt;y&gt;&quot;]" mode="b" show><template shadowrootmode="open"><div><i>shown</i><!----><ul><li>x</li><li>&lt;y&gt;</li></ul><span>B</span></div></template></x-list>',
+    );
+    expect(render('List', { mode: 'z' })).toBe(
+      '<x-list mode="z"><template shadowrootmode="open"><div><!----><ul></ul><em>other</em></div></template></x-list>',
+    );
+  });
+
+  it('passes the value to function children and the index to rows', () => {
+    expect(render('Users', { user: { name: 'Ann & Co' }, names: ['a', 'b'] })).toBe(
+      '<x-users user="{&quot;name&quot;:&quot;Ann &amp; Co&quot;}" names="[&quot;a&quot;,&quot;b&quot;]"><template shadowrootmode="open"><div><b>Ann &amp; Co</b><!----><ol><li>0<!---->:a</li><li>1<!---->:b</li></ol></div></template></x-users>',
+    );
+  });
+
+  it('renders the fallback of an error boundary and nothing for a portal', () => {
+    expect(render('Guarded')).toBe('<x-guarded><template shadowrootmode="open"><p>failed</p></template></x-guarded>');
+    expect(render('Portaled')).toBe('<x-portaled><template shadowrootmode="open"><div></div></template></x-portaled>');
+  });
+
+  it('projects children and escapes text at every level', () => {
+    expect(render('Page', { title: 'A & B' })).toBe(
+      '<x-page title="A &amp; B"><template shadowrootmode="open"><main><section><h2>A &amp; B</h2><b class="badge">A &amp; B</b><!----><em>A &amp; B</em></section><!----><p class="dark">themed</p><!----><div><i>shown</i><!----><ul><li>x</li><li>&lt;y&gt;</li></ul><span>B</span></div></main></template></x-page>',
+    );
+  });
+
+  it('rejects async values in renderToString', () => {
+    expect(() => render('Deferred')).toThrow(/renderToStream/);
+  });
+});
+
+describe('streaming', () => {
+  const tree = app as unknown as Record<string, (props: Record<string, () => unknown>) => unknown>;
+
+  async function collect(stream: ReadableStream<string>): Promise<string[]> {
+    const chunks: string[] = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    return chunks;
+  }
+
+  it('streams the same markup as renderToString when nothing is async', async () => {
+    const props = { title: 'A & B' };
+    const chunks = await collect(renderToStream('x-page', tree.Page as never, props));
+    expect(chunks.join('')).toBe(renderToString('x-page', tree.Page as never, props));
+  });
+
+  it('sends the markup before an async component resolves', async () => {
+    const chunks = await collect(renderToStream('x-deferred', tree.Deferred as never));
+    expect(chunks.length).toBeGreaterThan(2);
+    expect(chunks[0]).toBe('<x-deferred><template shadowrootmode="open">');
+    expect(chunks[1]).toBe('<section>');
+    expect(chunks.join('')).toBe('<x-deferred><template shadowrootmode="open"><section><q>soon</q></section></template></x-deferred>');
+  });
+
+  it('waits for a promise in a text hole', async () => {
+    const chunks = await collect(renderToStream('x-await', tree.Await as never, { value: Promise.resolve('a & b') }));
+    expect(chunks.join('')).toContain('<template shadowrootmode="open"><p>a &amp; b</p></template></x-await>');
+  });
+
+  it('works as a Web Response body', async () => {
+    const response = new Response(renderToStream('x-deferred', tree.Deferred as never), { headers: { 'content-type': 'text/html' } });
+    expect(await response.text()).toBe('<x-deferred><template shadowrootmode="open"><section><q>soon</q></section></template></x-deferred>');
   });
 });
 
