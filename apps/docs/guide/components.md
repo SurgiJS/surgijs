@@ -51,6 +51,7 @@ const Picker = (props: ReactiveProps<PickerProps>, host: HTMLElement, emit: Emit
   // ...
   emit('change', 'go');
   emit('close');
+  return null;
 };
 
 export const UiPicker = defineComponent<PickerProps, typeof pickerEvents>('ui-picker', Picker, { value: String }, { events: pickerEvents });

@@ -224,7 +224,8 @@ describe('defineComponent', () => {
   });
 
   it('emits declared events with typed detail and default flags', () => {
-    const events = { pick: defineEvent<number>(), reset: defineEvent() };
+    const staleFlags = { bubbles: true, detail: 'stale' };
+    const events = { pick: defineEvent<number>(staleFlags), reset: defineEvent() };
     let emit!: Emit<typeof events>;
     const Emitter = defineComponent<{}, typeof events>('x-emit', (_props, _host, e) => {
       emit = e;
@@ -245,6 +246,8 @@ describe('defineComponent', () => {
       emit('missing');
       // @ts-expect-error a void event takes no detail
       emit('reset', 1);
+      // @ts-expect-error a union of names cannot share one detail type
+      (name: 'pick' | 'reset') => emit(name, 3);
       el.addEventListener('pick', (e) => {
         // @ts-expect-error the typed listener receives a number, so `detail` is not a string
         const text: string = e.detail;

@@ -48,11 +48,12 @@ export type EventDecls = Record<string, EventDecl<any>>;
 
 type DetailOf<D> = D extends EventDecl<infer T> ? T : never;
 
+type EmitArgs<X> = {
+  [K in keyof X & string]: [name: K, ...detail: [DetailOf<X[K]>] extends [void] ? [] : [detail: DetailOf<X[K]>]];
+}[keyof X & string];
+
 /** `emit(name, detail)` for the events declared in `X`; `void` events take no detail. */
-export type Emit<X> = <K extends keyof X & string>(
-  name: K,
-  ...detail: [DetailOf<X[K]>] extends [void] ? [] : [detail: DetailOf<X[K]>]
-) => boolean;
+export type Emit<X> = (...args: EmitArgs<X>) => boolean;
 
 export interface TypedEventTarget<X> {
   addEventListener<K extends keyof X & string>(
@@ -191,7 +192,7 @@ export function defineComponent<P extends object = {}, X extends EventDecls = {}
         createRoot((dispose) => {
           self.__d = dispose;
           const emit = ((name: string, detail?: unknown) =>
-            this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail, ...events?.[name] }))) as Emit<X>;
+            this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, ...events?.[name], detail }))) as unknown as Emit<X>;
           deferMount(() => insert(root, render(self.__p as ReactiveProps<P>, this, emit)));
         });
       } finally {
