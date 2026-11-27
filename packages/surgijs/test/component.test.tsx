@@ -8,6 +8,7 @@ import {
   onCleanup,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Emit,
@@ -381,6 +382,43 @@ describe('defineComponent', () => {
     });
     document.body.appendChild(document.createElement('x-effect'));
     expect(inRoot).toBe(true);
+  });
+
+  it('accepts React-style deps arrays in compiled components', () => {
+    const log: string[] = [];
+    defineComponent<{ step?: number }>(
+      'x-deps',
+      (props) => {
+        const { step } = props;
+        const [count, setCount] = useState(0);
+        const [other, setOther] = useState(0);
+        useEffect(() => void log.push(`count ${count()} other ${other()}`), [count]);
+        useEffect(() => void log.push(`mount ${step}`), []);
+        const double = useMemo(() => count() * 2 + other(), [count]);
+        return (
+          <p>
+            <button class="count" onClick={() => setCount((c) => c + 1)}>+</button>
+            <button class="other" onClick={() => setOther((o) => o + 1)}>o</button>
+            <output>{double}</output>
+          </p>
+        );
+      },
+      { step: Number },
+    );
+    document.body.innerHTML = '<x-deps step="2"></x-deps>';
+    flush();
+    const root = document.querySelector('x-deps')!.shadowRoot!;
+    const click = (sel: string) => {
+      root.querySelector<HTMLButtonElement>(sel)!.click();
+      flush();
+    };
+    click('.other');
+    expect(root.querySelector('output')!.textContent).toBe('0');
+    click('.count');
+    expect(root.querySelector('output')!.textContent).toBe('3');
+    document.querySelector('x-deps')!.setAttribute('step', '5');
+    flush();
+    expect(log).toEqual(['count 0 other 0', 'mount 2', 'count 1 other 1']);
   });
 });
 

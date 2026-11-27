@@ -111,3 +111,5 @@ const city = fromStore(store, (s) => s.city);
 With the Redux DevTools extension installed, each store shows up as **SurgiJS**. No import and no `connect()` call.
 
 Docs: [guide](../../apps/docs/guide/store.md).
+
+Docs for AI coding agents: [llms.txt](https://surgijs.github.io/surgijs/llms.txt) (index) and [llms-full.txt](https://surgijs.github.io/surgijs/llms-full.txt) (all pages in one file).

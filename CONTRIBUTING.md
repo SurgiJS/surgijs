@@ -76,3 +76,7 @@ Screenshots come from the official Playwright image, so they only match when tak
 ## Writing style
 
 README, docs, comments and commit messages state what the code does, in affirmative sentences. Keep commits small, one feature each.
+
+## Peer dependencies on workspace packages
+
+Declare a peer on another workspace package as a plain range with an upper bound, for example `"@surgijs/core": ">=0.5.0 <1.0.0"`, and keep `workspace:*` in `devDependencies` only. A `workspace:^` peer is published as `^0.x`, which pins the minor version of a 0.x package, so every core minor release makes changesets bump dependents to a new major. Raise the lower bound by hand when a package needs a newer core.

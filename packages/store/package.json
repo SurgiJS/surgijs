@@ -1,6 +1,6 @@
 {
   "name": "@surgijs/store",
-  "version": "3.0.0",
+  "version": "0.3.0",
   "description": "Framework-agnostic store: one object, lazy remote data, deep equality subscriptions, unload when unused. Adapters for React, Vue, Svelte, Angular and SurgiJS.",
   "license": "MIT",
   "type": "module",
@@ -72,7 +72,7 @@
   },
   "peerDependencies": {
     "@angular/core": ">=16.0.0",
-    "@surgijs/core": ">=0.5.0",
+    "@surgijs/core": ">=0.5.0 <1.0.0",
     "react": ">=18",
     "vue": ">=3.2.0"
   },
