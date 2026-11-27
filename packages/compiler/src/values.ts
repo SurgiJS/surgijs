@@ -21,6 +21,14 @@ export interface UnwrapResult {
   inserts: Insert[];
   /** Getter names whose signal starts from a string or number. */
   textual: Set<string>;
+  /** Shorthand properties `{ name }` that the rewrite turned into `name: name()`. */
+  shorthand: ShorthandRead[];
+}
+
+export interface ShorthandRead {
+  name: string;
+  /** Offset of the property in the original text. */
+  pos: number;
 }
 
 const Kind = { Plain: 0, Getter: 1, Bag: 2 } as const;
@@ -169,6 +177,7 @@ export function unwrapGetterReads(code: string, filename = 'input.tsx'): UnwrapR
   const plainJs = /\.[mc]?jsx?$/.test(filename);
   const inserts: Insert[] = [];
   const textual = new Set<string>();
+  const shorthand: ShorthandRead[] = [];
 
   const declareBinding = (scope: Scope, decl: VariableDeclarator): void => {
     const init = decl.init && unwrap(decl.init);
@@ -257,7 +266,10 @@ export function unwrapGetterReads(code: string, filename = 'input.tsx'): UnwrapR
       if (node.computed) visit(node.key, node, scope);
       const v = node.value;
       if (v.type === 'Identifier') {
-        if (scope.lookup(v.name) === Kind.Getter) inserts.push({ pos: v.end, text: node.shorthand ? `: ${v.name}()` : '()' });
+        if (scope.lookup(v.name) === Kind.Getter) {
+          inserts.push({ pos: v.end, text: node.shorthand ? `: ${v.name}()` : '()' });
+          if (node.shorthand) shorthand.push({ name: v.name, pos: v.start });
+        }
       } else visit(v, node, scope);
       return;
     }
@@ -366,7 +378,7 @@ export function unwrapGetterReads(code: string, filename = 'input.tsx'): UnwrapR
   declareStatements(top, program.body);
   for (const st of program.body) visit(st, undefined, top);
 
-  if (!inserts.length) return { code, inserts, textual };
+  if (!inserts.length) return { code, inserts, textual, shorthand };
   inserts.sort((a, b) => a.pos - b.pos);
   let out = '';
   let last = 0;
@@ -375,7 +387,7 @@ export function unwrapGetterReads(code: string, filename = 'input.tsx'): UnwrapR
     last = ins.pos;
   }
   out += code.slice(last);
-  return { code: out, inserts, textual };
+  return { code: out, inserts, textual, shorthand };
 }
 
 /** Maps an offset in unwrapped code back to the original text. */
