@@ -1,3 +1,4 @@
+import { devRender, devUnmount } from './dev';
 import { delegateRoot, insert, undelegateRoot } from './dom';
 import { createRoot, createSignal, deferMount, type Accessor, type Setter } from './reactivity';
 import type { JSX } from './jsx-runtime';
@@ -20,6 +21,12 @@ export interface ComponentOptions {
   shadow?: boolean | ShadowRootInit;
   /** Form-associated element with `ElementInternals`. */
   form?: boolean;
+  /**
+   * CSS for the shadow root. Parsed into one `CSSStyleSheet` per component definition and
+   * adopted by every instance, so a hundred elements share one copy. Falls back to a
+   * `<style>` per root where constructable stylesheets are missing. Ignored in light DOM.
+   */
+  styles?: string | string[];
 }
 
 export interface FormHost extends HTMLElement {
@@ -39,6 +46,12 @@ let hydrateRoot: HydrateRoot | null = null;
 
 export function setHydrateRoot(fn: HydrateRoot | null): void {
   hydrateRoot = fn;
+}
+
+function makeSheet(text: string): CSSStyleSheet {
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(text);
+  return sheet;
 }
 
 const kebab = (s: string): string => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
@@ -95,6 +108,10 @@ export function defineComponent<P extends object = {}>(
   const closed = shadow && shadow.mode === 'closed';
   const form = !!options.form;
   const light = !shadow && !('children' in types);
+  const css = shadow && options.styles ? ([] as string[]).concat(options.styles) : null;
+  // replaceSync drops @import rules, so such CSS keeps a <style> element.
+  const adopt = typeof CSSStyleSheet != 'undefined' && 'replaceSync' in CSSStyleSheet.prototype && !css?.some((c) => /@imp/i.test(c));
+  let sheets: CSSStyleSheet[] | undefined;
 
   class Element extends HTMLElement {
     static observedAttributes = attrs;
@@ -134,6 +151,11 @@ export function defineComponent<P extends object = {}>(
       }
       const root = (self.__r ||= shadow ? this.shadowRoot || this.attachShadow(shadow) : this);
       if (closed) delegateRoot(root);
+      if (css) {
+        // Server markup carries its own copy of the CSS so it paints before upgrade.
+        root.querySelectorAll('style[data-s]').forEach((el) => el.remove());
+        if (adopt) (root as ShadowRoot).adoptedStyleSheets = sheets ||= css.map(makeSheet);
+      }
       const end = hydrateRoot ? hydrateRoot(root) : null;
       if (!end) {
         if (light && !self.__c) self.__c = Array.from(this.childNodes);
@@ -142,11 +164,21 @@ export function defineComponent<P extends object = {}>(
       try {
         createRoot((dispose) => {
           self.__d = dispose;
-          deferMount(() => insert(root, render(self.__p as ReactiveProps<P>, this)));
+          deferMount(() => {
+            // Fallback <style> elements share the root, so the render must not own all of it.
+            const shared = css && !adopt;
+            insert(
+              root,
+              devRender ? devRender(this, render, self.__p) : render(self.__p as ReactiveProps<P>, this),
+              shared ? null : undefined,
+              shared && end ? Array.from(root.childNodes) : undefined,
+            );
+          });
         });
       } finally {
         if (end) end();
       }
+      if (css && !adopt) root.append(...css.map((text) => Object.assign(document.createElement('style'), { textContent: text })));
     }
 
     disconnectedCallback(): void {
@@ -156,6 +188,7 @@ export function defineComponent<P extends object = {}>(
         if (!root || !self.__d || this.isConnected) return;
         if (closed) undelegateRoot(root);
         self.__d();
+        devUnmount?.(this);
         self.__d = undefined;
         root.replaceChildren();
       });

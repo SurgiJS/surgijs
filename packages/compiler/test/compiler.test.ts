@@ -107,6 +107,27 @@ describe('compile', () => {
     expect(dom('const el = <my-label htmlFor={id()} />;')).toContain('n.htmlFor = v');
   });
 
+  it('keeps style and script text raw, guarding only the closing tag', () => {
+    expect(ssr('const el = <style>a &gt; b &amp; c</style>;')).toContain('"<style>a > b & c</style>"');
+    expect(ssr('const el = <style>{css}</style>;')).toContain('_$escapeRaw([css], "style")');
+    expect(ssr('const el = <p>{css}</p>;')).toContain('_$text(css)');
+    expect(dom('const el = <style>a &gt; b &amp; c</style>;')).toContain('<style>a > b & c</style>');
+    expect(ssr('const el = <style>a &lt;/style&gt; b</style>;')).toContain('"<style>a <\\\\/style> b</style>"');
+  });
+
+  it('escapes dynamic raw text as a whole', () => {
+    const out = ssr('const el = <style>&lt;{tail}</style>;');
+    expect(out).toContain('_$escapeRaw(["<", tail], "style")');
+    expect(out).not.toContain('<!---->');
+  });
+
+  it('treats SVG style and script as ordinary text', () => {
+    expect(ssr('const el = <svg><style>{css}</style></svg>;')).toContain('_$text(css)');
+    expect(ssr('const el = <svg><style>a &amp; b</style></svg>;')).toContain('<style>a &amp; b</style>');
+    expect(dom('const el = <svg><style>a &amp; b</style></svg>;')).toContain('<style>a &amp; b</style>');
+    expect(ssr('const el = <svg><foreignObject><style>a &amp; b</style></foreignObject></svg>;')).toContain('<style>a & b</style>');
+  });
+
   it('keeps xlink, xml and xmlns prefixes', () => {
     const out = dom('const el = <svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a" xml:lang="en" /></svg>;');
     expect(out).toContain('xmlns:xlink=\\"http://www.w3.org/1999/xlink\\"');

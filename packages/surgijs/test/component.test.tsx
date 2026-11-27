@@ -225,3 +225,78 @@ describe('defineComponent', () => {
     expect(inRoot).toBe(true);
   });
 });
+
+describe('styles option', () => {
+  const View = () => <b>x</b>;
+  const css = 'b > i { color: red }';
+
+  it('shares one adopted sheet between instances', () => {
+    defineComponent('sty-shared', View, {}, { styles: css });
+    document.body.innerHTML = '<sty-shared></sty-shared><sty-shared></sty-shared>';
+    flush();
+    const [a, b] = Array.from(document.querySelectorAll('sty-shared')).map((e) => e.shadowRoot!);
+    expect(a!.adoptedStyleSheets).toHaveLength(1);
+    expect(a!.adoptedStyleSheets[0]).toBe(b!.adoptedStyleSheets[0]);
+    expect(a!.querySelector('style')).toBeNull();
+  });
+
+  it('drops the server style and keeps the adopted sheet on reconnect', () => {
+    defineComponent('sty-server', View, {}, { styles: css });
+    const el = document.createElement('sty-server');
+    el.attachShadow({ mode: 'open' }).innerHTML = `<style data-s>${css}</style><b>x</b>`;
+    document.body.append(el);
+    flush();
+    const root = el.shadowRoot!;
+    expect(root.querySelector('style')).toBeNull();
+    expect(root.adoptedStyleSheets).toHaveLength(1);
+    el.remove();
+    document.body.append(el);
+    flush();
+    expect(root.adoptedStyleSheets).toHaveLength(1);
+  });
+
+  it('keeps @import CSS in a style element that survives re-renders', () => {
+    const [show, setShow] = useState(true);
+    const imp = '@import url("/t.css");';
+    defineComponent('sty-import', () => (() => (show() ? 'a' : null)) as never, {}, { styles: imp });
+    document.body.innerHTML = '<sty-import></sty-import>';
+    flush();
+    const root = document.querySelector('sty-import')!.shadowRoot!;
+    expect(root.adoptedStyleSheets).toHaveLength(0);
+    expect(root.querySelector('style')!.textContent).toBe(imp);
+    setShow(false);
+    flush();
+    expect(root.querySelector('style')!.textContent).toBe(imp);
+    setShow(true);
+    flush();
+    expect(root.textContent).toContain('a');
+  });
+
+  it('hydrates the fallback path without duplicating changed text', async () => {
+    const { enableHydration, disableHydration } = await import('../src/hydrate');
+    defineComponent('sty-hydrate', () => 'client', {}, { styles: '@import url("/t.css");' });
+    const el = document.createElement('sty-hydrate');
+    el.attachShadow({ mode: 'open' }).innerHTML = '<style data-s>@import url("/t.css");</style>server';
+    enableHydration();
+    try {
+      document.body.append(el);
+      flush();
+    } finally {
+      disableHydration();
+    }
+    expect(el.shadowRoot!.textContent).toBe('client@import url("/t.css");');
+    expect(el.shadowRoot!.childNodes).toHaveLength(2);
+  });
+
+  it('falls back to a style element without constructable stylesheets', () => {
+    vi.stubGlobal('CSSStyleSheet', class {});
+    try {
+      defineComponent('sty-fallback', View, {}, { styles: css });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    document.body.innerHTML = '<sty-fallback></sty-fallback>';
+    flush();
+    expect(document.querySelector('sty-fallback')!.shadowRoot!.querySelector('style')!.textContent).toBe(css);
+  });
+});

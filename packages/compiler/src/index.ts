@@ -95,6 +95,11 @@ function cleanText(value: string): string {
 }
 
 const escText = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const RAW = new Set(['style', 'script']);
+const escRaw = (s: string, tag: string): string =>
+  s.replace(tag === 'script' ? /<(\/)?(script)(?=[\t\n\f />])/gi : /<(\/)(style)(?=[\t\n\f />])/gi, (_, slash, word) =>
+    slash ? `<\\/${word}` : `\\u003c${word}`,
+  );
 const escAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 const kebab = (s: string): string => (s.startsWith('--') ? s : s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()));
 
@@ -438,11 +443,13 @@ class Compiler {
       return () => r.name;
     };
 
-    const build = (n: JSXElement, ref: NodeRef): string => {
+    const build = (n: JSXElement, ref: NodeRef, svg = false): string => {
       const tag = this.tagName(n);
       const custom = tag.includes('-');
       if (custom) flags |= 1;
       const el = need.bind(null, ref);
+      const raw = RAW.has(tag) && !svg;
+      const inner = tag === 'svg' || (svg && tag !== 'foreignObject');
       let html = `<${tag}`;
       for (const a of n.openingElement.attributes) html += this.attribute(a, tag, custom, el, ops);
       html += '>';
@@ -456,9 +463,9 @@ class Compiler {
       };
       items.forEach((it, i) => {
         if (it.k === 'text') {
-          html += escText(it.text!);
+          html += raw ? escRaw(it.text!, tag) : escText(it.text!);
           child();
-        } else if (it.k === 'el') html += build(it.node!, child());
+        } else if (it.k === 'el') html += build(it.node!, child(), inner);
         else {
           const e = it.expr!;
           const only = items.length === 1;
@@ -739,17 +746,32 @@ class Compiler {
     return `${this.h('element')}([${out.join(', ')}])`;
   }
 
-  /** Parts for a list of children. `markers` writes a placeholder after each dynamic child except the last. */
-  ssrItems(items: Item[], markers = true): SsrPart[] {
+  hasJsx(e: Node): boolean {
+    let found = false;
+    const walk = (n: Node): void => {
+      if (found) return;
+      if (isJsx(n)) found = true;
+      else forEachChild(n, walk);
+    };
+    walk(e);
+    return found;
+  }
+
+  /**
+   * Parts for a list of children. `markers` writes a placeholder after each dynamic child except the last.
+   * `tag` is set only for raw text elements (HTML `style`/`script`); `svg` is the namespace of the children.
+   */
+  ssrItems(items: Item[], markers = true, tag = '', svg = false): SsrPart[] {
+    if (tag && items.some((it) => it.k === 'dyn')) return this.ssrRaw(items, tag);
     const parts: SsrPart[] = [];
     const only = items.length === 1;
     items.forEach((it, i) => {
       if (it.k === 'text') {
-        parts.push(escText(it.text!));
+        parts.push(tag ? escRaw(it.text!, tag) : escText(it.text!));
         return;
       }
       if (it.k === 'el') {
-        parts.push(...this.ssrParts(it.node!));
+        parts.push(...this.ssrParts(it.node!, svg));
         return;
       }
       const e = it.expr!;
@@ -764,11 +786,26 @@ class Compiler {
     return parts;
   }
 
+  /** `<style>`/`<script>` with dynamic text: escaped as a whole, since a closing tag can span fragments. */
+  ssrRaw(items: Item[], tag: string): SsrPart[] {
+    const values: string[] = [];
+    for (const it of items) {
+      if (it.k === 'text') values.push(JSON.stringify(it.text));
+      else if (it.k === 'dyn') {
+        const e = it.expr!;
+        if (isJsx(e) || this.hasJsx(e) || isFn(e as Expression)) continue;
+        values.push(this.expr(getterBody(e as Expression) ?? strip(e as Expression)));
+      }
+    }
+    const code = `${this.h('escapeRaw')}([${values.join(', ')}], ${JSON.stringify(tag)})`;
+    return [{ code: `(${code} || " ")` }];
+  }
+
   ssrElement(node: JSXElement): string {
     return this.ssrNode(this.ssrParts(node));
   }
 
-  ssrParts(node: JSXElement): SsrPart[] {
+  ssrParts(node: JSXElement, svg = false): SsrPart[] {
     const opening = node.openingElement;
     const tag = this.tagName(node);
     const custom = tag.includes('-');
@@ -815,7 +852,7 @@ class Compiler {
     }
     parts.push('>');
     if (!VOID.has(tag)) {
-      parts.push(...this.ssrItems(this.children(node.children)));
+      parts.push(...this.ssrItems(this.children(node.children), true, RAW.has(tag) && !svg ? tag : '', tag === 'svg' || (svg && tag !== 'foreignObject')));
       parts.push(`</${tag}>`);
     }
     return parts;

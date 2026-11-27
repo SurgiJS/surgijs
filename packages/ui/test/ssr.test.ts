@@ -28,7 +28,7 @@ describe('renderButton', () => {
 
   it('keeps the stylesheet byte for byte, so server CSS matches the client', () => {
     const [, , shadow] = parts(renderButton());
-    expect(shadow.startsWith(`<style>${buttonStyles}</style>`)).toBe(true);
+    expect(shadow.startsWith(`<style data-s>${buttonStyles}</style>`)).toBe(true);
   });
 
   it('renders disabled and label, escaping attribute values', () => {

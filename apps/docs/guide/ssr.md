@@ -54,6 +54,8 @@ Reactive context is read while a component runs, so read it before the first `aw
 
 `ReadableStream` and `Response` are web standards, so the same code runs in a route handler (Next.js, for example) or in an endpoint of any framework that returns a `Response`.
 
+Pass the same CSS as `options.styles` (string or array) and the server renders it as `<style data-s>` inside the shadow root, so the component is styled before JavaScript runs. On upgrade the component removes those elements and adopts its shared stylesheet instead. CSS is written as is: only sequences that would end the element are neutralised, after all pieces are joined (`</style`, and in scripts also `</script` and `<script`, written as `<\/…` and `\u003c…`; `i<scripts.length` is left alone). Inside `<svg>` these elements are not raw text, so they get ordinary escaping. The same holds for `<style>` and `<script>` written in JSX, where entities in the text are not decoded by the browser, so `a > b` is never turned into `a &gt; b`.
+
 ## Hydration
 
 ```ts

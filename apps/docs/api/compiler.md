@@ -22,8 +22,10 @@ A file without JSX comes back unchanged with `changed: false`.
 ```ts
 import surgi from '@surgijs/compiler/vite';
 
-surgi({ include, moduleName, generate });
+surgi({ include, moduleName, generate, devtools });
 ```
+
+`devtools` loads `<moduleName>/devtools` while `vite` is serving. It is on for `@surgijs/core`. A custom `moduleName` that exports `./devtools` turns it on with `devtools: true`.
 
 Runs before other transforms (`enforce: 'pre'`) and sets `esbuild.jsx` to `preserve`. Imports with a `?ssr` query compile for the server.
 

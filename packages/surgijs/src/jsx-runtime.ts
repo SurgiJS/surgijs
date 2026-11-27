@@ -1,3 +1,4 @@
+import { devNode } from './dev';
 import { createComponent, insert, setProp, use } from './dom';
 import { createRenderEffect } from './reactivity';
 
@@ -50,6 +51,7 @@ export namespace JSX {
 export function jsx(type: unknown, props: Record<string, unknown>): JSX.Element {
   if (typeof type === 'function') return createComponent(type as (p: unknown) => JSX.Element, props);
   const el = document.createElement(type as string);
+  devNode?.(el);
   for (const k in props) {
     const v = props[k];
     if (k === 'children') insert(el, v, null);

@@ -1,5 +1,4 @@
 import type { FormHost, ReactiveProps } from '@surgijs/core';
-import { buttonStyles } from './button.styles';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -23,7 +22,9 @@ export interface ButtonProps {
 /**
  * The view behind `<s-button>`: a native `<button>` in the shadow root, so keyboard,
  * focus and the accessible role come from the platform. The label comes from slotted
- * content or the `label` prop. On the server `host` is undefined.
+ * content or the `label` prop. On the server `host` is undefined. The view has no CSS of
+ * its own: `<s-button>` and `renderButton` apply `buttonStyles`, so anything rendering
+ * `Button` directly must adopt `buttonStyles` too.
  */
 export const Button = (props: ReactiveProps<ButtonProps>, host?: HTMLElement) => {
   const { disabled, loading, label, type } = props;
@@ -44,23 +45,20 @@ export const Button = (props: ReactiveProps<ButtonProps>, host?: HTMLElement) =>
   };
 
   return (
-    <>
-      <style>{buttonStyles}</style>
-      <button
-        type="button"
-        class="base"
-        part="base"
-        disabled={isDisabled()}
-        aria-disabled={isBusy() ? 'true' : undefined}
-        aria-busy={isBusy() ? 'true' : undefined}
-        aria-label={label()}
-        on:click={onClick}
-      >
-        <span class="spinner" part="spinner" aria-hidden="true" hidden={!isBusy()}></span>
-        <slot name="start"></slot>
-        <slot></slot>
-        <slot name="end"></slot>
-      </button>
-    </>
+    <button
+      type="button"
+      class="base"
+      part="base"
+      disabled={isDisabled()}
+      aria-disabled={isBusy() ? 'true' : undefined}
+      aria-busy={isBusy() ? 'true' : undefined}
+      aria-label={label()}
+      on:click={onClick}
+    >
+      <span class="spinner" part="spinner" aria-hidden="true" hidden={!isBusy()}></span>
+      <slot name="start"></slot>
+      <slot></slot>
+      <slot name="end"></slot>
+    </button>
   );
 };
