@@ -37,6 +37,10 @@ Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit
 - `apps/docs`: VitePress site.
 - `bench`: benchmark against other libraries; its dependencies stay out of the published packages.
 
+## Workspace sources
+
+Every entry in a package's `exports` has an `@surgijs/source` condition pointing at its TypeScript source. TypeScript (`customConditions` in `tsconfig.base.json`), Vite, Vitest, VitePress, Storybook (`tools/vite-workspace.ts`) and the esbuild scripts resolve with it, so tests, examples and dev servers run on sources without a build, and no config needs aliases or `paths`. A new entry point only needs its `exports` entry. Published consumers never set the condition and get `dist`.
+
 ## Changesets
 
 Every change to `@surgijs/core`, `@surgijs/compiler`, `@surgijs/store` or `@surgijs/ui` comes with a changeset:

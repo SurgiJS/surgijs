@@ -1,5 +1,15 @@
 # @surgijs/core
 
+## 0.5.0
+
+### Minor Changes
+
+- [#20](https://github.com/SurgiJS/surgijs/pull/20) [`887ce52`](https://github.com/SurgiJS/surgijs/commit/887ce52b03228868f5cf0981d739d03745da1018) Thanks [@banzalik](https://github.com/banzalik)! - Hot module replacement updates components in place. Defining an already defined tag swaps in the new `render` and re-renders connected instances (their state resets), and the Vite plugin marks modules that call `defineComponent` as hot-updatable, so editing a component no longer reloads the page.
+
+### Patch Changes
+
+- [#24](https://github.com/SurgiJS/surgijs/pull/24) [`8a05670`](https://github.com/SurgiJS/surgijs/commit/8a056700de7d8d64d7f1024eb8272bac4c1b1404) Thanks [@banzalik](https://github.com/banzalik)! - SSR renders nested components, `Show`, `For`, `Switch`/`Match`, `ErrorBoundary` and context on the server. `renderToStream` returns the markup as a `ReadableStream`, sending each chunk as async parts (async components and promises in holes) resolve. Hydration replaces the server content of control-flow regions instead of duplicating it.
+
 ## 0.4.0
 
 ### Minor Changes

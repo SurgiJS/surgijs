@@ -1,5 +1,12 @@
 # @surgijs/store
 
+## 3.0.0
+
+### Patch Changes
+
+- Updated dependencies [[`887ce52`](https://github.com/SurgiJS/surgijs/commit/887ce52b03228868f5cf0981d739d03745da1018), [`8a05670`](https://github.com/SurgiJS/surgijs/commit/8a056700de7d8d64d7f1024eb8272bac4c1b1404)]:
+  - @surgijs/core@0.5.0
+
 ## 2.0.0
 
 ### Minor Changes

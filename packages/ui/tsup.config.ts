@@ -21,7 +21,7 @@ export default defineConfig(async () => {
     platform: 'browser',
     splitting: true,
     treeshake: true,
-    dts: { compilerOptions: { ignoreDeprecations: '6.0', paths: {} } },
+    dts: { compilerOptions: { ignoreDeprecations: '6.0' } },
     sourcemap: true,
     clean: true,
     external: [/^@surgijs\/core/],
