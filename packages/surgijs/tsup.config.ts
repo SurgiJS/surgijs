@@ -16,6 +16,7 @@ export default defineConfig({
   splitting: true,
   treeshake: true,
   dts: { compilerOptions: { ignoreDeprecations: '6.0' } },
+  define: { 'process.env.NODE_ENV': 'process.env.NODE_ENV' },
   sourcemap: true,
   clean: true,
 });
