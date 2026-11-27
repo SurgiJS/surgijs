@@ -1,3 +1,4 @@
+import { devComponent, devNode } from './dev';
 import { createRenderEffect, untrack } from './reactivity';
 
 type Claim = (html: string, flags: number) => Node | null;
@@ -25,7 +26,10 @@ export function template(html: string, flags = 0): () => Node {
   return () => {
     if (claim) {
       const claimed = claim(html, flags);
-      if (claimed) return claimed;
+      if (claimed) {
+        devNode?.(claimed);
+        return claimed;
+      }
     }
     if (!node) {
       const t = document.createElement('template');
@@ -33,7 +37,9 @@ export function template(html: string, flags = 0): () => Node {
       node = t.content.firstChild!;
       if (flags & 2) node = node.firstChild!;
     }
-    return flags & 1 ? document.importNode(node, true) : node.cloneNode(true);
+    const clone = flags & 1 ? document.importNode(node, true) : node.cloneNode(true);
+    devNode?.(clone);
+    return clone;
   };
 }
 
@@ -355,5 +361,6 @@ export function spread(el: Element, props: Record<string, unknown>): void {
 }
 
 export function createComponent<P, R>(fn: (props: P) => R, props: P): R {
+  if (devComponent) return devComponent(fn, props, () => untrack(() => fn(props)));
   return untrack(() => fn(props));
 }

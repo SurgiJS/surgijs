@@ -1,4 +1,5 @@
 import type { Get, SetStore } from './action';
+import { connectDevtools } from './devtools';
 import { deepEqual } from './equal';
 import { isRemoteError } from './http';
 import {
@@ -172,6 +173,9 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
   let viewVersion = -1;
   let tracking: Set<string> | null = null;
   let notifying = false;
+  let quiet = false;
+  let restoring = false;
+  let emit: (action: { type: string; key?: string }) => void = () => {};
   const pending = { keys: null as Set<string> | null, one: null as string | null };
   const focusRegs = new Map<string, FocusTarget>();
   const onlineRegs = new Map<string, FocusTarget>();
@@ -518,6 +522,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     if (entry.httpStatus === undefined) entry.httpStatus = 200;
     bump();
     notifyKey(name);
+    emit({ type: 'fetch', key: name });
     if (entry.refs === 0) scheduleGc(name, entry);
     return entry.data;
   };
@@ -534,6 +539,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     applyErrorMeta(entry, err);
     bump();
     notifyKey(name);
+    emit({ type: 'error', key: name });
     if (entry.refs === 0) scheduleGc(name, entry);
     throw err;
   };
@@ -748,14 +754,16 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
 
   const afterSyncWrite = (key: string): void => {
     bump();
-    maybeReloadRemotes(key);
+    if (!restoring) maybeReloadRemotes(key);
     notifyKey(key);
+    emit({ type: 'set', key });
   };
 
   const afterSyncWriteMany = (changed: Set<string>): void => {
     bump();
-    maybeReloadRemotes(changed);
+    if (!restoring) maybeReloadRemotes(changed);
     notifyKeys(changed);
+    emit({ type: 'set' });
   };
 
   const forceLoad = (key: string): Promise<unknown> => {
@@ -802,6 +810,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       if (entry.lastStatus === undefined && next !== undefined) entry.lastStatus = 'success';
       bump();
       notifyKey(name);
+      emit({ type: 'setData', key: name });
     },
 
     subscribe(selector, listener, options) {
@@ -852,6 +861,43 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         fn(get, store.set as SetStore<D>, ...args);
       };
     },
+  };
+
+  const replace = (next: Record<string, unknown>): void => {
+    quiet = true;
+    restoring = true;
+    try {
+      const partial: Record<string, unknown> = {};
+      for (const key of Object.keys(sync)) {
+        if (Object.prototype.hasOwnProperty.call(next, key)) partial[key] = next[key];
+      }
+      if (Object.keys(partial).length) (store.set as (value: Record<string, unknown>) => void)(partial);
+      for (const key of remotes.keys()) {
+        if (Object.prototype.hasOwnProperty.call(next, key)) store.setData(key as never, next[key] as never);
+      }
+    } finally {
+      quiet = false;
+      restoring = false;
+    }
+  };
+
+  const dispatch = (action: Record<string, unknown>): void => {
+    quiet = true;
+    try {
+      if (action.type === 'setData' && typeof action.key === 'string') store.setData(action.key as never, action.value as never);
+      else if (action.type === 'set' && typeof action.key === 'string') store.set(action.key as never, action.value as never);
+      else if (action.type === 'set' && action.payload && typeof action.payload === 'object' && !Array.isArray(action.payload))
+        (store.set as (value: Record<string, unknown>) => void)(action.payload as Record<string, unknown>);
+      else if (action.type == null) replace(action);
+    } finally {
+      quiet = false;
+    }
+    emit({ type: typeof action.type === 'string' ? action.type : 'dispatch', key: typeof action.key === 'string' ? action.key : undefined });
+  };
+
+  const send = connectDevtools({ get: () => snapshot() as Record<string, unknown>, replace, dispatch });
+  emit = (action) => {
+    if (!quiet && send) send(action);
   };
 
   return store;

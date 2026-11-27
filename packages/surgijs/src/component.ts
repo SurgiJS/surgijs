@@ -1,3 +1,4 @@
+import { devRender, devUnmount } from './dev';
 import { delegateRoot, insert, undelegateRoot } from './dom';
 import { createRoot, createSignal, deferMount, type Accessor, type Setter } from './reactivity';
 import type { JSX } from './jsx-runtime';
@@ -142,7 +143,16 @@ export function defineComponent<P extends object = {}>(
       try {
         createRoot((dispose) => {
           self.__d = dispose;
-          deferMount(() => insert(root, render(self.__p as ReactiveProps<P>, this)));
+          deferMount(() =>
+            insert(
+              root,
+              devRender
+                ? devRender(this, render as (props: object, host: HTMLElement) => unknown, self.__p, () =>
+                    render(self.__p as ReactiveProps<P>, this),
+                  )
+                : render(self.__p as ReactiveProps<P>, this),
+            ),
+          );
         });
       } finally {
         if (end) end();
@@ -155,6 +165,7 @@ export function defineComponent<P extends object = {}>(
         const root = self.__r;
         if (!root || !self.__d || this.isConnected) return;
         if (closed) undelegateRoot(root);
+        devUnmount?.(this);
         self.__d();
         self.__d = undefined;
         root.replaceChildren();

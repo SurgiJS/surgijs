@@ -22,7 +22,9 @@ export interface SurgiVitePlugin {
   name: string;
   enforce: 'pre';
   config(this: SurgiViteConfigContext | void): { esbuild: { jsx: 'preserve' } };
+  configResolved(config: { command: string }): void;
   transform(code: string, id: string): { code: string; map: SourceMapV3 | null } | null;
+  transformIndexHtml(): { tag: string; attrs: { type: string }; children: string; injectTo: 'head-prepend' }[] | undefined;
 }
 
 interface SurgiViteConfigContext {
@@ -34,6 +36,8 @@ const DEFAULT = /\.[jt]sx$/;
 /** Vite / Rollup plugin: compiles SurgiJS JSX before other transforms. */
 export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePlugin {
   const include = options.include;
+  const runtime = options.moduleName ?? '@surgijs/core';
+  let serve = false;
   const matches = (id: string): boolean => {
     const file = id.split('?')[0]!;
     if (typeof include === 'function') return include(file);
@@ -48,6 +52,20 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
       // have no `oxc` key, so the Vite 8 branch is cast to the declared shape.
       const rolldown = (this?.meta as { rolldownVersion?: string } | undefined)?.rolldownVersion;
       return rolldown ? ({ oxc: { jsx: 'preserve' } } as unknown as { esbuild: { jsx: 'preserve' } }) : { esbuild: { jsx: 'preserve' } };
+    },
+    configResolved(config) {
+      serve = config.command === 'serve';
+    },
+    transformIndexHtml() {
+      if (!serve) return;
+      return [
+        {
+          tag: 'script',
+          attrs: { type: 'module' },
+          children: `import { installDevtools } from ${JSON.stringify(`${runtime}/devtools`)};\ninstallDevtools();`,
+          injectTo: 'head-prepend',
+        },
+      ];
     },
     transform(code, id) {
       if (!matches(id)) return null;
