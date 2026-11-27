@@ -92,6 +92,7 @@ Run it locally with `pnpm bench` (`pnpm bench surgijs solid --rows 10000` for a 
 ## Links
 
 - Documentation: https://surgijs.github.io/surgijs/
+- Coming from React: https://surgijs.github.io/surgijs/guide/from-react
 - For AI coding agents: https://surgijs.github.io/surgijs/llms.txt, https://surgijs.github.io/surgijs/llms-full.txt
 - Playground: https://surgijs.github.io/surgijs/playground/ ([`apps/playground`](apps/playground))
 - Storybook: https://surgijs.github.io/surgijs/storybook/ ([`apps/storybook`](apps/storybook))

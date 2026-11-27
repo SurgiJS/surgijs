@@ -1,5 +1,7 @@
 # Getting started
 
+Coming from React? Read [SurgiJS for React developers](./from-react) first.
+
 ## Install
 
 ```bash

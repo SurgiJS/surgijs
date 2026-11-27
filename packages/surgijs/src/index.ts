@@ -1,13 +1,11 @@
 export {
   batch,
-  bind,
   createEffect,
   createMemo,
   createRenderEffect,
   createRoot,
   createSignal,
   deferMount,
-  effect,
   flush,
   getOwner,
   handleError,
@@ -20,26 +18,8 @@ export {
   type Setter,
   type Signal,
 } from './reactivity';
-export { createResource, useEffect, useId, useMemo, useRef, useState, type Ref, type Resource } from './hooks';
+export { createResource, useEffect, useId, useMemo, useRef, useState, type Deps, type Ref, type Resource } from './hooks';
 export { createContext, useContext, type Context, type ProviderProps } from './context';
-export {
-  attr,
-  attrNS,
-  className,
-  createComponent,
-  delegate,
-  delegateRoot,
-  diff,
-  insert,
-  setProp,
-  setText,
-  spread,
-  style,
-  template,
-  toNodes,
-  undelegateRoot,
-  use,
-} from './dom';
 export { For, type ForProps } from './for';
 export {
   ErrorBoundary,
