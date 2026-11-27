@@ -5,8 +5,8 @@ type Identifier = NodeOf<'Identifier'>;
 type Fn = FunctionNode;
 
 /** Calls whose result (or first tuple element) is a getter read as a value. */
-export const GETTER_FNS: ReadonlySet<string> = new Set(['useState', 'createSignal', 'createMemo', 'useMemo', 'useContext']);
-const TUPLE_FNS = new Set(['useState', 'createSignal']);
+export const GETTER_FNS: ReadonlySet<string> = new Set(['useState', 'useReducer', 'createSignal', 'createMemo', 'useMemo', 'useContext']);
+const TUPLE_FNS = new Set(['useState', 'useReducer', 'createSignal']);
 /** Hooks whose second argument lists dependencies; an array literal there becomes a tracked thunk. */
 const DEPS_FNS = new Set(['useEffect', 'useMemo']);
 const PROPS_TYPE = /(^|\.)ReactiveProps$/;

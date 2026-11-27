@@ -36,6 +36,15 @@ describe('bundle', () => {
     }
   });
 
+  it('useReducer alone tree-shakes the DOM and component layers', async () => {
+    const { code } = await bundle(
+      "import { useReducer } from '@surgijs/core'; const [n, dispatch] = useReducer((s: number) => s + 1, 0); dispatch(); console.log(n());",
+    );
+    for (const word of ['customElements', 'attachShadow', 'observedAttributes', 'createElement', 'addEventListener']) {
+      expect(code).not.toContain(word);
+    }
+  });
+
   it.each(CASES)('$name fits its budget', async ({ entry, limit }) => {
     expect((await bundle(entry)).gzip).toBeLessThanOrEqual(limit);
   });

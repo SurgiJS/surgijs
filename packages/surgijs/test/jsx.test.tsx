@@ -14,6 +14,7 @@ import {
   Show,
   Switch,
   useContext,
+  useReducer,
   useRef,
   useState,
   type JSX,
@@ -466,6 +467,42 @@ describe('ErrorBoundary', () => {
     ));
     await tick();
     expect(host.textContent).toBe('caught');
+  });
+});
+
+describe('useReducer', () => {
+  type Action = { type: 'inc' } | { type: 'add'; by: number };
+  const reducer = (n: number, a: Action) => (a.type === 'inc' ? n + 1 : n + a.by);
+
+  it('stores reducer results and reads the state as a getter', () => {
+    const [count, dispatch] = useReducer(reducer, 0);
+    expect(count()).toBe(0);
+    dispatch({ type: 'inc' });
+    dispatch({ type: 'add', by: 5 });
+    expect(count()).toBe(6);
+  });
+
+  it('updates the view on dispatch', () => {
+    const [count, dispatch] = useReducer(reducer, 1);
+    const host = mount(() => (
+      <p>
+        Value: {count} <button onClick={() => dispatch({ type: 'inc' })}>+</button>
+      </p>
+    ));
+    const p = host.firstChild as HTMLElement;
+    expect(p.textContent).toBe('Value: 1 +');
+    p.querySelector('button')!.click();
+    flush();
+    expect(p.textContent).toBe('Value: 2 +');
+  });
+
+  it('skips the update when the reducer returns the same state', () => {
+    const [state, dispatch] = useReducer((s: { n: number }) => s, { n: 0 });
+    const seen: unknown[] = [];
+    createRoot(() => createRenderEffect(() => seen.push(state())));
+    dispatch({});
+    flush();
+    expect(seen).toHaveLength(1);
   });
 });
 

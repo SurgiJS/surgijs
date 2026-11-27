@@ -16,6 +16,15 @@ export function useState<T>(value?: T): Signal<T | undefined> {
 }
 
 /**
+ * `[state, dispatch]`: each `dispatch(action)` stores `reducer(state, action)`. Like `useState`,
+ * the compiler reads `state` as a value inside JSX and component bodies.
+ */
+export function useReducer<S, A>(reducer: (state: S, action: A) => S, init: S): [Accessor<S>, (action: A) => void] {
+  const [state, setState] = useState(init);
+  return [state, (action) => setState((prev) => reducer(prev, action))];
+}
+
+/**
  * Dependencies of `useEffect` and `useMemo`. In compiled `.tsx`/`.jsx` files write them as in
  * React, `[count, step]`: the compiler turns the array into `() => [count(), step()]`, so the
  * listed signals are tracked. Elsewhere pass that function, or an array of getters.

@@ -32,6 +32,7 @@ const Counter = (props: ReactiveProps<{ step?: number }>) => {
 | Hook | Behavior |
 | --- | --- |
 | `useState(init)` | `[get, set]`; `set(v)` or `set(prev => next)` |
+| `useReducer(reducer, init)` | `[state, dispatch]`; `state` is a getter, `dispatch(action)` stores `reducer(state, action)` and skips the update when the result is the same value |
 | `useMemo(fn, deps?)` | cached getter; recomputes when a signal it reads changes, or only when a listed dependency does |
 | `useEffect(fn, deps?)` | runs after mount and when dependencies change; the returned function runs as cleanup before the next run and on unmount |
 | `useRef()` | `{ current: null }` for `ref={...}` |

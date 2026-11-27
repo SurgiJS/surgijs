@@ -25,6 +25,7 @@ Use hooks inside components and the `create*` primitives above outside them.
 | Export | Signature |
 | --- | --- |
 | `useState` | `(value?) => [get, set]`, as `createSignal` |
+| `useReducer` | `(reducer, init) => [state, dispatch]`; `state` is a getter |
 | `useMemo` | `(fn, deps?) => get`; with `deps`, recomputes only when a listed dependency changes |
 | `useEffect` | `(fn, deps?)`; after mount and on changes; `[]` runs once; a returned function is the cleanup |
 | `useRef` | `() => { current: null }` |

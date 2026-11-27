@@ -18,7 +18,7 @@ export {
   type Setter,
   type Signal,
 } from './reactivity';
-export { createResource, useEffect, useId, useMemo, useRef, useState, type Deps, type Ref, type Resource } from './hooks';
+export { createResource, useEffect, useId, useMemo, useReducer, useRef, useState, type Deps, type Ref, type Resource } from './hooks';
 export { createContext, useContext, type Context, type ProviderProps } from './context';
 export { For, type ForProps } from './for';
 export {
