@@ -149,12 +149,15 @@ export function defineComponent<P extends object = {}>(
   const unmount = (self: Host): void => {
     const root = self.__r!;
     if (closed) undelegateRoot(root);
-    self.__d?.();
-    devUnmount?.(self);
-    self.__d = undefined;
-    self.__o = null;
-    hosts.delete(self);
-    root.replaceChildren();
+    try {
+      self.__d?.();
+      devUnmount?.(self);
+    } finally {
+      self.__d = undefined;
+      self.__o = null;
+      hosts.delete(self);
+      root.replaceChildren();
+    }
   };
 
   class Element extends HTMLElement {

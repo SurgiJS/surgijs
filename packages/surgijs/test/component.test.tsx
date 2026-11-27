@@ -292,6 +292,22 @@ describe('defineComponent', () => {
     expect(renders).toBe(1);
   });
 
+  it('releases tracking when disposal throws during a redefine', async () => {
+    defineComponent('x-hot-throw', () => {
+      onCleanup(() => {
+        throw new Error('boom');
+      });
+      return <p>one</p>;
+    });
+    const el = document.createElement('x-hot-throw');
+    document.body.appendChild(el);
+    el.remove();
+    expect(() => defineComponent('x-hot-throw', () => <p>two</p>)).toThrow('boom');
+    document.body.appendChild(el);
+    expect(el.shadowRoot!.innerHTML).toBe('<p>two</p>');
+    await Promise.resolve();
+  });
+
   it('runs effects after the shadow root holds the nodes', () => {
     let inRoot = false;
     defineComponent('x-effect', (_props, host) => {
