@@ -198,4 +198,17 @@ describe('react devtools', () => {
     await tick();
     expect(last().child).toBeNull();
   });
+
+  it('re-renders a redefined component and empties the root when it is removed', async () => {
+    defineComponent('x-dev-hot', () => <p>one</p>);
+    const el = document.createElement('x-dev-hot');
+    document.body.appendChild(el);
+    await tick();
+    defineComponent('x-dev-hot', () => <p>two</p>);
+    expect(el.shadowRoot!.innerHTML).toBe('<p>two</p>');
+    await tick();
+    el.remove();
+    await tick();
+    expect(last().child).toBeNull();
+  });
 });

@@ -41,3 +41,42 @@ describe('vite plugin config', () => {
     expect(warnings).toEqual([[expect.stringContaining('a: () => a()'), { line: 2, column: 12 }]]);
   });
 });
+
+describe('vite plugin HMR', () => {
+  const plugin = surgi();
+  const transform = (code: string, id: string, options?: { ssr?: boolean }) => plugin.transform.call(undefined, code, id, options);
+  const source = "import { defineComponent } from '@surgijs/core';\nexport const A = defineComponent('x-a', () => <b>a</b>);\n";
+  const accept = 'if (import.meta.hot) import.meta.hot.accept();';
+
+  it('accepts hot updates in compiled modules that define components', () => {
+    const out = transform(source, '/src/a.tsx');
+    expect(out?.code).toContain(accept);
+  });
+
+  it('accepts hot updates in plain TypeScript modules that define components', () => {
+    const out = transform("export const B = defineComponent('x-b', () => null);", '/src/b.ts');
+    expect(out?.code).toContain(accept);
+  });
+
+  it('accepts aliased imports and namespace calls', () => {
+    const alias = "import { defineComponent as define } from '@surgijs/core';\ndefine('x-c', () => null);";
+    const ns = "import * as core from '@surgijs/core';\ncore.defineComponent('x-d', () => null);";
+    expect(transform(alias, '/src/c.ts')?.code).toContain(accept);
+    expect(transform(ns, '/src/d.ts')?.code).toContain(accept);
+    expect(transform("import { define } from './x';\ndefine('x-e');", '/src/e.ts')).toBeNull();
+  });
+
+  it('leaves modules without a component definition alone', () => {
+    expect(transform('export const n = 1;', '/src/n.ts')).toBeNull();
+    expect(transform('export function defineComponent<P>(tag: string) {}', '/src/component.ts')).toBeNull();
+    expect(transform("// defineComponent('x', f)\nexport const s = 'defineComponent(';", '/src/labels.ts')).toBeNull();
+  });
+
+  it('skips SSR output and dependencies', () => {
+    expect(transform(source, '/src/a.tsx?ssr')?.code ?? '').not.toContain(accept);
+    expect(transform(source, '/node_modules/lib/a.tsx')).toBeNull();
+    const plain = "export const B = defineComponent('x-b', () => null);";
+    expect(transform(plain, '/src/b.ts', { ssr: true })).toBeNull();
+    expect(transform(plain, '/src/b.ts', { ssr: false })?.code).toContain(accept);
+  });
+});

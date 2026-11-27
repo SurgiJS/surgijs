@@ -1,3 +1,5 @@
+import { parseSync } from 'oxc-parser';
+import { children, type Node } from './ast.ts';
 import { compile } from './index.ts';
 
 export interface SurgiVitePluginOptions {
@@ -28,7 +30,12 @@ export interface SurgiVitePlugin {
   enforce: 'pre';
   config(this: SurgiViteConfigContext | void): { esbuild: { jsx: 'preserve' } };
   configResolved(config: { command: string }): void;
-  transform(this: SurgiViteTransformContext | void, code: string, id: string): { code: string; map: SourceMapV3 | null } | null;
+  transform(
+    this: SurgiViteTransformContext | void,
+    code: string,
+    id: string,
+    transformOptions?: { ssr?: boolean },
+  ): { code: string; map: SourceMapV3 | null } | null;
   transformIndexHtml: {
     order: 'pre';
     handler(): { tag: string; attrs: { type: string }; children: string; injectTo: 'head-prepend' }[] | undefined;
@@ -44,6 +51,32 @@ interface SurgiViteTransformContext {
 }
 
 const DEFAULT = /\.[jt]sx$/;
+
+/** Whether the module calls `defineComponent`; mentions in comments, strings or declarations do not count. */
+function definesComponent(file: string, code: string): boolean {
+  if (!code.includes('defineComponent')) return false;
+  const program = parseSync(file, code, { sourceType: 'module' }).program;
+  const names = new Set(['defineComponent']);
+  for (const s of program.body) {
+    if (s.type !== 'ImportDeclaration') continue;
+    for (const spec of s.specifiers) {
+      if (spec.type !== 'ImportSpecifier') continue;
+      const imported = spec.imported.type === 'Identifier' ? spec.imported.name : spec.imported.value;
+      if (imported === 'defineComponent') names.add(spec.local.name);
+    }
+  }
+  const stack: Node[] = [program as Node];
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (n.type === 'CallExpression') {
+      const c = n.callee;
+      if (c.type === 'Identifier' && names.has(c.name)) return true;
+      if (c.type === 'MemberExpression' && !c.computed && c.property.type === 'Identifier' && c.property.name === 'defineComponent') return true;
+    }
+    stack.push(...children(n));
+  }
+  return false;
+}
 
 /** Vite / Rollup plugin: compiles SurgiJS JSX before other transforms. */
 export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePlugin {
@@ -84,18 +117,24 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
         ];
       },
     },
-    transform(code, id) {
-      if (!matches(id)) return null;
+    transform(code, id, transformOptions) {
       const [file, query = ''] = id.split('?') as [string, string?];
       const generate = /(^|&)ssr(&|=|$)/.test(query) ? 'ssr' : options.generate;
-      const result = compile(code, {
-        filename: file,
-        ...(options.moduleName ? { moduleName: options.moduleName } : {}),
-        ...(generate ? { generate } : {}),
-      });
-      for (const w of result.warnings) this?.warn(w.message, { line: w.line, column: w.column });
-      if (!result.changed) return null;
-      return { code: result.code, map: result.map ? (JSON.parse(result.map) as SourceMapV3) : null };
+      const result = matches(id)
+        ? compile(code, {
+            filename: file,
+            ...(options.moduleName ? { moduleName: options.moduleName } : {}),
+            ...(generate ? { generate } : {}),
+          })
+        : null;
+      for (const w of result?.warnings ?? []) this?.warn(w.message, { line: w.line, column: w.column });
+      const changed = result?.changed === true;
+      const refresh =
+        generate !== 'ssr' && !transformOptions?.ssr && !file.startsWith('\0') && !file.includes('/node_modules/') && definesComponent(file, code);
+      if (!changed && !refresh) return null;
+      const source = changed ? result!.code : code;
+      const out = refresh ? `${source}\nif (import.meta.hot) import.meta.hot.accept();\n` : source;
+      return { code: out, map: changed && result!.map ? (JSON.parse(result!.map) as SourceMapV3) : null };
     },
   };
 }

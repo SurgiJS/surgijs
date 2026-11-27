@@ -1,5 +1,17 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { defineComponent, flush, onCleanup, useEffect, useRef, useState, type FormHost, type ReactiveProps } from '@surgijs/core';
+import {
+  createContext,
+  createRoot,
+  defineComponent,
+  flush,
+  onCleanup,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type FormHost,
+  type ReactiveProps,
+} from '@surgijs/core';
 import { MyCounter } from '../../../apps/playground/src/counter.tsx';
 
 interface FakeInternals {
@@ -212,6 +224,90 @@ describe('defineComponent', () => {
     expect(input.value).toBe('a');
   });
 
+  it('re-renders connected instances when the tag is defined again', () => {
+    defineComponent('x-hot', () => <p>one</p>);
+    const el = document.createElement('x-hot');
+    document.body.appendChild(el);
+    expect(el.shadowRoot!.innerHTML).toBe('<p>one</p>');
+    const Again = defineComponent('x-hot', () => <p>two</p>);
+    expect(Again).toBe(customElements.get('x-hot'));
+    expect(el.shadowRoot!.innerHTML).toBe('<p>two</p>');
+    const late = document.createElement('x-hot');
+    document.body.appendChild(late);
+    expect(late.shadowRoot!.innerHTML).toBe('<p>two</p>');
+  });
+
+  it('skips disconnected instances on redefine and keeps light DOM children', async () => {
+    defineComponent<{}>('x-hot-light', (props) => <section>{props.children}</section>, {}, { shadow: false });
+    const kept = document.createElement('x-hot-light');
+    kept.innerHTML = '<b>kept</b>';
+    const gone = document.createElement('x-hot-light');
+    document.body.append(kept, gone);
+    gone.remove();
+    await Promise.resolve();
+    defineComponent<{}>('x-hot-light', (props) => <div>{props.children}</div>, {}, { shadow: false });
+    expect(kept.innerHTML).toBe('<div><b>kept</b></div>');
+    expect(gone.childNodes.length).toBe(0);
+  });
+
+  it('keeps provided context when re-rendering on redefine', () => {
+    const Theme = createContext('light');
+    defineComponent('x-hot-ctx', () => <i>{useContext(Theme)()}</i>);
+    const inner = document.createElement('x-hot-ctx');
+    createRoot(() => Theme.Provider({ value: 'dark', children: () => (document.body.appendChild(inner), null) }));
+    expect(inner.shadowRoot!.innerHTML).toBe('<i>dark</i>');
+    defineComponent('x-hot-ctx', () => <b>{useContext(Theme)()}</b>);
+    expect(inner.shadowRoot!.innerHTML).toBe('<b>dark</b>');
+  });
+
+  it('does not render detached instances on redefine but renders them when reinserted', async () => {
+    let renders = 0;
+    defineComponent('x-hot-detached', () => (renders++, <p>one</p>));
+    const el = document.createElement('x-hot-detached');
+    document.body.appendChild(el);
+    el.remove();
+    defineComponent('x-hot-detached', () => (renders++, <p>two</p>));
+    expect(renders).toBe(1);
+    expect(el.shadowRoot!.childNodes.length).toBe(0);
+    document.body.appendChild(el);
+    await Promise.resolve();
+    expect(el.shadowRoot!.innerHTML).toBe('<p>two</p>');
+    expect(renders).toBe(2);
+  });
+
+  it('does not render a host that a cleanup detaches during redefine', () => {
+    let renders = 0;
+    defineComponent('x-hot-cleanup', (_props, host) => {
+      onCleanup(() => host.remove());
+      return <p>one</p>;
+    });
+    const el = document.createElement('x-hot-cleanup');
+    document.body.appendChild(el);
+    defineComponent('x-hot-cleanup', () => (renders++, <p>two</p>));
+    expect(el.isConnected).toBe(false);
+    expect(renders).toBe(0);
+    expect(el.shadowRoot!.childNodes.length).toBe(0);
+    document.body.appendChild(el);
+    expect(el.shadowRoot!.innerHTML).toBe('<p>two</p>');
+    expect(renders).toBe(1);
+  });
+
+  it('releases tracking when disposal throws during a redefine', async () => {
+    defineComponent('x-hot-throw', () => {
+      onCleanup(() => {
+        throw new Error('boom');
+      });
+      return <p>one</p>;
+    });
+    const el = document.createElement('x-hot-throw');
+    document.body.appendChild(el);
+    el.remove();
+    expect(() => defineComponent('x-hot-throw', () => <p>two</p>)).toThrow('boom');
+    document.body.appendChild(el);
+    expect(el.shadowRoot!.innerHTML).toBe('<p>two</p>');
+    await Promise.resolve();
+  });
+
   it('runs effects after the shadow root holds the nodes', () => {
     let inRoot = false;
     defineComponent('x-effect', (_props, host) => {
@@ -270,6 +366,18 @@ describe('styles option', () => {
     setShow(true);
     flush();
     expect(root.textContent).toContain('a');
+  });
+
+  it('keeps the fallback style element when a redefine re-renders the instance', () => {
+    const imp = '@import url("/t.css");';
+    defineComponent('sty-hot', () => <p>one</p>, {}, { styles: imp });
+    const el = document.createElement('sty-hot');
+    document.body.appendChild(el);
+    defineComponent('sty-hot', () => <p>two</p>, {}, { styles: imp });
+    const root = el.shadowRoot!;
+    expect(root.querySelector('p')!.textContent).toBe('two');
+    expect(root.querySelectorAll('style')).toHaveLength(1);
+    expect(root.querySelector('style')!.textContent).toBe(imp);
   });
 
   it('hydrates the fallback path without duplicating changed text', async () => {
