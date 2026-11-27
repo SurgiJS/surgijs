@@ -1,5 +1,11 @@
 # @surgijs/core
 
+## 0.3.1
+
+### Patch Changes
+
+- [#13](https://github.com/SurgiJS/surgijs/pull/13) [`5f9acba`](https://github.com/SurgiJS/surgijs/commit/5f9acba735bb8a0ff91821cf2e5d21977d6253f1) Thanks [@banzalik](https://github.com/banzalik)! - `renderToString` and `shadowHTML` take `options`: `children` renders light DOM after the declarative shadow root (slotted content), `delegatesFocus` adds `shadowrootdelegatesfocus`.
+
 ## 0.3.0
 
 ### Patch Changes

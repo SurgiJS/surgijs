@@ -1,3 +1,4 @@
+import { devRender, devUnmount } from './dev';
 import { delegateRoot, insert, undelegateRoot } from './dom';
 import { createRoot, createSignal, deferMount, type Accessor, type Setter } from './reactivity';
 import type { JSX } from './jsx-runtime';
@@ -166,7 +167,12 @@ export function defineComponent<P extends object = {}>(
           deferMount(() => {
             // Fallback <style> elements share the root, so the render must not own all of it.
             const shared = css && !adopt;
-            insert(root, render(self.__p as ReactiveProps<P>, this), shared ? null : undefined, shared && end ? Array.from(root.childNodes) : undefined);
+            insert(
+              root,
+              devRender ? devRender(this, render, self.__p) : render(self.__p as ReactiveProps<P>, this),
+              shared ? null : undefined,
+              shared && end ? Array.from(root.childNodes) : undefined,
+            );
           });
         });
       } finally {
@@ -182,6 +188,7 @@ export function defineComponent<P extends object = {}>(
         if (!root || !self.__d || this.isConnected) return;
         if (closed) undelegateRoot(root);
         self.__d();
+        devUnmount?.(this);
         self.__d = undefined;
         root.replaceChildren();
       });
