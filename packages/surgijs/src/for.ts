@@ -3,7 +3,11 @@ import type { JSX } from './jsx-runtime';
 
 export interface ForProps<T> {
   each: readonly T[] | null | undefined | Accessor<readonly T[] | null | undefined>;
-  /** Row key. Defaults to the item itself; keys must be unique. */
+  /**
+   * Row key. Defaults to the item itself; keys must be unique. A key renders its row once:
+   * the row does not re-render when the item's content changes. Read changing values through
+   * signals in the row, or put them in the key (`${id}:${value}`) to get a new row.
+   */
   by?: (item: T, index: number) => unknown;
   children: (item: T, index: Accessor<number>) => JSX.Element;
 }
