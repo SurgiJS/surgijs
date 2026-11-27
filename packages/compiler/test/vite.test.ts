@@ -17,9 +17,17 @@ describe('vite plugin config', () => {
     expect(dev.transformIndexHtml.order).toBe('pre');
     expect(dev.transformIndexHtml.handler()?.[0]?.children).toContain('import { installDevtools } from "@surgijs/core/devtools"');
 
-    const named = surgi({ moduleName: 'my-runtime' });
+    const custom = surgi({ moduleName: 'my-runtime' });
+    custom.configResolved({ command: 'serve' });
+    expect(custom.transformIndexHtml.handler()).toBeUndefined();
+
+    const named = surgi({ moduleName: 'my-runtime', devtools: true });
     named.configResolved({ command: 'serve' });
     expect(named.transformIndexHtml.handler()?.[0]?.children).toContain('my-runtime/devtools');
+
+    const off = surgi({ devtools: false });
+    off.configResolved({ command: 'serve' });
+    expect(off.transformIndexHtml.handler()).toBeUndefined();
 
     const build = surgi();
     build.configResolved({ command: 'build' });
