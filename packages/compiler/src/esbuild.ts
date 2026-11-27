@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { compile } from './index.ts';
 
 export interface SurgiEsbuildPluginOptions {
   moduleName?: string;
+  /** Output mode. Imports with a `?ssr` query always compile for the server. */
   generate?: 'dom' | 'ssr';
   /** Files to compile. Default: `.jsx`/`.tsx` outside `node_modules`. */
   include?: RegExp | ((path: string) => boolean);
@@ -10,9 +12,16 @@ export interface SurgiEsbuildPluginOptions {
 
 interface OnLoadArgs {
   path: string;
+  suffix?: string;
+}
+
+interface OnResolveArgs {
+  path: string;
+  resolveDir: string;
 }
 
 interface PluginBuild {
+  onResolve(options: { filter: RegExp }, callback: (args: OnResolveArgs) => { path: string; suffix: string }): void;
   onLoad(
     options: { filter: RegExp },
     callback: (args: OnLoadArgs) => Promise<{ contents: string; loader: 'ts' | 'js' } | undefined>,
@@ -37,13 +46,18 @@ export default function surgi(options: SurgiEsbuildPluginOptions = {}): SurgiEsb
   return {
     name: 'surgijs',
     setup(build) {
+      build.onResolve({ filter: /\.[jt]sx\?ssr$/ }, (args) => ({
+        path: resolve(args.resolveDir, args.path.slice(0, -4)),
+        suffix: '?ssr',
+      }));
       build.onLoad({ filter: /\.[jt]sx$/ }, async (args) => {
         if (!matches(args.path)) return undefined;
         const source = await readFile(args.path, 'utf8');
+        const generate = args.suffix === '?ssr' ? 'ssr' : options.generate;
         const result = compile(source, {
           filename: args.path,
           ...(options.moduleName ? { moduleName: options.moduleName } : {}),
-          ...(options.generate ? { generate: options.generate } : {}),
+          ...(generate ? { generate } : {}),
         });
         let contents = result.code;
         if (result.map) contents += `\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(result.map).toString('base64')}\n`;
