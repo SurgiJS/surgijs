@@ -1,5 +1,5 @@
 ---
-"@surgijs/ui": patch
+"@surgijs/ui": minor
 ---
 
-Built with `@surgijs/compiler` 0.6, which imports runtime helpers from `@surgijs/core/internal`; the `@surgijs/core` peer range starts at 0.6.0.
+Built with `@surgijs/compiler` 0.7, which imports runtime helpers from `@surgijs/core/internal`; the `@surgijs/core` peer range starts at 0.7.0.
