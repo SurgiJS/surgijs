@@ -53,12 +53,12 @@ export async function bundle(contents) {
 
 /** Size budgets, min+gzip bytes. */
 export const CASES = [
-  { name: 'full runtime (export *)', entry: "export * from '@surgijs/core';", limit: 6262 },
+  { name: 'full runtime (export *)', entry: "export * from '@surgijs/core';", limit: 6283 },
   {
     name: 'useState only',
     entry: "import { useState } from '@surgijs/core'; const [n, setN] = useState(0); setN(1); console.log(n());",
     limit: 720,
   },
-  { name: 'counter app (compiled)', entry: "export * from './apps/playground/src/counter.tsx';", limit: 3843 },
-  { name: 'dropdown app (compiled)', entry: "export * from './apps/playground/src/dropdown.tsx';", limit: 5658 },
+  { name: 'counter app (compiled)', entry: "export * from './apps/playground/src/counter.tsx';", limit: 3859 },
+  { name: 'dropdown app (compiled)', entry: "export * from './apps/playground/src/dropdown.tsx';", limit: 5672 },
 ];

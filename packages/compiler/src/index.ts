@@ -94,7 +94,9 @@ function cleanText(value: string): string {
 const escText = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const RAW = new Set(['style', 'script']);
 const escRaw = (s: string, tag: string): string =>
-  s.replace(tag === 'script' ? /<(\/)?(script|!--)/gi : /<(\/)(style)/gi, (_, slash, word) => (slash ? `<\\/${word}` : `\\u003c${word}`));
+  s.replace(tag === 'script' ? /<(\/)?(script)(?=[\t\n\f />])/gi : /<(\/)(style)(?=[\t\n\f />])/gi, (_, slash, word) =>
+    slash ? `<\\/${word}` : `\\u003c${word}`,
+  );
 const escAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 const kebab = (s: string): string => (s.startsWith('--') ? s : s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()));
 
@@ -438,11 +440,13 @@ class Compiler {
       return () => r.name;
     };
 
-    const build = (n: JSXElement, ref: NodeRef): string => {
+    const build = (n: JSXElement, ref: NodeRef, svg = false): string => {
       const tag = this.tagName(n);
       const custom = tag.includes('-');
       if (custom) flags |= 1;
       const el = need.bind(null, ref);
+      const raw = RAW.has(tag) && !svg;
+      const inner = tag === 'svg' || (svg && tag !== 'foreignObject');
       let html = `<${tag}`;
       for (const a of n.openingElement.attributes) html += this.attribute(a, tag, custom, el, ops);
       html += '>';
@@ -456,9 +460,9 @@ class Compiler {
       };
       items.forEach((it, i) => {
         if (it.k === 'text') {
-          html += RAW.has(tag) ? escRaw(it.text!, tag) : escText(it.text!);
+          html += raw ? escRaw(it.text!, tag) : escText(it.text!);
           child();
-        } else if (it.k === 'el') html += build(it.node!, child());
+        } else if (it.k === 'el') html += build(it.node!, child(), inner);
         else {
           const e = it.expr!;
           const only = items.length === 1;
@@ -735,12 +739,13 @@ class Compiler {
     return found;
   }
 
-  ssrItems(items: Item[], tag = ''): (string | { code: string })[] {
-    if (RAW.has(tag) && items.some((it) => it.k === 'dyn')) return this.ssrRaw(items, tag);
+  /** `tag` is set only for raw text elements (HTML `style`/`script`); `svg` is the namespace of the children. */
+  ssrItems(items: Item[], tag = '', svg = false): (string | { code: string })[] {
+    if (tag && items.some((it) => it.k === 'dyn')) return this.ssrRaw(items, tag);
     const parts: (string | { code: string })[] = [];
     items.forEach((it, i) => {
-      if (it.k === 'text') parts.push(RAW.has(tag) ? escRaw(it.text!, tag) : escText(it.text!));
-      else if (it.k === 'el') parts.push(...this.ssrParts(it.node!));
+      if (it.k === 'text') parts.push(tag ? escRaw(it.text!, tag) : escText(it.text!));
+      else if (it.k === 'el') parts.push(...this.ssrParts(it.node!, svg));
       else {
         const only = items.length === 1;
         const last = i === items.length - 1;
@@ -776,7 +781,7 @@ class Compiler {
     return this.ssrConcat(this.ssrParts(node));
   }
 
-  ssrParts(node: JSXElement): (string | { code: string })[] {
+  ssrParts(node: JSXElement, svg = false): (string | { code: string })[] {
     const opening = node.openingElement;
     const tag = this.tagName(node);
     const custom = tag.includes('-');
@@ -823,7 +828,7 @@ class Compiler {
     }
     parts.push('>');
     if (!VOID.has(tag)) {
-      parts.push(...this.ssrItems(this.children(node.children), tag));
+      parts.push(...this.ssrItems(this.children(node.children), RAW.has(tag) && !svg ? tag : '', tag === 'svg' || (svg && tag !== 'foreignObject')));
       parts.push(`</${tag}>`);
     }
     return parts;

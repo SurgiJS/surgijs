@@ -12,13 +12,15 @@ export function escape(value: unknown): string {
 /**
  * Text for raw text elements (`<style>`, `<script>`), where entities are not decoded: the
  * pieces are joined first, then only sequences that would end the element are neutralised
- * (`</style`, `</script`, and for scripts `<script` and `<!--`, which enter the double-escaped
- * state). `<` becomes `\u003c`, valid inside JS and JSON strings, so `a > b` and `&` survive.
+ * (`</style`, `</script`, and for scripts `<script`, which after `<!--` enters the
+ * double-escaped state), each only where the HTML tokenizer sees a tag name end. `<` becomes
+ * `\u003c`, valid inside JS and JSON strings, so `a > b`, `&` and `i<scripts.length` survive.
+ * Not for SVG `<style>`/`<script>`, which are foreign content: use `escape` there.
  */
 export function escapeRaw(value: unknown, tag: string): string {
   const text = (v: unknown): string =>
     v == null || typeof v === 'boolean' ? '' : Array.isArray(v) ? v.map(text).join('') : '' + (v as string);
-  return text(value).replace(tag === 'script' ? /<(\/)?(script|!--)/gi : /<(\/)(style)/gi, (_, slash, word) =>
+  return text(value).replace(tag === 'script' ? /<(\/)?(script)(?=[\t\n\f />])/gi : /<(\/)(style)(?=[\t\n\f />])/gi, (_, slash, word) =>
     slash ? `<\\/${word}` : `\\u003c${word}`,
   );
 }

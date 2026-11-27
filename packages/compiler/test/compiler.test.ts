@@ -121,6 +121,13 @@ describe('compile', () => {
     expect(out).not.toContain('<!---->');
   });
 
+  it('treats SVG style and script as ordinary text', () => {
+    expect(ssr('const el = <svg><style>{css}</style></svg>;')).toContain('_$escape(css)');
+    expect(ssr('const el = <svg><style>a &amp; b</style></svg>;')).toContain('<style>a &amp; b</style>');
+    expect(dom('const el = <svg><style>a &amp; b</style></svg>;')).toContain('<style>a &amp; b</style>');
+    expect(ssr('const el = <svg><foreignObject><style>a &amp; b</style></foreignObject></svg>;')).toContain('<style>a & b</style>');
+  });
+
   it('keeps xlink, xml and xmlns prefixes', () => {
     const out = dom('const el = <svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a" xml:lang="en" /></svg>;');
     expect(out).toContain('xmlns:xlink=\\"http://www.w3.org/1999/xlink\\"');

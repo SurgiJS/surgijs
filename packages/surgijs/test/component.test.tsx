@@ -272,6 +272,22 @@ describe('styles option', () => {
     expect(root.textContent).toContain('a');
   });
 
+  it('hydrates the fallback path without duplicating changed text', async () => {
+    const { enableHydration, disableHydration } = await import('../src/hydrate');
+    defineComponent('sty-hydrate', () => 'client', {}, { styles: '@import url("/t.css");' });
+    const el = document.createElement('sty-hydrate');
+    el.attachShadow({ mode: 'open' }).innerHTML = '<style data-s>@import url("/t.css");</style>server';
+    enableHydration();
+    try {
+      document.body.append(el);
+      flush();
+    } finally {
+      disableHydration();
+    }
+    expect(el.shadowRoot!.textContent).toBe('client@import url("/t.css");');
+    expect(el.shadowRoot!.childNodes).toHaveLength(2);
+  });
+
   it('falls back to a style element without constructable stylesheets', () => {
     vi.stubGlobal('CSSStyleSheet', class {});
     try {

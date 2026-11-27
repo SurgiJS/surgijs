@@ -41,7 +41,8 @@ describe('server helpers', () => {
     expect(escapeRaw(null, 'style')).toBe('');
     expect(escapeRaw(['<', '/style><img>'], 'style')).toBe('<\\/style><img>');
     expect(escapeRaw(['</sty', 'le>'], 'style')).toBe('<\\/style>');
-    expect(escapeRaw('{"t":"<!--<script>"}</script>', 'script')).toBe('{"t":"\\u003c!--\\u003cscript>"}<\\/script>');
+    expect(escapeRaw('{"t":"<!--<script>"}</script>', 'script')).toBe('{"t":"<!--\\u003cscript>"}<\\/script>');
+    expect(escapeRaw('for(i=0;i<scripts.length;i++)if(a<!--b)x</scripts>', 'script')).toBe('for(i=0;i<scripts.length;i++)if(a<!--b)x</scripts>');
     expect(JSON.parse(escapeRaw('{"t":"<!--<script>"}', 'script'))).toEqual({ t: '<!--<script>' });
     expect(escapeRaw('<!--', 'style')).toBe('<!--');
     expect(shadowHTML('x-a', '<b></b>', {}, { styles: ['a > b { color: red }', 'i { x: "&" }'] })).toBe(

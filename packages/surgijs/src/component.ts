@@ -163,7 +163,11 @@ export function defineComponent<P extends object = {}>(
       try {
         createRoot((dispose) => {
           self.__d = dispose;
-          deferMount(() => insert(root, render(self.__p as ReactiveProps<P>, this), css && !adopt ? null : undefined));
+          deferMount(() => {
+            // Fallback <style> elements share the root, so the render must not own all of it.
+            const shared = css && !adopt;
+            insert(root, render(self.__p as ReactiveProps<P>, this), shared ? null : undefined, shared && end ? Array.from(root.childNodes) : undefined);
+          });
         });
       } finally {
         if (end) end();
