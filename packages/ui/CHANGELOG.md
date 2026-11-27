@@ -1,5 +1,11 @@
 # @surgijs/ui
 
+## 0.3.0
+
+### Minor Changes
+
+- [#32](https://github.com/SurgiJS/surgijs/pull/32) [`596beaf`](https://github.com/SurgiJS/surgijs/commit/596beafa954a7f03be80e45ac8df5b45fa4203fe) Thanks [@banzalik](https://github.com/banzalik)! - Built with `@surgijs/compiler` 0.7, which imports runtime helpers from `@surgijs/core/internal`; the `@surgijs/core` peer range starts at 0.7.0.
+
 ## 0.2.0
 
 ### Minor Changes
