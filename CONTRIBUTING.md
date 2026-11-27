@@ -48,7 +48,7 @@ Budgets live in `packages/surgijs/scripts/bundle.mjs`. Raise a limit only when t
 
 ## Code review
 
-[CodeRabbit](https://coderabbit.ai) reviews every non-draft pull request to `main`; its settings live in `.coderabbit.yaml`. Mention `@coderabbitai` in a PR comment to ask it a question, or comment `@coderabbitai review` to run the review again. Release PRs titled "Version Packages" are skipped.
+[CodeRabbit](https://coderabbit.ai) reviews every non-draft pull request to `main`; its settings live in `.coderabbit.yaml`. Mention `@coderabbitai` in a PR comment to ask it a question. `@coderabbitai review` reviews the commits pushed since its last review; `@coderabbitai full review` reviews the whole PR again. PRs with "Version Packages" (release PRs) or "WIP" in the title are skipped.
 
 ## Writing style
 
