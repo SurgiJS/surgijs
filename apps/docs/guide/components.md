@@ -6,7 +6,7 @@
 defineComponent<P>(tag, render, schema?, options?)
 ```
 
-- `tag`: custom element name. A second call with a defined tag returns the existing class and swaps in the new `render`: connected instances re-render with it. This is how hot module replacement updates a component in place. The schema and options keep their first values, and component state resets on a hot update.
+- `tag`: custom element name. A second call with a defined tag returns the existing class and swaps in the new `render`: connected instances re-render with it. This is how hot module replacement updates a component in place. The schema and options keep their first values, and component state resets on a hot update. A module that calls `defineComponent` accepts its own updates, so modules importing its other exports keep the old values until the page reloads.
 - `render(props, host)`: a function component. `props` holds a getter per schema key.
 - `schema`: `{ name: String | Number | Boolean | Object | Array }`. Keys become observed attributes in kebab case (`maxItems` ↔ `max-items`) and properties on the element.
 - `options.shadow`: `true` (open shadow root, the default), a `ShadowRootInit`, or `false` for light DOM.
