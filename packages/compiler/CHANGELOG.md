@@ -1,5 +1,37 @@
 # @surgijs/compiler
 
+## 0.4.0
+
+### Minor Changes
+
+- [#18](https://github.com/SurgiJS/surgijs/pull/18) [`5a2a5a2`](https://github.com/SurgiJS/surgijs/commit/5a2a5a2fda8a33adbda3b66ce1117a9ba69d2def) Thanks [@banzalik](https://github.com/banzalik)! - React DevTools shows the component tree while Vite is serving: the plugin loads the adapter, and production bundles leave it out. Redux DevTools shows each store when the extension is installed, and jumping to a state writes it back.
+
+- [#27](https://github.com/SurgiJS/surgijs/pull/27) [`37d03b6`](https://github.com/SurgiJS/surgijs/commit/37d03b68a89d3ca0651551f94f93f0245ee07170) Thanks [@banzalik](https://github.com/banzalik)! - The compiler warns about a shorthand property that names a signal (`{ label }`): it compiles to `label: label()`, so the object keeps the value read at creation. `compile()` returns `warnings`, and the Vite and esbuild plugins report them.
+
+### Patch Changes
+
+- [#19](https://github.com/SurgiJS/surgijs/pull/19) [`255a196`](https://github.com/SurgiJS/surgijs/commit/255a196f9ba1cb4785cf83f74f72a78b6072043d) Thanks [@banzalik](https://github.com/banzalik)! - `defineComponent` takes `styles`: one `CSSStyleSheet` per definition, adopted by every instance via `adoptedStyleSheets` instead of a `<style>` per element (falls back to `<style>` where unsupported). `renderToString` and `shadowHTML` take `options.styles` and render it as `<style data-s>`, which the client replaces with the shared sheet on upgrade.
+
+  SSR no longer escapes `<style>` and `<script>` text, which broke selectors such as `a > b` (entities are not decoded in raw text elements); only sequences that would end the element are neutralised, after all fragments are joined. The client compiler does the same for static text in these elements. New `escapeRaw` helper in `@surgijs/core/server`.
+
+  `<s-button>` uses the shared stylesheet.
+
+## 0.3.1
+
+### Patch Changes
+
+- [#13](https://github.com/SurgiJS/surgijs/pull/13) [`6b4907a`](https://github.com/SurgiJS/surgijs/commit/6b4907a97b72058ad80438476611344b59379627) Thanks [@banzalik](https://github.com/banzalik)! - The esbuild plugin compiles `.tsx?ssr` / `.jsx?ssr` imports with `generate: 'ssr'`, like the Vite plugin, so one source can feed both the client and the server bundle.
+
+## 0.3.0
+
+### Minor Changes
+
+- [#14](https://github.com/SurgiJS/surgijs/pull/14) [`286da21`](https://github.com/SurgiJS/surgijs/commit/286da219ac4496e65a1d3efc4e38876d12d6a73e) Thanks [@banzalik](https://github.com/banzalik)! - The compiler parses with `oxc-parser` instead of the TypeScript compiler API. `typescript` is no longer a peer dependency, so TypeScript 7 (which has no JS API) works without a pin. Output for valid code is unchanged. Input with syntax errors (unclosed JSX or template literals, TypeScript-only syntax in `.jsx` files) is no longer rewritten; the bundler reports the syntax error instead.
+
+### Patch Changes
+
+- [#12](https://github.com/SurgiJS/surgijs/pull/12) [`900c5ad`](https://github.com/SurgiJS/surgijs/commit/900c5adf4b533f7b2e6455625b8a1c370c674b09) Thanks [@banzalik](https://github.com/banzalik)! - The Vite plugin sets `oxc.jsx: 'preserve'` on Vite 8 (Rolldown) instead of the deprecated `esbuild` option.
+
 ## 0.2.1
 
 ### Patch Changes

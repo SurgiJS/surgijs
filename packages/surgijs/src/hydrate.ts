@@ -29,7 +29,14 @@ function align(node: Node, tmpl: Node): void {
   let t = tmpl.firstChild;
   let n = node.firstChild;
   while (t) {
-    if (t.nodeType === 3) {
+    if (t.nodeType === 8) {
+      // A placeholder marks a dynamic child; the server content before its marker is dropped.
+      while (n && n.nodeType !== 8) {
+        const next: ChildNode | null = n.nextSibling;
+        node.removeChild(n);
+        n = next;
+      }
+    } else if (t.nodeType === 3) {
       if (!n || n.nodeType !== 3) {
         node.insertBefore(t.cloneNode(), n);
         t = t.nextSibling;
@@ -45,6 +52,12 @@ function align(node: Node, tmpl: Node): void {
     } else if (t.nodeType === 1 && n && n.nodeType === 1) align(n, t);
     t = t.nextSibling;
     n = n ? n.nextSibling : null;
+  }
+  // Server content after the last template child belongs to a dynamic child, which the client renders again.
+  while (n) {
+    const next: ChildNode | null = n.nextSibling;
+    node.removeChild(n);
+    n = next;
   }
 }
 

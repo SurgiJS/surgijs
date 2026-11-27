@@ -1,5 +1,29 @@
 # @surgijs/core
 
+## 0.4.0
+
+### Minor Changes
+
+- [#18](https://github.com/SurgiJS/surgijs/pull/18) [`5a2a5a2`](https://github.com/SurgiJS/surgijs/commit/5a2a5a2fda8a33adbda3b66ce1117a9ba69d2def) Thanks [@banzalik](https://github.com/banzalik)! - React DevTools shows the component tree while Vite is serving: the plugin loads the adapter, and production bundles leave it out. Redux DevTools shows each store when the extension is installed, and jumping to a state writes it back.
+
+- [#19](https://github.com/SurgiJS/surgijs/pull/19) [`255a196`](https://github.com/SurgiJS/surgijs/commit/255a196f9ba1cb4785cf83f74f72a78b6072043d) Thanks [@banzalik](https://github.com/banzalik)! - `defineComponent` takes `styles`: one `CSSStyleSheet` per definition, adopted by every instance via `adoptedStyleSheets` instead of a `<style>` per element (falls back to `<style>` where unsupported). `renderToString` and `shadowHTML` take `options.styles` and render it as `<style data-s>`, which the client replaces with the shared sheet on upgrade.
+
+  SSR no longer escapes `<style>` and `<script>` text, which broke selectors such as `a > b` (entities are not decoded in raw text elements); only sequences that would end the element are neutralised, after all fragments are joined. The client compiler does the same for static text in these elements. New `escapeRaw` helper in `@surgijs/core/server`.
+
+  `<s-button>` uses the shared stylesheet.
+
+## 0.3.1
+
+### Patch Changes
+
+- [#13](https://github.com/SurgiJS/surgijs/pull/13) [`5f9acba`](https://github.com/SurgiJS/surgijs/commit/5f9acba735bb8a0ff91821cf2e5d21977d6253f1) Thanks [@banzalik](https://github.com/banzalik)! - `renderToString` and `shadowHTML` take `options`: `children` renders light DOM after the declarative shadow root (slotted content), `delegatesFocus` adds `shadowrootdelegatesfocus`.
+
+## 0.3.0
+
+### Patch Changes
+
+- [#12](https://github.com/SurgiJS/surgijs/pull/12) [`8d42848`](https://github.com/SurgiJS/surgijs/commit/8d428485fb77fa17092a88d7302e083d0db3148e) Thanks [@banzalik](https://github.com/banzalik)! - Document that a `For` key renders its row once and how to show changed content (signals in the row, or values in the key).
+
 ## 0.2.1
 
 ### Patch Changes

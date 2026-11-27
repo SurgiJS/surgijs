@@ -3,8 +3,6 @@
  * defaults come from the theme tokens in themes.css with built-in light fallbacks, so the
  * button renders without any stylesheet. Variants and sizes only change the `--_*` defaults,
  * which keeps a `--s-button-*` override working for every variant.
- *
- * The SSR compiler escapes `<style>` text, so this CSS avoids `<`, `>`, `&` and `"`.
  */
 export const buttonStyles = `
 :host {

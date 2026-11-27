@@ -1,5 +1,6 @@
+import { devRender, devUnmount } from './dev';
 import { delegateRoot, insert, undelegateRoot } from './dom';
-import { createRoot, createSignal, deferMount, type Accessor, type Setter } from './reactivity';
+import { createRoot, createSignal, deferMount, getOwner, type Accessor, type OwnerNode, type Setter } from './reactivity';
 import type { JSX } from './jsx-runtime';
 
 export type PropType = StringConstructor | NumberConstructor | BooleanConstructor | ObjectConstructor | ArrayConstructor;
@@ -20,6 +21,12 @@ export interface ComponentOptions {
   shadow?: boolean | ShadowRootInit;
   /** Form-associated element with `ElementInternals`. */
   form?: boolean;
+  /**
+   * CSS for the shadow root. Parsed into one `CSSStyleSheet` per component definition and
+   * adopted by every instance, so a hundred elements share one copy. Falls back to a
+   * `<style>` per root where constructable stylesheets are missing. Ignored in light DOM.
+   */
+  styles?: string | string[];
 }
 
 export interface FormHost extends HTMLElement {
@@ -41,7 +48,15 @@ export function setHydrateRoot(fn: HydrateRoot | null): void {
   hydrateRoot = fn;
 }
 
+function makeSheet(text: string): CSSStyleSheet {
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(text);
+  return sheet;
+}
+
 const kebab = (s: string): string => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+
+const updates = new WeakMap<object, (render: unknown) => void>();
 
 function coerce(type: PropType | undefined, v: string | null): unknown {
   if (type === Boolean) return v !== null && v !== 'false';
@@ -61,6 +76,7 @@ interface Host extends HTMLElement {
   __s: Record<string, [Accessor<unknown>, Setter<unknown>]>;
   __p: Record<string, Accessor<unknown>>;
   __d: (() => void) | undefined;
+  __o: OwnerNode | null;
   __r: ShadowRoot | HTMLElement | undefined;
   __c: Node[] | undefined;
   __u: boolean;
@@ -74,6 +90,8 @@ interface Host extends HTMLElement {
 /**
  * Defines a custom element whose shadow root (or light DOM) renders `render(props, host)`
  * once per connection. `schema` lists observed props and their attribute coercion.
+ * Defining an already defined tag swaps its render and re-renders connected instances, which is
+ * how hot module replacement updates components; the schema and options stay as first defined.
  */
 export function defineComponent<P extends object = {}>(
   tag: string,
@@ -83,7 +101,10 @@ export function defineComponent<P extends object = {}>(
 ): ComponentClass<P> {
   if (typeof customElements === 'undefined') return class {} as unknown as ComponentClass<P>;
   const existing = customElements.get(tag);
-  if (existing) return existing as unknown as ComponentClass<P>;
+  if (existing) {
+    updates.get(existing)?.(render);
+    return existing as unknown as ComponentClass<P>;
+  }
 
   const types = schema as Record<string, PropType>;
   const keys = Object.keys(types);
@@ -95,6 +116,49 @@ export function defineComponent<P extends object = {}>(
   const closed = shadow && shadow.mode === 'closed';
   const form = !!options.form;
   const light = !shadow && !('children' in types);
+  const css = shadow && options.styles ? ([] as string[]).concat(options.styles) : null;
+  // replaceSync drops @import rules, so such CSS keeps a <style> element.
+  const adopt = typeof CSSStyleSheet != 'undefined' && 'replaceSync' in CSSStyleSheet.prototype && !css?.some((c) => /@imp/i.test(c));
+  let sheets: CSSStyleSheet[] | undefined;
+  const hosts = new Set<HTMLElement>();
+  let current = render;
+
+  const mount = (el: HTMLElement, root: Node, owner: OwnerNode | null, hydrated: boolean): void => {
+    const self = el as unknown as Host;
+    self.__o = owner;
+    hosts.add(el);
+    createRoot((dispose) => {
+      self.__d = dispose;
+      deferMount(() => {
+        // Fallback <style> elements share the root, so the render must not own all of it.
+        const shared = css && !adopt;
+        insert(
+          root,
+          devRender ? devRender(el, current, self.__p) : current(self.__p as ReactiveProps<P>, el),
+          shared ? null : undefined,
+          shared && hydrated ? Array.from(root.childNodes) : undefined,
+        );
+      });
+    }, owner);
+  };
+
+  const appendFallbackStyles = (root: ParentNode): void => {
+    if (css && !adopt) root.append(...css.map((text) => Object.assign(document.createElement('style'), { textContent: text })));
+  };
+
+  const unmount = (self: Host): void => {
+    const root = self.__r!;
+    if (closed) undelegateRoot(root);
+    try {
+      self.__d?.();
+      devUnmount?.(self);
+    } finally {
+      self.__d = undefined;
+      self.__o = null;
+      hosts.delete(self);
+      root.replaceChildren();
+    }
+  };
 
   class Element extends HTMLElement {
     static observedAttributes = attrs;
@@ -134,30 +198,28 @@ export function defineComponent<P extends object = {}>(
       }
       const root = (self.__r ||= shadow ? this.shadowRoot || this.attachShadow(shadow) : this);
       if (closed) delegateRoot(root);
+      if (css) {
+        // Server markup carries its own copy of the CSS so it paints before upgrade.
+        root.querySelectorAll('style[data-s]').forEach((el) => el.remove());
+        if (adopt) (root as ShadowRoot).adoptedStyleSheets = sheets ||= css.map(makeSheet);
+      }
       const end = hydrateRoot ? hydrateRoot(root) : null;
       if (!end) {
         if (light && !self.__c) self.__c = Array.from(this.childNodes);
         root.replaceChildren();
       }
       try {
-        createRoot((dispose) => {
-          self.__d = dispose;
-          deferMount(() => insert(root, render(self.__p as ReactiveProps<P>, this)));
-        });
+        mount(this, root, getOwner(), !!end);
       } finally {
         if (end) end();
       }
+      appendFallbackStyles(root);
     }
 
     disconnectedCallback(): void {
       queueMicrotask(() => {
         const self = this as unknown as Host;
-        const root = self.__r;
-        if (!root || !self.__d || this.isConnected) return;
-        if (closed) undelegateRoot(root);
-        self.__d();
-        self.__d = undefined;
-        root.replaceChildren();
+        if (self.__d && !this.isConnected) unmount(self);
       });
     }
 
@@ -202,6 +264,24 @@ export function defineComponent<P extends object = {}>(
     });
   }
 
+  updates.set(Element, (next) => {
+    current = next as typeof render;
+    for (const el of [...hosts]) {
+      const self = el as unknown as Host;
+      if (!self.__d) continue;
+      if (el.isConnected) {
+        self.__d();
+        devUnmount?.(el);
+      }
+      if (!el.isConnected) {
+        unmount(self);
+        continue;
+      }
+      self.__r!.replaceChildren();
+      mount(el, self.__r!, self.__o, false);
+      appendFallbackStyles(self.__r!);
+    }
+  });
   customElements.define(tag, Element);
   return Element as unknown as ComponentClass<P>;
 }

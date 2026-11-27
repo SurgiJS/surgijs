@@ -13,6 +13,8 @@ export default defineConfig(async () => {
       index: 'src/index.ts',
       button: 'src/button/index.ts',
       server: 'src/server.ts',
+      react: 'src/react.ts',
+      vue: 'src/vue.ts',
     },
     format: ['esm'],
     target: 'es2022',

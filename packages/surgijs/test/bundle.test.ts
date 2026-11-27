@@ -18,6 +18,12 @@ describe('bundle', () => {
     expect(code).not.toContain('shadowrootmode');
   });
 
+  it('keeps React DevTools out of the production counter', async () => {
+    const { code } = await bundle(entry('counter'));
+    expect(code).not.toContain('__REACT_DEVTOOLS_GLOBAL_HOOK__');
+    expect(code).not.toContain('installDevtools');
+  });
+
   it('compiled counter detects events without startsWith', async () => {
     const { code } = await bundle(entry('counter'));
     expect(code).not.toContain('startsWith("on")');

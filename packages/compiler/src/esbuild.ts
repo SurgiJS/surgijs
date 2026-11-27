@@ -15,6 +15,11 @@ interface OnLoadArgs {
   suffix?: string;
 }
 
+interface PluginWarning {
+  text: string;
+  location: { file: string; line: number; column: number; lineText: string };
+}
+
 interface OnResolveArgs {
   path: string;
   resolveDir: string;
@@ -24,7 +29,7 @@ interface PluginBuild {
   onResolve(options: { filter: RegExp }, callback: (args: OnResolveArgs) => { path: string; suffix: string }): void;
   onLoad(
     options: { filter: RegExp },
-    callback: (args: OnLoadArgs) => Promise<{ contents: string; loader: 'ts' | 'js' } | undefined>,
+    callback: (args: OnLoadArgs) => Promise<{ contents: string; loader: 'ts' | 'js'; warnings: PluginWarning[] } | undefined>,
   ): void;
 }
 
@@ -61,7 +66,12 @@ export default function surgi(options: SurgiEsbuildPluginOptions = {}): SurgiEsb
         });
         let contents = result.code;
         if (result.map) contents += `\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(result.map).toString('base64')}\n`;
-        return { contents, loader: args.path.endsWith('.tsx') ? 'ts' : 'js' };
+        const lines = source.split('\n');
+        const warnings = result.warnings.map((w) => ({
+          text: w.message,
+          location: { file: args.path, line: w.line, column: w.column, lineText: lines[w.line - 1] ?? '' },
+        }));
+        return { contents, warnings, loader: args.path.endsWith('.tsx') ? 'ts' : 'js' };
       });
     },
   };
