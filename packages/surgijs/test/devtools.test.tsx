@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createComponent, defineComponent, flush, For, Show, useMemo, useState, type ReactiveProps } from '@surgijs/core';
+import { defineComponent, flush, For, Show, useMemo, useState, type ReactiveProps } from '@surgijs/core';
+import { createComponent } from '@surgijs/core/internal';
 import { installDevtools, uninstallDevtools } from '@surgijs/core/devtools';
 
 interface Fiber {

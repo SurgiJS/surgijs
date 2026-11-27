@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { bind, createEffect, createMemo, createRoot, createSignal, defineComponent, flush, For, untrack } from '@surgijs/core';
+import { createEffect, createMemo, createRoot, createSignal, defineComponent, flush, For, untrack } from '@surgijs/core';
+import { bind } from '@surgijs/core/internal';
 
 let warn: ReturnType<typeof vi.spyOn>;
 

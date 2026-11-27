@@ -90,3 +90,27 @@ test('blocks clicks while disabled or loading', async ({ page }) => {
   });
   expect(clicks).toBe(1);
 });
+
+test('mirrors start and end slots and keeps padding symmetric under dir="rtl"', async ({ page }) => {
+  const box = async (dir: string) => {
+    await page.goto(storyUrl('components-button--with-icon', 'light', dir));
+    const button = page.locator('s-button');
+    await button.waitFor();
+    return button.evaluate((el) => {
+      const rect = (n: Element) => n.getBoundingClientRect();
+      const base = el.shadowRoot!.querySelector('.base')!;
+      const style = getComputedStyle(base);
+      return {
+        dir: getComputedStyle(el).direction,
+        iconBeforeText: rect(el.querySelector('svg')!).left < rect(base).left + rect(base).width / 2,
+        start: style.paddingInlineStart,
+        end: style.paddingInlineEnd,
+      };
+    });
+  };
+  const ltr = await box('ltr');
+  expect(ltr).toMatchObject({ dir: 'ltr', iconBeforeText: true });
+  const rtl = await box('rtl');
+  expect(rtl).toMatchObject({ dir: 'rtl', iconBeforeText: false });
+  expect(rtl.start).toBe(rtl.end);
+});
