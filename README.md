@@ -5,7 +5,7 @@ Compiled Web Components on JSX/TSX. The compiler hoists static HTML into templat
 - Signals with microtask batching, memos, effects, ownership and context.
 - `defineComponent` creates standard custom elements: typed attributes, property reflection, shadow or light DOM, form association.
 - `For`, `Show`, `Switch`, `Portal`, `ErrorBoundary`, `createResource`.
-- SSR to declarative shadow DOM and hydration that adopts server nodes.
+- SSR to declarative shadow DOM with nested components, control flow, streaming (`renderToStream`) and hydration that adopts server nodes.
 - Vite / Rollup and esbuild plugins with source maps.
 
 ## Install

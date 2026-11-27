@@ -12,7 +12,7 @@ const { code, changed, map } = compile(source, { filename: 'app.tsx' });
 | --- | --- | --- |
 | `filename` | `'input.tsx'` | used for parsing mode and the source map |
 | `moduleName` | `'@surgijs/core'` | runtime module of the generated imports; SSR imports `<moduleName>/server` |
-| `generate` | `'dom'` | `'ssr'` emits string concatenation |
+| `generate` | `'dom'` | `'ssr'` emits element trees for `<moduleName>/server`: nested components are calls, holes escape text |
 | `sourceMap` | `true` | returns a V3 source map as JSON in `map` |
 
 A file without JSX comes back unchanged with `changed: false`.

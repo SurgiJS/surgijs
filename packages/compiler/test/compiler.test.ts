@@ -20,7 +20,7 @@ describe('compile', () => {
 
   it('honours moduleName', () => {
     expect(compile('const el = <div />;', { moduleName: 'my-runtime' }).code).toContain('from "my-runtime"');
-    expect(compile('const el = <div />;', { moduleName: 'my-runtime', generate: 'ssr' }).code).not.toContain('my-runtime/server');
+    expect(compile('const el = <div />;', { moduleName: 'my-runtime', generate: 'ssr' }).code).toContain('from "my-runtime/server"');
   });
 
   it('resolves every path before the first mutation', () => {
@@ -62,7 +62,7 @@ describe('compile', () => {
       expect(out).not.toMatch(/=> log\(\), n\(\)|=> \{ v: n\(\) \}/);
     }
     expect(dom('const el = <span>{(log(), n())}</span>;')).toContain('_$insert(_el$2, () => (log(), n()));');
-    expect(ssr('const el = <p title={(log(), n())}>{(log(), n())}</p>;')).toContain('_$escape((log(), n()))');
+    expect(ssr('const el = <p title={(log(), n())}>{(log(), n())}</p>;')).toContain('_$text((log(), n()))');
   });
 
   it('inserts a marker for middle children', () => {
@@ -107,10 +107,15 @@ describe('compile', () => {
     expect(dom('const el = <my-label htmlFor={id()} />;')).toContain('n.htmlFor = v');
   });
 
+  it('emits fragments as their own parts, so a Switch can read its cases through them', () => {
+    expect(ssr('const el = <><b>x</b></>;')).toContain('_$fragment(');
+    expect(ssr('const el = <div><b>x</b></div>;')).not.toContain('_$fragment(');
+  });
+
   it('keeps style and script text raw, guarding only the closing tag', () => {
     expect(ssr('const el = <style>a &gt; b &amp; c</style>;')).toContain('"<style>a > b & c</style>"');
     expect(ssr('const el = <style>{css}</style>;')).toContain('_$escapeRaw([css], "style")');
-    expect(ssr('const el = <p>{css}</p>;')).toContain('_$escape(css)');
+    expect(ssr('const el = <p>{css}</p>;')).toContain('_$text(css)');
     expect(dom('const el = <style>a &gt; b &amp; c</style>;')).toContain('<style>a > b & c</style>');
     expect(ssr('const el = <style>a &lt;/style&gt; b</style>;')).toContain('"<style>a <\\\\/style> b</style>"');
   });
@@ -122,7 +127,7 @@ describe('compile', () => {
   });
 
   it('treats SVG style and script as ordinary text', () => {
-    expect(ssr('const el = <svg><style>{css}</style></svg>;')).toContain('_$escape(css)');
+    expect(ssr('const el = <svg><style>{css}</style></svg>;')).toContain('_$text(css)');
     expect(ssr('const el = <svg><style>a &amp; b</style></svg>;')).toContain('<style>a &amp; b</style>');
     expect(dom('const el = <svg><style>a &amp; b</style></svg>;')).toContain('<style>a &amp; b</style>');
     expect(ssr('const el = <svg><foreignObject><style>a &amp; b</style></foreignObject></svg>;')).toContain('<style>a & b</style>');
@@ -221,8 +226,8 @@ describe('compile', () => {
       const [count] = useState(0);
       const el = <div class={cls()} onClick={h}><p>Value: {count}</p><Show when={count() > 1}><b /></Show>{a()}<span /></div>;
     `);
-    expect(out).toContain('import { attrPart as _$attrPart, escape as _$escape } from "@surgijs/core/server";');
-    expect(out).toContain('"<div" + _$attrPart("class", cls()) + "><p>Value: " + _$escape(count()) + "</p><!----><!----><span></span></div>"');
+    expect(out).toContain('import { attrPart as _$attrPart, text as _$text, element as _$element, component as _$component, Show as _$Show } from "@surgijs/core/server";');
+    expect(out).toContain('const el = _$element(["<div", _$attrPart("class", cls()), "><p>Value: ", _$text(count()), "</p>", _$component(_$Show, { when: () => count() > 1, children: () => _$element(["<b></b>"]) }), "<!---->", _$text(a()), "<!----><span></span></div>"]);');
     expect(out).not.toContain('_$template');
     expect(out).not.toContain('onClick');
   });
