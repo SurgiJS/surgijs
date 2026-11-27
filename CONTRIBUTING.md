@@ -63,6 +63,10 @@ Every visual value goes through a `--s-<component>-*` custom property that defau
 
 Screenshots come from the official Playwright image, so they only match when taken there: run `pnpm test:e2e` (Docker or Podman) rather than Playwright on the host. After an intended visual change, run `pnpm test:e2e:update`, look at the new images in `apps/storybook/e2e/__screenshots__`, and commit them.
 
+## Code review
+
+[CodeRabbit](https://coderabbit.ai) reviews every non-draft pull request to `main`; its settings live in `.coderabbit.yaml`. Mention `@coderabbitai` in a PR comment to ask it a question. `@coderabbitai review` reviews the commits pushed since its last review; `@coderabbitai full review` reviews the whole PR again. PRs with "Version Packages" (release PRs) or "WIP" in the title are skipped.
+
 ## Writing style
 
 README, docs, comments and commit messages state what the code does, in affirmative sentences. Keep commits small, one feature each.
