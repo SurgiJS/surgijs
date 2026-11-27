@@ -16,7 +16,6 @@ import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 
 const dir = fileURLToPath(new URL('.', import.meta.url));
-const runtime = fileURLToPath(new URL('../packages/surgijs/src/', import.meta.url));
 const require = createRequire(import.meta.url);
 const version = (name) => JSON.parse(readFileSync(join(dir, 'node_modules', name, 'package.json'), 'utf8')).version;
 const own = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8')).version;
@@ -52,12 +51,10 @@ function parseArgs(argv) {
 }
 
 const plugins = {
-  /** `@surgijs/core` from workspace sources, `.tsx` through the workspace compiler. */
+  /** `.tsx` through the workspace compiler; `@surgijs/core` resolves to sources by condition. */
   surgijs: {
     name: 'surgijs',
     setup(b) {
-      b.onResolve({ filter: /^@surgijs\/core$/ }, () => ({ path: `${runtime}index.ts` }));
-      b.onResolve({ filter: /^@surgijs\/core\/(.+)$/ }, (args) => ({ path: `${runtime}${args.path.slice('@surgijs/core/'.length)}.ts` }));
       b.onLoad({ filter: /\.tsx$/ }, async (args) => {
         const { compile } = await import('../packages/compiler/src/index.ts');
         const { code } = compile(await readFile(args.path, 'utf8'), { filename: args.path, sourceMap: false });
@@ -101,7 +98,7 @@ async function bundle(c) {
     format: 'esm',
     target: 'es2022',
     platform: 'browser',
-    conditions: ['production', 'browser'],
+    conditions: ['@surgijs/source', 'production', 'browser'],
     legalComments: 'none',
     define: {
       'process.env.NODE_ENV': '"production"',

@@ -28,14 +28,17 @@
   "bugs": "https://github.com/SurgiJS/surgijs/issues",
   "exports": {
     ".": {
+      "@surgijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./react": {
+      "@surgijs/source": "./src/react.ts",
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"
     },
     "./core": {
+      "@surgijs/source": "./src/core.ts",
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
     },

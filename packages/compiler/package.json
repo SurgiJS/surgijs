@@ -27,14 +27,17 @@
   "bugs": "https://github.com/SurgiJS/surgijs/issues",
   "exports": {
     ".": {
+      "@surgijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./vite": {
+      "@surgijs/source": "./src/vite.ts",
       "types": "./dist/vite.d.ts",
       "import": "./dist/vite.js"
     },
     "./esbuild": {
+      "@surgijs/source": "./src/esbuild.ts",
       "types": "./dist/esbuild.d.ts",
       "import": "./dist/esbuild.js"
     },

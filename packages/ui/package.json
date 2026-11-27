@@ -28,18 +28,24 @@
   "bugs": "https://github.com/SurgiJS/surgijs/issues",
   "exports": {
     ".": {
+      "@surgijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./button": {
+      "@surgijs/source": "./src/button/index.ts",
       "types": "./dist/button.d.ts",
       "import": "./dist/button.js"
     },
     "./server": {
+      "@surgijs/source": "./src/server.ts",
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js"
     },
-    "./themes.css": "./dist/themes.css",
+    "./themes.css": {
+      "@surgijs/source": "./src/themes.css",
+      "default": "./dist/themes.css"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",
