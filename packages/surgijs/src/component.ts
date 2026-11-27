@@ -21,6 +21,12 @@ export interface ComponentOptions {
   shadow?: boolean | ShadowRootInit;
   /** Form-associated element with `ElementInternals`. */
   form?: boolean;
+  /**
+   * CSS for the shadow root. Parsed into one `CSSStyleSheet` per component definition and
+   * adopted by every instance, so a hundred elements share one copy. Falls back to a
+   * `<style>` per root where constructable stylesheets are missing. Ignored in light DOM.
+   */
+  styles?: string | string[];
 }
 
 export interface FormHost extends HTMLElement {
@@ -40,6 +46,12 @@ let hydrateRoot: HydrateRoot | null = null;
 
 export function setHydrateRoot(fn: HydrateRoot | null): void {
   hydrateRoot = fn;
+}
+
+function makeSheet(text: string): CSSStyleSheet {
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(text);
+  return sheet;
 }
 
 const kebab = (s: string): string => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
@@ -104,17 +116,34 @@ export function defineComponent<P extends object = {}>(
   const closed = shadow && shadow.mode === 'closed';
   const form = !!options.form;
   const light = !shadow && !('children' in types);
+  const css = shadow && options.styles ? ([] as string[]).concat(options.styles) : null;
+  // replaceSync drops @import rules, so such CSS keeps a <style> element.
+  const adopt = typeof CSSStyleSheet != 'undefined' && 'replaceSync' in CSSStyleSheet.prototype && !css?.some((c) => /@imp/i.test(c));
+  let sheets: CSSStyleSheet[] | undefined;
   const hosts = new Set<HTMLElement>();
   let current = render;
 
-  const mount = (el: HTMLElement, root: Node, owner: OwnerNode | null): void => {
+  const mount = (el: HTMLElement, root: Node, owner: OwnerNode | null, hydrated: boolean): void => {
     const self = el as unknown as Host;
     self.__o = owner;
     hosts.add(el);
     createRoot((dispose) => {
       self.__d = dispose;
-      deferMount(() => insert(root, devRender ? devRender(el, current, self.__p) : current(self.__p as ReactiveProps<P>, el)));
+      deferMount(() => {
+        // Fallback <style> elements share the root, so the render must not own all of it.
+        const shared = css && !adopt;
+        insert(
+          root,
+          devRender ? devRender(el, current, self.__p) : current(self.__p as ReactiveProps<P>, el),
+          shared ? null : undefined,
+          shared && hydrated ? Array.from(root.childNodes) : undefined,
+        );
+      });
     }, owner);
+  };
+
+  const appendFallbackStyles = (root: ParentNode): void => {
+    if (css && !adopt) root.append(...css.map((text) => Object.assign(document.createElement('style'), { textContent: text })));
   };
 
   const unmount = (self: Host): void => {
@@ -166,16 +195,22 @@ export function defineComponent<P extends object = {}>(
       }
       const root = (self.__r ||= shadow ? this.shadowRoot || this.attachShadow(shadow) : this);
       if (closed) delegateRoot(root);
+      if (css) {
+        // Server markup carries its own copy of the CSS so it paints before upgrade.
+        root.querySelectorAll('style[data-s]').forEach((el) => el.remove());
+        if (adopt) (root as ShadowRoot).adoptedStyleSheets = sheets ||= css.map(makeSheet);
+      }
       const end = hydrateRoot ? hydrateRoot(root) : null;
       if (!end) {
         if (light && !self.__c) self.__c = Array.from(this.childNodes);
         root.replaceChildren();
       }
       try {
-        mount(this, root, getOwner());
+        mount(this, root, getOwner(), !!end);
       } finally {
         if (end) end();
       }
+      appendFallbackStyles(root);
     }
 
     disconnectedCallback(): void {
@@ -240,7 +275,8 @@ export function defineComponent<P extends object = {}>(
         continue;
       }
       self.__r!.replaceChildren();
-      mount(el, self.__r!, self.__o);
+      mount(el, self.__r!, self.__o, false);
+      appendFallbackStyles(self.__r!);
     }
   });
   customElements.define(tag, Element);

@@ -9,6 +9,22 @@ export function escape(value: unknown): string {
   return ('' + (value as string)).replace(/[&<>"]/g, (c) => ESC[c]!);
 }
 
+/**
+ * Text for raw text elements (`<style>`, `<script>`), where entities are not decoded: the
+ * pieces are joined first, then only sequences that would end the element are neutralised
+ * (`</style`, `</script`, and for scripts `<script`, which after `<!--` enters the
+ * double-escaped state), each only where the HTML tokenizer sees a tag name end. `<` becomes
+ * `\u003c`, valid inside JS and JSON strings, so `a > b`, `&` and `i<scripts.length` survive.
+ * Not for SVG `<style>`/`<script>`, which are foreign content: use `escape` there.
+ */
+export function escapeRaw(value: unknown, tag: string): string {
+  const text = (v: unknown): string =>
+    v == null || typeof v === 'boolean' ? '' : Array.isArray(v) ? v.map(text).join('') : '' + (v as string);
+  return text(value).replace(tag === 'script' ? /<(\/)?(script)(?=[\t\n\f />])/gi : /<(\/)(style)(?=[\t\n\f />])/gi, (_, slash, word) =>
+    slash ? `<\\/${word}` : `\\u003c${word}`,
+  );
+}
+
 /** ` name="value"`, ` name` for `true`, `''` for `null`/`false`. */
 export function attrPart(name: string, value: unknown): string {
   if (value == null || value === false) return '';
@@ -23,6 +39,8 @@ export interface ShadowOptions {
   children?: string;
   /** Adds `shadowrootdelegatesfocus`, matching `attachShadow({ delegatesFocus: true })`. */
   delegatesFocus?: boolean;
+  /** CSS rendered as `<style data-s>` inside the shadow root; the client swaps it for a shared adopted sheet. */
+  styles?: string | string[];
 }
 
 /** `<tag a="1"><template shadowrootmode="open">inner</template>children</tag>`. */
@@ -30,7 +48,8 @@ export function shadowHTML(tag: string, inner: string, attrs: Record<string, unk
   let a = '';
   for (const k in attrs) a += attrPart(kebab(k), attrs[k]);
   const focus = options.delegatesFocus ? ' shadowrootdelegatesfocus' : '';
-  return `<${tag}${a}><template shadowrootmode="open"${focus}>${inner}</template>${options.children ?? ''}</${tag}>`;
+  const css = ([] as string[]).concat(options.styles ?? []).map((c) => `<style data-s>${escapeRaw(c, 'style')}</style>`);
+  return `<${tag}${a}><template shadowrootmode="open"${focus}>${css.join('')}${inner}</template>${options.children ?? ''}</${tag}>`;
 }
 
 /**
