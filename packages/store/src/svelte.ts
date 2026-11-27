@@ -29,7 +29,7 @@ export function fromStore<D extends Record<string, unknown>, T>(
 ): StoreReadable<T> {
   return {
     subscribe(run) {
-      return store.subscribe(selector, (value) => run(value), { equals, fireImmediately: true });
+      return subscribeWithValue(store, selector, equals, run);
     },
   };
 }
@@ -42,7 +42,27 @@ export function fromStatus<D extends Record<string, unknown>, K extends RemoteKe
   const read = () => store.status(key);
   return {
     subscribe(run) {
-      return store.subscribe(read, (value) => run(value), { equals: () => false, fireImmediately: true });
+      return subscribeWithValue(store, read, () => false, run);
     },
   };
+}
+
+/**
+ * Registers before the first call to `run`, so a throwing subscriber cannot leave the store
+ * subscription behind without an unsubscribe function.
+ */
+function subscribeWithValue<D extends Record<string, unknown>, T>(
+  store: Store<D>,
+  selector: Selector<D, T>,
+  equals: Equals<T>,
+  run: (value: T) => void,
+): () => void {
+  const stop = store.subscribe(selector, (value) => run(value), { equals });
+  try {
+    run(store.get(selector));
+  } catch (error) {
+    stop();
+    throw error;
+  }
+  return stop;
 }

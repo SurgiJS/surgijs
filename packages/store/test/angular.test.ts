@@ -77,4 +77,12 @@ describe('angular adapter', () => {
     injector.destroy();
     expect(store.status('list').isActive).toBe(false);
   });
+
+  it('does not keep the subscription when the injection context is already destroyed', () => {
+    const store = createStore({ list: remote({ deps: () => '/x', fetch: async () => [1], retry: false }) });
+    const { injector, run } = context();
+    injector.destroy();
+    expect(() => run(() => fromStatus(store, 'list'))).toThrow();
+    expect(store.status('list').isActive).toBe(false);
+  });
 });

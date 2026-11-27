@@ -58,4 +58,17 @@ describe('svelte adapter', () => {
     unsubscribe();
     expect(store.status('list').isActive).toBe(false);
   });
+
+  it('releases the store subscription when the first call throws', () => {
+    const store = createStore({
+      list: remote({ deps: () => '/x', fetch: async () => [1], retry: false }),
+    });
+    const list = fromStore(store, (s) => s.list);
+    expect(() =>
+      list.subscribe(() => {
+        throw new Error('boom');
+      }),
+    ).toThrow('boom');
+    expect(store.status('list').isActive).toBe(false);
+  });
 });

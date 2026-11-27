@@ -34,7 +34,7 @@ export function fromStore<D extends Record<string, unknown>, T>(
   const destroyRef = options.destroyRef ?? inject(DestroyRef);
   const equals = (options.equals ?? deepEqual) as Equals<T>;
   const value = signal<T>(store.get(selector));
-  destroyRef.onDestroy(store.subscribe(selector, (next) => value.set(next), { equals }));
+  onDestroyOrStop(destroyRef, store.subscribe(selector, (next) => value.set(next), { equals }));
   return value.asReadonly();
 }
 
@@ -47,6 +47,15 @@ export function fromStatus<D extends Record<string, unknown>, K extends RemoteKe
   const destroyRef = options.destroyRef ?? inject(DestroyRef);
   const read = () => store.status(key);
   const value = signal(read());
-  destroyRef.onDestroy(store.subscribe(read, (next) => value.set(next), { equals: () => false }));
+  onDestroyOrStop(destroyRef, store.subscribe(read, (next) => value.set(next), { equals: () => false }));
   return value.asReadonly();
+}
+
+function onDestroyOrStop(destroyRef: DestroyRef, stop: () => void): void {
+  try {
+    destroyRef.onDestroy(stop);
+  } catch (error) {
+    stop();
+    throw error;
+  }
 }
