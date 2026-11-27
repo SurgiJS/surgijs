@@ -9,6 +9,9 @@ import * as dom from './fixtures/ssr-app.tsx';
 
 const ServerCounter = server.Counter!;
 
+const renderApp = (view: string) =>
+  renderToString(`x-${view.toLowerCase()}`, (app as unknown as Record<string, (props: Record<string, () => unknown>) => unknown>)[view]!);
+
 const CARD = '<div class="card"><h3>Counter</h3><p>Value: 0</p><button>Add</button></div>';
 
 afterEach(() => {
@@ -161,6 +164,37 @@ describe('streaming', () => {
     expect(chunks.join('')).toContain('<template shadowrootmode="open"><p>a &amp; b</p></template></x-await>');
   });
 
+  it('replaces the whole boundary when an async child rejects', async () => {
+    const chunks = await collect(renderToStream('x-mixed', app.MixedGuard as never));
+    expect(chunks.join('')).toBe('<x-mixed><template shadowrootmode="open"><div><p>failed</p></div></template></x-mixed>');
+  });
+
+  it('runs cleanups of a component that throws inside an error boundary', () => {
+    const fixture = app as unknown as { cleaned: string[] };
+    fixture.cleaned.length = 0;
+    expect(renderApp('ThrowsBoundary')).toContain('<p>caught</p>');
+    expect(fixture.cleaned).toEqual(['done']);
+  });
+
+  it('escapes strings returned by children, components and fallbacks', () => {
+    const out = renderApp('Unsafe');
+    expect(out).toContain('&lt;i&gt;show&lt;/i&gt;');
+    expect(out).toContain('&lt;u&gt;row&lt;/u&gt;');
+    expect(out).toContain('&lt;b&gt;fallback&lt;/b&gt;');
+    expect(out).not.toMatch(/<[iubs]>/);
+    expect(renderApp('StrHost')).toContain('&lt;em&gt;str&lt;/em&gt;');
+    expect(renderApp('GuardedStr')).toContain('&lt;r&gt;child&lt;/r&gt;');
+  });
+
+  it('escapes strings returned by async components when streamed', async () => {
+    const chunks = await collect(renderToStream('x-async-str', app.AsyncStrHost as never));
+    expect(chunks.join('')).toContain('&lt;s&gt;async&lt;/s&gt;');
+  });
+
+  it('collects match cases inside a fragment child', () => {
+    expect(renderApp('FragSwitch')).toContain('<b>yes</b>');
+  });
+
   it('renders the fallback when an async child rejects', async () => {
     const chunks = await collect(renderToStream('x-guarded', tree.AsyncGuarded as never));
     expect(chunks.join('')).toBe('<x-guarded><template shadowrootmode="open"><div><p>failed</p></div></template></x-guarded>');
@@ -178,8 +212,20 @@ describe('streaming', () => {
     expect(chunks.join('')).toBe('<x-pair><template shadowrootmode="open"><section><q>a</q><!----><q>b</q></section></template></x-pair>');
   });
 
+  it('starts async siblings nested in a deeper element before a later sibling resolves', async () => {
+    const fixture = app as unknown as { started: string[]; gate: { open: () => void } };
+    fixture.started.length = 0;
+    const reader = renderToStream('x-nested-siblings', app.NestedSiblings as never).getReader();
+    await reader.read();
+    await reader.read();
+    expect([...fixture.started].sort()).toEqual(['a', 'b']);
+    fixture.gate.open();
+    for (let next = await reader.read(); !next.done; next = await reader.read());
+  });
+
   it('works as a Web Response body', async () => {
-    const response = new Response(renderToStream('x-deferred', tree.Deferred as never), { headers: { 'content-type': 'text/html' } });
+    const stream = renderToStream('x-deferred', tree.Deferred as never).pipeThrough(new TextEncoderStream());
+    const response = new Response(stream, { headers: { 'content-type': 'text/html' } });
     expect(await response.text()).toBe('<x-deferred><template shadowrootmode="open"><section><q>soon</q></section></template></x-deferred>');
   });
 });

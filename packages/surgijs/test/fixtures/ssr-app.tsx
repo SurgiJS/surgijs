@@ -1,4 +1,4 @@
-import { createContext, ErrorBoundary, For, Match, Portal, Show, Switch, useContext, type JSX, type ReactiveProps } from '@surgijs/core';
+import { createContext, ErrorBoundary, For, Match, onCleanup, Portal, Show, Switch, useContext, type JSX, type ReactiveProps } from '@surgijs/core';
 
 export const Theme = createContext('light');
 
@@ -177,5 +177,87 @@ export const Pair = () => (
   <section>
     <Probe id="a" />
     <Probe id="b" />
+  </section>
+);
+
+export const Unsafe = () => (
+  <div>
+    <Show when={true}>{() => '<i>show</i>'}</Show>
+    <For each={['<u>row</u>']}>{(row) => row}</For>
+    <Show when={false} fallback={() => '<b>fallback</b>'}>
+      no
+    </Show>
+  </div>
+);
+
+export const Str = (() => '<em>str</em>') as unknown as () => JSX.Element;
+
+export const AsyncStr = (async () => {
+  await Promise.resolve();
+  return '<s>async</s>';
+}) as unknown as () => JSX.Element;
+
+export const StrHost = () => (
+  <div>
+    <Str />
+  </div>
+);
+
+export const AsyncStrHost = () => (
+  <div>
+    <AsyncStr />
+  </div>
+);
+
+export const GuardedStr = () => (
+  <div>
+    <ErrorBoundary fallback={() => '<q>fb</q>'}>{(() => '<r>child</r>') as unknown as JSX.Element}</ErrorBoundary>
+  </div>
+);
+
+export const FragSwitch = () => (
+  <Switch fallback={<p>none</p>}>
+    <>
+      <Match when={true}>
+        <b>yes</b>
+      </Match>
+    </>
+  </Switch>
+);
+
+export const MixedGuard = () => (
+  <div>
+    <ErrorBoundary fallback={<p>failed</p>}>
+      <Failing />
+      <span>ok</span>
+    </ErrorBoundary>
+  </div>
+);
+
+export const cleaned: string[] = [];
+
+export const Throws = (() => {
+  onCleanup(() => cleaned.push('done'));
+  throw new Error('component failed');
+}) as unknown as () => JSX.Element;
+
+export const ThrowsBoundary = () => (
+  <div>
+    <ErrorBoundary fallback={<p>caught</p>}>
+      <Throws />
+    </ErrorBoundary>
+  </div>
+);
+
+export const Wrapper = () => (
+  <div>
+    <Probe id="b" />
+  </div>
+);
+
+export const NestedSiblings = () => (
+  <section>
+    <Probe id="a" />
+    <Wrapper />
   </section>
 );

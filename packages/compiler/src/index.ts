@@ -715,7 +715,7 @@ class Compiler {
 
   fragment(children: readonly JSXChild[]): string {
     const items = this.children(children);
-    if (this.ssr) return this.ssrNode(this.ssrItems(items, false));
+    if (this.ssr) return this.ssrNode(this.ssrItems(items, false), 'fragment');
     const values = items.map((it) => {
       if (it.k === 'text') return JSON.stringify(it.text);
       if (it.k === 'el') return this.jsx(it.node!);
@@ -731,7 +731,7 @@ class Compiler {
    * `element([...])`: a string part is HTML already, a `{ code }` part evaluates to an attribute
    * string, a text hole (`text(value)`), a nested component thunk or a child element.
    */
-  ssrNode(parts: SsrPart[]): string {
+  ssrNode(parts: SsrPart[], helper = 'element'): string {
     const out: string[] = [];
     let buf = '';
     for (const p of parts) {
@@ -743,7 +743,7 @@ class Compiler {
       }
     }
     if (buf || !out.length) out.push(JSON.stringify(buf));
-    return `${this.h('element')}([${out.join(', ')}])`;
+    return `${this.h(helper)}([${out.join(', ')}])`;
   }
 
   hasJsx(e: Node): boolean {

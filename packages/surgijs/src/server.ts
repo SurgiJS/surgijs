@@ -70,7 +70,10 @@ export function shadowHTML(tag: string, inner: string, attrs: Record<string, unk
 type Part = string | Html | Part[] | Promise<Part> | (() => Part);
 
 class Html {
-  constructor(readonly parts: Part[]) {}
+  constructor(
+    readonly parts: Part[],
+    readonly fragment = false,
+  ) {}
 }
 
 const isPromise = (v: unknown): v is Promise<unknown> => v != null && typeof (v as Promise<unknown>).then === 'function';
@@ -78,6 +81,11 @@ const isPromise = (v: unknown): v is Promise<unknown> => v != null && typeof (v 
 /** A compiled element. */
 export function element(parts: Part[]): Html {
   return new Html(parts);
+}
+
+/** A compiled fragment: its children are transparent to `Switch`. */
+export function fragment(parts: Part[]): Html {
+  return new Html(parts, true);
 }
 
 /** A text hole: escapes values, keeps elements, maps arrays, calls accessors, waits on promises. */
@@ -96,9 +104,11 @@ function later(fn: () => unknown): () => Part {
   return () =>
     text(
       createRoot((dispose) => {
-        const out = fn();
-        dispose();
-        return out;
+        try {
+          return fn();
+        } finally {
+          dispose();
+        }
       }, owner),
     );
 }
@@ -115,25 +125,20 @@ const resolve = (c: unknown, value?: unknown): unknown => (typeof c === 'functio
 /** Evaluates every deferred part now, keeping the structure and promises. Used where errors must be caught. */
 function settle(p: unknown): unknown {
   if (typeof p === 'function') return settle((p as () => unknown)());
-  if (p instanceof Html) return new Html(p.parts.map(settle) as Part[]);
+  if (p instanceof Html) return new Html(p.parts.map(settle) as Part[], p.fragment);
   if (Array.isArray(p)) return p.map(settle);
   return p;
 }
 
-/** Wraps promises and deferred parts so that a failure inside them becomes `fail(err)`. */
-function guard(p: unknown, fail: (err: unknown) => Part): unknown {
-  if (isPromise(p)) return (p as Promise<unknown>).then((v) => guard(v, fail), (err) => fail(err));
-  if (p instanceof Html) return new Html(p.parts.map((x) => guard(x, fail)) as Part[]);
-  if (Array.isArray(p)) return p.map((x) => guard(x, fail));
-  if (typeof p === 'function') {
-    return () => {
-      try {
-        return guard((p as () => unknown)(), fail) as Part;
-      } catch (err) {
-        return fail(err);
-      }
-    };
-  }
+const hasPromise = (p: unknown): boolean =>
+  isPromise(p) || (p instanceof Html && p.parts.some(hasPromise)) || (Array.isArray(p) && p.some(hasPromise));
+
+/** Waits for every promise in a settled subtree, so that a rejection can replace the whole subtree. */
+async function resolveDeep(p: unknown): Promise<unknown> {
+  if (typeof p === 'function') return resolveDeep((p as () => unknown)());
+  if (isPromise(p)) return resolveDeep(await p);
+  if (p instanceof Html) return new Html((await Promise.all(p.parts.map(resolveDeep))) as Part[], p.fragment);
+  if (Array.isArray(p)) return Promise.all(p.map(resolveDeep));
   return p;
 }
 
@@ -182,6 +187,7 @@ export function Match<T>(props: MatchProps<T>): MatchCase {
 const collectCases = (v: unknown, out: MatchCase[]): void => {
   if (typeof v === 'function') collectCases((v as () => unknown)(), out);
   else if (Array.isArray(v)) v.forEach((x) => collectCases(x, out));
+  else if (v instanceof Html && v.fragment) v.parts.forEach((x) => collectCases(x, out));
   else if (v && (v as Partial<MatchCase>)[MATCH]) out.push(v as MatchCase);
 };
 
@@ -209,7 +215,11 @@ interface ErrorBoundaryProps {
   children: unknown;
 }
 
-/** Renders `fallback` for a failure in its children, synchronous or async, before or during streaming. */
+/**
+ * Renders `fallback` in place of the whole boundary when a child fails. A boundary whose children
+ * contain async parts waits for all of them first, so an async failure replaces the same output as
+ * a synchronous one, at the cost of streaming nothing of the boundary before its children resolve.
+ */
 export function ErrorBoundary(props: ErrorBoundaryProps): () => Part {
   return later(() => {
     const fail = (err: unknown): Part => {
@@ -217,7 +227,8 @@ export function ErrorBoundary(props: ErrorBoundaryProps): () => Part {
       return text(typeof f === 'function' ? (f as (e: unknown, reset: () => void) => unknown)(err, () => {}) : f);
     };
     try {
-      return guard(settle(resolve(props.children)), fail) as Part;
+      const tree = settle(resolve(props.children));
+      return hasPromise(tree) ? (resolveDeep(tree).catch(fail) as Part) : (tree as Part);
     } catch (err) {
       return fail(err);
     }
@@ -228,8 +239,16 @@ const pushReversed = (stack: unknown[], items: readonly unknown[]): void => {
   for (let i = items.length - 1; i >= 0; i--) stack.push(items[i]);
 };
 
-/** Calls the deferred parts among `items`, so async siblings start before any of them is awaited. */
-const expand = (items: readonly unknown[]): unknown[] => items.map((x) => (typeof x === 'function' ? (x as () => unknown)() : x));
+/**
+ * Calls every deferred part reachable from `p` without awaiting, in output order, so that async
+ * siblings start before any of them is awaited. Promises stay as they are.
+ */
+function expand(p: unknown): unknown {
+  if (typeof p === 'function') return expand((p as () => unknown)());
+  if (p instanceof Html) return new Html(p.parts.map(expand) as Part[], p.fragment);
+  if (Array.isArray(p)) return p.map(expand);
+  return p;
+}
 
 /** Concatenates a part tree. Throws if it reaches a promise: use `renderToStream` for async parts. */
 function toHtml(root: unknown): string {
@@ -250,19 +269,18 @@ function toHtml(root: unknown): string {
 /** Yields the part tree in order, flushing the buffered HTML before each wait on a promise. */
 async function* streamHtml(root: unknown): AsyncGenerator<string> {
   let buf = '';
-  const stack: unknown[] = [root];
+  const stack: unknown[] = [expand(root)];
   while (stack.length) {
     const p = stack.pop();
     if (typeof p === 'string') buf += p;
-    else if (p instanceof Html) pushReversed(stack, expand(p.parts));
-    else if (Array.isArray(p)) pushReversed(stack, expand(p));
-    else if (typeof p === 'function') stack.push((p as () => unknown)());
+    else if (p instanceof Html) pushReversed(stack, p.parts);
+    else if (Array.isArray(p)) pushReversed(stack, p);
     else if (isPromise(p)) {
       if (buf) {
         yield buf;
         buf = '';
       }
-      stack.push(await p);
+      stack.push(expand(await p));
     } else if (p != null && typeof p !== 'boolean') buf += String(p);
   }
   if (buf) yield buf;

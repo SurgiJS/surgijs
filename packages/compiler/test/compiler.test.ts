@@ -107,6 +107,11 @@ describe('compile', () => {
     expect(dom('const el = <my-label htmlFor={id()} />;')).toContain('n.htmlFor = v');
   });
 
+  it('emits fragments as their own parts, so a Switch can read its cases through them', () => {
+    expect(ssr('const el = <><b>x</b></>;')).toContain('_$fragment(');
+    expect(ssr('const el = <div><b>x</b></div>;')).not.toContain('_$fragment(');
+  });
+
   it('keeps style and script text raw, guarding only the closing tag', () => {
     expect(ssr('const el = <style>a &gt; b &amp; c</style>;')).toContain('"<style>a > b & c</style>"');
     expect(ssr('const el = <style>{css}</style>;')).toContain('_$escapeRaw([css], "style")');
