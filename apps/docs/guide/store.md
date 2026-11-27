@@ -1,6 +1,6 @@
 # @surgijs/store
 
-Framework-agnostic store (React, Angular, SurgiJS, or plain JS). One object, lazy remotes with **`deps`**, **`staleTime`**, retry, focus/reconnect refetch, **`status()`** for UI, GC with TTL. Not tied to the SurgiJS runtime.
+Framework-agnostic store (React, Vue, Svelte, Angular, SurgiJS, or plain JS). One object, lazy remotes with **`deps`**, **`staleTime`**, retry, focus/reconnect refetch, **`status()`** for UI, GC with TTL. Not tied to the SurgiJS runtime.
 
 ```bash
 npm i @surgijs/store
@@ -101,6 +101,39 @@ function Weather() {
 ```
 
 Both return accessors. The subscription, which keeps remotes loaded, ends with the owner (the component). `@surgijs/core` is an optional peer dependency.
+
+## Vue, Svelte, Angular
+
+Each adapter exposes the same two functions, `fromStore(store, selector)` and `fromStatus(store, key)`, returning that framework's native reactive value. The subscription, which keeps remotes loaded, ends with the framework's owner. Peer dependencies are optional and only needed by the adapter you import.
+
+```ts
+// Vue 3: Readonly<ShallowRef<T>>, ends with the current effect scope (component setup, effectScope())
+import { fromStore, fromStatus } from '@surgijs/store/vue';
+const city = fromStore(store, (s) => s.city);
+// template: <p>{{ city?.name }}</p>
+```
+
+```svelte
+<!-- Svelte: a store with subscribe(), so $city works; no svelte import needed by the adapter -->
+<script lang="ts">
+  import { fromStore } from '@surgijs/store/svelte';
+  const city = fromStore(store, (s) => s.city);
+</script>
+<p>{$city?.name}</p>
+```
+
+```ts
+// Angular 16+: Signal<T>, ends with the injection context's DestroyRef
+import { fromStore, fromStatus } from '@surgijs/store/angular';
+
+@Component({ template: `{{ city()?.name }}` })
+class Weather {
+  city = fromStore(store, (s) => s.city);
+  status = fromStatus(store, 'weather');
+}
+```
+
+Angular accepts `{ destroyRef }` as the third argument when there is no injection context, for example in a function that runs outside a component or service. Pass `{ equals }` to change the comparison. `equals` defaults to deep equality, as in `subscribe`.
 
 ## Complex stores (important)
 
