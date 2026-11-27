@@ -18,6 +18,7 @@ describe('custom elements manifest', () => {
   it('declares one custom element per defineComponent call', () => {
     const exported = manifest.modules.flatMap((m) => m.exports.map((e) => [e.kind, e.name, e.declaration.name]));
     expect(exported).toEqual([['custom-element-definition', 's-button', 'SButton']]);
+    expect(manifest.modules[0]!.path).toBe('dist/button.js');
     expect(button.name).toBe('SButton');
     expect(button.customElement).toBe(true);
   });

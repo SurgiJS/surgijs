@@ -3,7 +3,7 @@
   "modules": [
     {
       "kind": "javascript-module",
-      "path": "src/button/index.ts",
+      "path": "dist/button.js",
       "declarations": [
         {
           "kind": "class",
@@ -213,7 +213,7 @@
           "name": "s-button",
           "declaration": {
             "name": "SButton",
-            "module": "src/button/index.ts"
+            "module": "dist/button.js"
           }
         }
       ]

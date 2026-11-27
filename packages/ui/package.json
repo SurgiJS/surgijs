@@ -63,7 +63,7 @@
   },
   "peerDependencies": {
     "@surgijs/core": "workspace:^",
-    "react": ">=18",
+    "react": ">=19",
     "vue": ">=3.4"
   },
   "peerDependenciesMeta": {

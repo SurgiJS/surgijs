@@ -17,7 +17,7 @@ The manifest comes from the `defineComponent` calls and the props interfaces in 
 
 ## React
 
-React 19 passes each prop to a custom element as a property when the element defines it, and as an attribute otherwise, so `<s-button>` works as written. To get props checked and autocompleted in JSX, import the typing once in the project:
+The React typing requires React 19. React 19 passes each prop to a custom element as a property when the element defines it, and as an attribute otherwise, so `<s-button>` works as written. To get props checked and autocompleted in JSX, import the typing once in the project:
 
 ```ts
 import '@surgijs/ui/react';
@@ -49,7 +49,7 @@ Then import the typing once, next to the app entry:
 import '@surgijs/ui/vue';
 ```
 
-With `vue-tsc`, `<s-button>` and `<SButton>` both get the props of `ButtonProps`:
+With `vue-tsc`, `<s-button>` gets the props of `ButtonProps`. Write the tag in templates; `SButton` is the key the typing uses and is not registered as a component:
 
 ```vue
 <template>
