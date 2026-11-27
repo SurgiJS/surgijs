@@ -27,6 +27,14 @@ describe('vite plugin HMR', () => {
     expect(out?.code).toContain(accept);
   });
 
+  it('accepts aliased imports and namespace calls', () => {
+    const alias = "import { defineComponent as define } from '@surgijs/core';\ndefine('x-c', () => null);";
+    const ns = "import * as core from '@surgijs/core';\ncore.defineComponent('x-d', () => null);";
+    expect(plugin.transform(alias, '/src/c.ts')?.code).toContain(accept);
+    expect(plugin.transform(ns, '/src/d.ts')?.code).toContain(accept);
+    expect(plugin.transform("import { define } from './x';\ndefine('x-e');", '/src/e.ts')).toBeNull();
+  });
+
   it('leaves modules without a component definition alone', () => {
     expect(plugin.transform('export const n = 1;', '/src/n.ts')).toBeNull();
     expect(plugin.transform('export function defineComponent<P>(tag: string) {}', '/src/component.ts')).toBeNull();

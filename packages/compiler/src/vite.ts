@@ -36,10 +36,24 @@ const DEFAULT = /\.[jt]sx$/;
 /** Whether the module calls `defineComponent`; mentions in comments, strings or declarations do not count. */
 function definesComponent(file: string, code: string): boolean {
   if (!code.includes('defineComponent')) return false;
-  const stack: Node[] = [parseSync(file, code, { sourceType: 'module' }).program as Node];
+  const program = parseSync(file, code, { sourceType: 'module' }).program;
+  const names = new Set(['defineComponent']);
+  for (const s of program.body) {
+    if (s.type !== 'ImportDeclaration') continue;
+    for (const spec of s.specifiers) {
+      if (spec.type !== 'ImportSpecifier') continue;
+      const imported = spec.imported.type === 'Identifier' ? spec.imported.name : spec.imported.value;
+      if (imported === 'defineComponent') names.add(spec.local.name);
+    }
+  }
+  const stack: Node[] = [program as Node];
   while (stack.length) {
     const n = stack.pop()!;
-    if (n.type === 'CallExpression' && n.callee.type === 'Identifier' && n.callee.name === 'defineComponent') return true;
+    if (n.type === 'CallExpression') {
+      const c = n.callee;
+      if (c.type === 'Identifier' && names.has(c.name)) return true;
+      if (c.type === 'MemberExpression' && !c.computed && c.property.type === 'Identifier' && c.property.name === 'defineComponent') return true;
+    }
     stack.push(...children(n));
   }
   return false;
