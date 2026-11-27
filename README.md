@@ -12,7 +12,7 @@ Compiled Web Components on JSX/TSX. The compiler hoists static HTML into templat
 
 ```bash
 npm i @surgijs/core
-npm i -D @surgijs/compiler typescript@6
+npm i -D @surgijs/compiler
 ```
 
 ```ts

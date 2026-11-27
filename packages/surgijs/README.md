@@ -4,7 +4,7 @@ Runtime of [SurgiJS](https://github.com/SurgiJS/surgijs): compiled Web Component
 
 ```bash
 npm i @surgijs/core
-npm i -D @surgijs/compiler typescript@6
+npm i -D @surgijs/compiler
 ```
 
 ```tsx

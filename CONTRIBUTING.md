@@ -26,7 +26,7 @@ Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit
 ## Layout
 
 - `packages/surgijs`: runtime, zero dependencies, `sideEffects: false`.
-- `packages/compiler`: JSX compiler and the Vite / esbuild plugins; `typescript` is its only peer.
+- `packages/compiler`: JSX compiler and the Vite / esbuild plugins; `oxc-parser` is its only runtime dependency.
 - `packages/store`: framework-agnostic `@surgijs/store` (optional React entry); no dependency on the runtime.
 - `apps/playground`: examples, also used by the runtime tests and the docs.
 - `apps/docs`: VitePress site.
