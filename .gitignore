@@ -6,3 +6,4 @@ coverage
 *.log
 .DS_Store
 packages/store/bench/results.json
+.min-core

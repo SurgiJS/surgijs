@@ -22,6 +22,7 @@ pnpm install
 | `pnpm storybook` | Storybook for `@surgijs/ui` |
 | `pnpm test:e2e` | builds, then runs Playwright in Docker: behavior, axe accessibility audits and SSR in Chromium, Firefox and WebKit, plus visual regression in Chromium |
 | `pnpm test:e2e:update` | the same, rewriting the screenshot baselines |
+| `node tools/check-min-core.mjs <ui\|store>` | builds and tests the package against the lowest published `@surgijs/core` its peer range allows (CI job `min-core`) |
 | `pnpm bench [ids...] [--rows N]` | benchmark in headless Chrome (`CHROME_PATH` overrides the binary) |
 
 Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit.
