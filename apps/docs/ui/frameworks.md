@@ -59,8 +59,26 @@ With `vue-tsc`, `<s-button>` gets the props of `ButtonProps`. Write the tag in t
 
 ## Angular
 
-Angular accepts custom elements with the `CUSTOM_ELEMENTS_SCHEMA` schema in the component or module that uses them. The package does not ship Angular typings yet; the manifest is the input for them.
+Angular checks a template's bindings only against declarations, so `<s-button>` needs a directive to be typed. `@surgijs/ui/angular` exports one per component: `SButtonDirective` has an input for each prop of `ButtonProps` and forwards its value to the element. Import it in the standalone component that uses the element:
+
+```ts
+import { Component } from '@angular/core';
+import { SButtonDirective } from '@surgijs/ui/angular';
+
+@Component({
+  selector: 'app-save',
+  imports: [SButtonDirective],
+  template: `<s-button variant="ghost" [loading]="busy">Save</s-button>`,
+})
+export class SaveComponent {
+  busy = false;
+}
+```
+
+An unknown `variant` in the template is a compile error, as is a value of the wrong type for `size`, `disabled` or any other input. `CUSTOM_ELEMENTS_SCHEMA` is not needed. The directive matches the tag name only and renders nothing of its own.
+
+The directive needs Angular 19 or later. It is shipped as a partial declaration, which the Angular CLI links when the app is built; in JIT mode (tests, for example) `@angular/compiler` must be loaded.
 
 ## Regenerating
 
-The manifest and the React and Vue typings are generated from the components. After changing a component, run `pnpm --filter @surgijs/ui generate`. The test suite fails when the committed files are stale.
+The manifest and the React, Vue and Angular typings are generated from the components. After changing a component, run `pnpm --filter @surgijs/ui generate`. The test suite fails when the committed files are stale.

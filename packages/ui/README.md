@@ -15,6 +15,6 @@ import '@surgijs/ui';
 <s-button variant="primary">Save</s-button>
 ```
 
-Entry points: `@surgijs/ui` (all components), `@surgijs/ui/button`, `@surgijs/ui/server` (`renderButton` for SSR), `@surgijs/ui/themes.css` (light and dark tokens), `@surgijs/ui/react` and `@surgijs/ui/vue` (JSX and `GlobalComponents` typings), `@surgijs/ui/custom-elements.json` (Custom Elements Manifest).
+Entry points: `@surgijs/ui` (all components), `@surgijs/ui/button`, `@surgijs/ui/server` (`renderButton` for SSR), `@surgijs/ui/themes.css` (light and dark tokens), `@surgijs/ui/react` and `@surgijs/ui/vue` (JSX and `GlobalComponents` typings), `@surgijs/ui/angular` (directives with typed inputs), `@surgijs/ui/custom-elements.json` (Custom Elements Manifest).
 
 Documentation: https://surgijs.github.io/surgijs/ui/ · Storybook: https://surgijs.github.io/surgijs/storybook/
