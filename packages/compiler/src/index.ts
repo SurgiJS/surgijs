@@ -708,7 +708,7 @@ class Compiler {
 
   fragment(children: readonly JSXChild[]): string {
     const items = this.children(children);
-    if (this.ssr) return this.ssrNode(this.ssrItems(items));
+    if (this.ssr) return this.ssrNode(this.ssrItems(items, false));
     const values = items.map((it) => {
       if (it.k === 'text') return JSON.stringify(it.text);
       if (it.k === 'el') return this.jsx(it.node!);
@@ -739,7 +739,8 @@ class Compiler {
     return `${this.h('element')}([${out.join(', ')}])`;
   }
 
-  ssrItems(items: Item[]): SsrPart[] {
+  /** Parts for a list of children. `markers` writes a placeholder after each dynamic child except the last. */
+  ssrItems(items: Item[], markers = true): SsrPart[] {
     const parts: SsrPart[] = [];
     const only = items.length === 1;
     items.forEach((it, i) => {
@@ -758,7 +759,7 @@ class Compiler {
         const code = `${this.h('text')}(${this.expr(x)})`;
         parts.push({ code: only && isDynamic(x) && this.isTextual(x) ? `(${code} || " ")` : code });
       }
-      if (i < items.length - 1) parts.push('<!---->');
+      if (markers && i < items.length - 1) parts.push('<!---->');
     });
     return parts;
   }
