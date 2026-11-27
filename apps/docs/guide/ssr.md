@@ -14,6 +14,8 @@ const html = renderToString('my-counter', Counter, { title: 'Clicks', step: 2 })
 
 The SSR output concatenates strings with `escape` and `attrPart` and never touches a DOM. `shadowHTML(tag, inner, attrs, options)` builds the declarative shadow DOM wrapper for custom markup. Both take `options.children`, light DOM markup placed after the template and projected into slots (it is not escaped), and `options.delegatesFocus`, which renders `shadowrootdelegatesfocus` to match `attachShadow({ delegatesFocus: true })`.
 
+Pass the same CSS as `options.styles` (string or array) and the server renders it as `<style data-s>` inside the shadow root, so the component is styled before JavaScript runs. On upgrade the component removes those elements and adopts its shared stylesheet instead. CSS is written as is: only sequences that would end the element are neutralised, after all pieces are joined (`</style`, and in scripts also `</script` and `<script`, written as `<\/…` and `\u003c…`; `i<scripts.length` is left alone). Inside `<svg>` these elements are not raw text, so they get ordinary escaping. The same holds for `<style>` and `<script>` written in JSX, where entities in the text are not decoded by the browser, so `a > b` is never turned into `a &gt; b`.
+
 ## Hydration
 
 ```ts
