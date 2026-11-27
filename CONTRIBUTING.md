@@ -46,6 +46,10 @@ Both packages version together as a fixed group. Below 1.0, breaking changes bum
 
 Budgets live in `packages/surgijs/scripts/bundle.mjs`. Raise a limit only when the behavior is correct and the extra bytes are necessary, and set the new limit tight to the measured size.
 
+## Code review
+
+[CodeRabbit](https://coderabbit.ai) reviews every non-draft pull request to `main`; its settings live in `.coderabbit.yaml`. Mention `@coderabbitai` in a PR comment to ask it a question. `@coderabbitai review` reviews the commits pushed since its last review; `@coderabbitai full review` reviews the whole PR again. PRs with "Version Packages" (release PRs) or "WIP" in the title are skipped.
+
 ## Writing style
 
 README, docs, comments and commit messages state what the code does, in affirmative sentences. Keep commits small, one feature each.

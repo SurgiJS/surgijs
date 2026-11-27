@@ -1,0 +1,108 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit AI review configuration: https://docs.coderabbit.ai/reference/configuration
+language: en-US
+tone_instructions: >-
+  Be concise and technical. Point out correctness, reactivity and bundle-size
+  issues first; skip praise and restating the diff.
+early_access: false
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  review_status: true
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: false
+  poem: false
+  suggested_labels: false
+  suggested_reviewers: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+    ignore_title_keywords:
+      - Version Packages
+      - WIP
+
+  path_filters:
+    - "!**/dist/**"
+    - "!**/coverage/**"
+    - "!pnpm-lock.yaml"
+    - "!**/CHANGELOG.md"
+    - "!bench/results*.json"
+    - "!apps/docs/.vitepress/cache/**"
+
+  path_instructions:
+    - path: "packages/surgijs/src/**"
+      instructions: |
+        Runtime package: zero dependencies, `sideEffects: false`, strict gzip budgets
+        (packages/surgijs/scripts/bundle.mjs).
+        - Flag any new import from outside the package and any top-level side effect.
+        - Flag code that grows the bundle without need; prefer small, tree-shakable exports.
+        - Check signal / memo / effect ownership and cleanup: leaks, missing disposal,
+          reads outside tracking scope, writes during render, broken microtask batching.
+        - Check custom element lifecycle (connected/disconnected, attribute reflection,
+          form association) and hydration adopting server nodes correctly.
+    - path: "packages/compiler/src/**"
+      instructions: |
+        JSX compiler and Vite / esbuild plugins; `typescript` is the only peer dependency.
+        - Every dynamic expression must compile to a direct binding; static HTML is hoisted
+          into templates. Flag escaping / XSS issues in emitted HTML and attributes.
+        - Check source map correctness and that generated code stays valid for SSR and
+          client builds.
+    - path: "packages/*/test/**"
+      instructions: |
+        Vitest (node for the compiler, happy-dom for the runtime). Check that tests assert
+        behavior, cover edge cases and do not depend on timing beyond microtask flushes.
+    - path: "apps/docs/**"
+      instructions: |
+        VitePress docs. Text states what the code does in affirmative sentences. Check that
+        code samples match the current public API.
+    - path: ".changeset/*.md"
+      instructions: |
+        `@surgijs/core` and `@surgijs/compiler` version as a fixed group; `@surgijs/store`
+        versions on its own. Below 1.0 breaking
+        changes bump the minor version; check the bump matches the change.
+    - path: ".github/workflows/**"
+      instructions: |
+        Check pinned actions, least-privilege `permissions`, and that CI still runs
+        typecheck, test, size and build.
+    - path: ".github/workflows/release.yml"
+      instructions: |
+        npm publishing uses trusted publishing (OIDC): it needs `id-token: write` and
+        npm >= 11.5.1. Flag any `NPM_TOKEN`, `NODE_AUTH_TOKEN` or setup-node
+        `registry-url`, since they make npm skip the OIDC exchange.
+
+  tools:
+    actionlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    markdownlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    biome:
+      enabled: false
+    eslint:
+      enabled: false
+    languagetool:
+      enabled: false
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: local
+  issues:
+    scope: local
+  pull_requests:
+    scope: local
