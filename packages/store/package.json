@@ -1,7 +1,7 @@
 {
   "name": "@surgijs/store",
   "version": "3.0.0",
-  "description": "Framework-agnostic store: one object, lazy remote data, deep equality subscriptions, unload when unused.",
+  "description": "Framework-agnostic store: one object, lazy remote data, deep equality subscriptions, unload when unused. Adapters for React, Vue, Svelte, Angular and SurgiJS.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -14,7 +14,10 @@
     "cache",
     "fetch",
     "reactive",
-    "surgijs"
+    "surgijs",
+    "vue",
+    "svelte",
+    "angular"
   ],
   "repository": {
     "type": "git",
@@ -42,6 +45,21 @@
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
     },
+    "./vue": {
+      "@surgijs/source": "./src/vue.ts",
+      "types": "./dist/vue.d.ts",
+      "import": "./dist/vue.js"
+    },
+    "./svelte": {
+      "@surgijs/source": "./src/svelte.ts",
+      "types": "./dist/svelte.d.ts",
+      "import": "./dist/svelte.js"
+    },
+    "./angular": {
+      "@surgijs/source": "./src/angular.ts",
+      "types": "./dist/angular.d.ts",
+      "import": "./dist/angular.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",
@@ -53,18 +71,27 @@
     "bench": "node bench/run.mjs"
   },
   "peerDependencies": {
+    "@angular/core": ">=16.0.0",
+    "@surgijs/core": ">=0.5.0",
     "react": ">=18",
-    "@surgijs/core": ">=0.5.0"
+    "vue": ">=3.2.0"
   },
   "peerDependenciesMeta": {
-    "react": {
+    "@angular/core": {
       "optional": true
     },
     "@surgijs/core": {
       "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@angular/core": "^22.3.0",
     "@surgijs/core": "workspace:*",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.3.0",
@@ -73,7 +100,9 @@
     "react": "^19.2.0",
     "react-dom": "^19.3.1",
     "redux": "^5.0.1",
+    "rxjs": "^7.8.2",
     "valtio": "^2.1.8",
+    "vue": "^3.5.45",
     "zustand": "^5.0.8"
   }
 }

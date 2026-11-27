@@ -5,6 +5,9 @@ export default defineConfig({
     index: 'src/index.ts',
     react: 'src/react.ts',
     core: 'src/core.ts',
+    vue: 'src/vue.ts',
+    svelte: 'src/svelte.ts',
+    angular: 'src/angular.ts',
   },
   // http helpers ship in the main entry
   format: ['esm'],
@@ -15,5 +18,5 @@ export default defineConfig({
   dts: { compilerOptions: { ignoreDeprecations: '6.0' } },
   sourcemap: true,
   clean: true,
-  external: ['react', '@surgijs/core'],
+  external: ['react', 'vue', '@angular/core', '@surgijs/core'],
 });
