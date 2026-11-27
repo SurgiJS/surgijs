@@ -147,7 +147,7 @@ export function defineComponent<P extends object = {}, X extends EventDecls = {}
   schema: NoInfer<Schema<P>> = {},
   options: ComponentOptions<X> = {},
 ): ComponentClass<P, X> {
-  if (typeof customElements === 'undefined') return class {} as unknown as ComponentClass<P, X>;
+  if (typeof customElements === 'undefined') return class { static $surgi = { tag, render, schema, options }; } as unknown as ComponentClass<P, X>;
   const existing = customElements.get(tag);
   if (existing) {
     updates.get(existing)?.(render);

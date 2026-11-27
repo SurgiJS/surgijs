@@ -1,0 +1,29 @@
+---
+import { MyCounter } from '../components/counter.tsx';
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SurgiJS on Astro</title>
+  </head>
+  <body>
+    <h1>SurgiJS on Astro</h1>
+
+    <h2>client:load</h2>
+    <MyCounter client:load title="Loaded" step={2}>
+      <em>Slotted text</em>
+      <small slot="footer">Footer slot</small>
+    </MyCounter>
+
+    <h2>client:visible</h2>
+    <div style="height: 120vh"></div>
+    <MyCounter client:visible title="Visible" step="5" />
+
+    <h2>No directive</h2>
+    <MyCounter title="Static" />
+
+    <h2>client:only</h2>
+    <MyCounter client:only="@surgijs/astro" title="Client only" />
+  </body>
+</html>

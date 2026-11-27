@@ -26,6 +26,10 @@ jobs:
       - run: pnpm test
       - run: pnpm size
       - run: pnpm build
+      - name: Astro example renders declarative shadow DOM
+        run: |
+          pnpm --filter @surgijs/astro-example build
+          grep -q 'shadowrootmode="open"' apps/astro/dist/index.html
 
   e2e:
     # The image pins browsers and fonts, so screenshots match the baselines made with

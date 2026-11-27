@@ -12,7 +12,7 @@ const { code, changed, map } = compile(source, { filename: 'app.tsx' });
 | --- | --- | --- |
 | `filename` | `'input.tsx'` | used for parsing mode and the source map |
 | `moduleName` | `'@surgijs/core'` | runtime module of the generated imports; SSR imports `<moduleName>/server` |
-| `generate` | `'dom'` | `'ssr'` emits element trees for `<moduleName>/server`: nested components are calls, holes escape text |
+| `generate` | `'dom'` | `'ssr'` emits element trees for `<moduleName>/server`: nested components are calls, holes escape text. The Vite plugin also takes `'auto'`: modules in Vite's SSR graph compile for the server, the rest for the DOM |
 | `sourceMap` | `true` | returns a V3 source map as JSON in `map` |
 
 A file without JSX comes back unchanged with `changed: false`.
