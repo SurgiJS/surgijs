@@ -1,10 +1,18 @@
 import { createEffect, createMemo, createRenderEffect, createSignal, onCleanup, untrack, type Accessor, type Signal } from './reactivity';
 
+let devHook: ((kind: string, read: () => unknown) => void) | null = null;
+
+export function setDevHook(fn: typeof devHook): void {
+  devHook = fn;
+}
+
 /** `[get, set]` pair. The compiler reads `get` as a value inside JSX and component bodies. */
 export function useState<T>(): Signal<T | undefined>;
 export function useState<T>(value: T): Signal<T>;
 export function useState<T>(value?: T): Signal<T | undefined> {
-  return createSignal(value);
+  const signal = createSignal(value);
+  if (devHook) devHook('useState', signal[0]);
+  return signal;
 }
 
 /**
@@ -25,16 +33,24 @@ export interface Ref<T> {
 }
 
 export function useRef<T = Element>(): Ref<T> {
-  return { current: null };
+  const ref: Ref<T> = { current: null };
+  if (devHook) devHook('useRef', () => ref);
+  return ref;
 }
 
-export { createMemo as useMemo };
+export function useMemo<T>(fn: (prev: T | undefined) => T, init?: T): Accessor<T> {
+  const get = createMemo(fn, init);
+  if (devHook) devHook('useMemo', get);
+  return get;
+}
 
 let ids = 0;
 
 /** Unique id within the document, stable for the component instance. */
 export function useId(prefix = 's'): string {
-  return `${prefix}-${(++ids).toString(36)}`;
+  const id = `${prefix}-${(++ids).toString(36)}`;
+  if (devHook) devHook('useId', () => id);
+  return id;
 }
 
 export interface Resource<T> {

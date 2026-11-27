@@ -7,6 +7,7 @@ export default defineConfig({
     'jsx-dev-runtime': 'src/jsx-dev-runtime.ts',
     hydrate: 'src/hydrate.ts',
     server: 'src/server.ts',
+    devtools: 'src/devtools.ts',
   },
   format: ['esm'],
   target: 'es2022',

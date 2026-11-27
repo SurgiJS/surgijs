@@ -1,3 +1,4 @@
+import { devRender, devUnmount } from './dev';
 import { delegateRoot, insert, undelegateRoot } from './dom';
 import { createRoot, createSignal, deferMount, getOwner, type Accessor, type OwnerNode, type Setter } from './reactivity';
 import type { JSX } from './jsx-runtime';
@@ -112,14 +113,15 @@ export function defineComponent<P extends object = {}>(
     hosts.add(el);
     createRoot((dispose) => {
       self.__d = dispose;
-      deferMount(() => insert(root, current(self.__p as ReactiveProps<P>, el)));
+      deferMount(() => insert(root, devRender ? devRender(el, current, self.__p) : current(self.__p as ReactiveProps<P>, el)));
     }, owner);
   };
 
   const unmount = (self: Host): void => {
     const root = self.__r!;
     if (closed) undelegateRoot(root);
-    self.__d!();
+    self.__d?.();
+    devUnmount?.(self);
     self.__d = undefined;
     self.__o = null;
     hosts.delete(self);
@@ -229,7 +231,10 @@ export function defineComponent<P extends object = {}>(
     for (const el of [...hosts]) {
       const self = el as unknown as Host;
       if (!self.__d) continue;
-      if (el.isConnected) self.__d();
+      if (el.isConnected) {
+        self.__d();
+        devUnmount?.(el);
+      }
       if (!el.isConnected) {
         unmount(self);
         continue;

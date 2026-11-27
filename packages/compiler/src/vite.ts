@@ -5,6 +5,11 @@ import { compile } from './index.ts';
 export interface SurgiVitePluginOptions {
   /** Runtime module imported by compiled code. Default `@surgijs/core`. */
   moduleName?: string;
+  /**
+   * Load `<moduleName>/devtools` while Vite is serving. Default: on for `@surgijs/core`, off for a
+   * custom `moduleName` (turn it on when that runtime exports `./devtools`).
+   */
+  devtools?: boolean;
   /** Files to compile. Default: `.jsx`/`.tsx` outside `node_modules`. */
   include?: RegExp | ((id: string) => boolean);
   /** Output mode. Imports with a `?ssr` query always compile for the server. */
@@ -24,7 +29,12 @@ export interface SurgiVitePlugin {
   name: string;
   enforce: 'pre';
   config(this: SurgiViteConfigContext | void): { esbuild: { jsx: 'preserve' } };
+  configResolved(config: { command: string }): void;
   transform(code: string, id: string): { code: string; map: SourceMapV3 | null } | null;
+  transformIndexHtml: {
+    order: 'pre';
+    handler(): { tag: string; attrs: { type: string }; children: string; injectTo: 'head-prepend' }[] | undefined;
+  };
 }
 
 interface SurgiViteConfigContext {
@@ -62,6 +72,9 @@ function definesComponent(file: string, code: string): boolean {
 /** Vite / Rollup plugin: compiles SurgiJS JSX before other transforms. */
 export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePlugin {
   const include = options.include;
+  const runtime = options.moduleName ?? '@surgijs/core';
+  const devtools = options.devtools ?? !options.moduleName;
+  let serve = false;
   const matches = (id: string): boolean => {
     const file = id.split('?')[0]!;
     if (typeof include === 'function') return include(file);
@@ -76,6 +89,24 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
       // have no `oxc` key, so the Vite 8 branch is cast to the declared shape.
       const rolldown = (this?.meta as { rolldownVersion?: string } | undefined)?.rolldownVersion;
       return rolldown ? ({ oxc: { jsx: 'preserve' } } as unknown as { esbuild: { jsx: 'preserve' } }) : { esbuild: { jsx: 'preserve' } };
+    },
+    configResolved(config) {
+      serve = config.command === 'serve';
+    },
+    // Pre-order: Vite only resolves inline module imports for tags injected before its own HTML pass.
+    transformIndexHtml: {
+      order: 'pre',
+      handler() {
+        if (!serve || !devtools) return;
+        return [
+          {
+            tag: 'script',
+            attrs: { type: 'module' },
+            children: `import { installDevtools } from ${JSON.stringify(`${runtime}/devtools`)};\ninstallDevtools();`,
+            injectTo: 'head-prepend',
+          },
+        ];
+      },
     },
     transform(code, id) {
       const [file, query = ''] = id.split('?') as [string, string?];
