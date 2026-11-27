@@ -13,5 +13,5 @@ export default defineConfig({
   dts: { compilerOptions: { ignoreDeprecations: '6.0' } },
   sourcemap: true,
   clean: true,
-  external: ['typescript'],
+  external: ['oxc-parser'],
 });

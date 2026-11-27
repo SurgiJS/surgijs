@@ -37,6 +37,71 @@ store.set('windowQueryParams', { q: 'ada' }); // does
 await store.prefetch('results'); // warm cache without a subscriber
 ```
 
+### Defaults
+
+`createStore(def, { retry, retryDelay, staleTime, gcTime, refetchOnFocus, refetchOnReconnect })` sets the defaults for every remote. An option on `remote()` wins; an omitted one falls back to the store option, then to the built-in default (`retry: 2`, `staleTime: 0`, `gcTime: 5 min`, refetch on focus and reconnect).
+
+### Data belongs to deps
+
+When `deps` change, `data` resets to `placeholderData` (or `undefined`) and `status` is `pending` until the new fetch settles, so the field never shows data fetched for other deps. `status(key).dataDeps` is the deps the current data was fetched for.
+
+To keep the old data on screen while the new request runs, set `keepPreviousData: true` on the remote. `status(key).isPreviousData` is then `true` until the new data arrives.
+
+### Debounce
+
+`debounce: 300` waits 300 ms after the last `deps` change before calling `fetch`. The first load is not delayed.
+
+```ts
+results: remote({
+  deps: (get) => get.query,
+  debounce: 300,
+  fetch: (get, { signal }) => search(get.query, signal),
+}),
+```
+
+### Typed reads
+
+`remote()` cannot know the shape of the store it ends up in, so `get` reads sync fields as `unknown`. `createRemote<State>()` returns a `remote` that knows them, and `ctx.deps` gets the type `deps` returns (a tuple for an array literal):
+
+```ts
+type State = { cityId: number };
+const remote = createRemote<State>();
+
+const store = createStore({
+  cityId: 1,
+  weather: remote({
+    deps: (get) => [get.cityId], // get.cityId: number
+    fetch: async (get, { deps: [cityId], signal }) => loadWeather(cityId, signal),
+  }),
+});
+```
+
+## Persist and URL
+
+```ts
+import { persist, syncLocation } from '@surgijs/store';
+
+persist(store, { name: 'app', keys: ['cityId', 'theme'] }); // restores now, saves on change; localStorage by default
+
+syncLocation(store, { path: 'path', query: 'query' }); // URL <-> sync fields; back/forward update the store
+```
+
+`syncLocation` binds `location.pathname` to a string field and `location.search` to a `Record<string, string>` field; `history: 'replace'` rewrites the current entry instead of pushing. Route matching stays with your code: read `path` in `deps` or a selector. Both functions return an unsubscribe function.
+
+## SurgiJS signals
+
+```tsx
+import { fromStatus, fromStore } from '@surgijs/store/core';
+
+function Weather() {
+  const weather = fromStore(store, (s) => s.weather);
+  const status = fromStatus(store, 'weather');
+  return <p>{status().isPending ? 'Loading' : weather()?.summary}</p>;
+}
+```
+
+Both return accessors. The subscription, which keeps remotes loaded, ends with the owner (the component). `@surgijs/core` is an optional peer dependency.
+
 ## Complex stores (important)
 
 **`remote()` is top-level only.** Nested remotes and dotted status paths are **not** supported:
@@ -127,7 +192,9 @@ st.age; // ms since last successful data
 st.source; // 'network' | 'cache' | 'optimistic'
 st.staleTime;
 st.gcTime;
-st.deps;
+st.deps; // deps of the latest load
+st.dataDeps; // deps the current data was fetched for
+st.isPreviousData; // keepPreviousData: data still belongs to older deps
 ```
 
 Watch status in React:

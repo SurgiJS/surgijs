@@ -29,7 +29,7 @@ Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit
 ## Layout
 
 - `packages/surgijs`: runtime, zero dependencies, `sideEffects: false`.
-- `packages/compiler`: JSX compiler and the Vite / esbuild plugins; `typescript` is its only peer.
+- `packages/compiler`: JSX compiler and the Vite / esbuild plugins; `oxc-parser` is its only runtime dependency.
 - `packages/store`: framework-agnostic `@surgijs/store` (optional React entry); no dependency on the runtime.
 - `packages/ui`: `@surgijs/ui` web components; `@surgijs/core` is its peer.
 - `apps/storybook`: stories for `@surgijs/ui` and the Playwright suite in `e2e/`.

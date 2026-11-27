@@ -13,10 +13,11 @@ export type RemoteKey = string | number | boolean | null | undefined | bigint | 
  * Callable as `get('field')`, `get(s => s.field)`, `get()`, and also as
  * a state object: `get.windowLocation`.
  */
-export type RemoteGet = ((
-  keyOrSelector?: string | ((state: Record<string, unknown>) => unknown),
-) => unknown) &
-  Record<string, unknown>;
+export type RemoteGet<S extends object = Record<string, unknown>> = {
+  (): S;
+  <K extends keyof S>(key: K): S[K];
+  <T>(selector: (state: S) => T): T;
+} & Readonly<S>;
 
 export interface RemoteReport {
   /** HTTP status (200, 404, …). */
@@ -25,21 +26,24 @@ export interface RemoteReport {
   code?: string | number;
 }
 
-export interface RemoteContext {
+export interface RemoteContext<S extends object = Record<string, unknown>, K = RemoteKey> {
   signal: AbortSignal;
   /** Current `deps(get)` value for this load. */
-  deps: RemoteKey;
+  deps: K;
   /** Same reader as the first `fetch` argument. */
-  get: RemoteGet;
+  get: RemoteGet<S>;
   /** Attach HTTP / app codes to `store.status(...)` while the request runs. */
   report: (info: RemoteReport) => void;
 }
 
 type DepsFn = (get: RemoteGet) => RemoteKey;
 
+/** `K` is inferred as a tuple when `deps` returns an array literal. */
+type DepsKey = {} | null | undefined | readonly [];
+
 export type RetryDelay = number | ((attempt: number, error: unknown) => number);
 
-export interface RemoteOptions<T> {
+export interface RemoteOptions<T, S extends object = Record<string, unknown>, K = RemoteKey> {
   /**
    * When this value changes (deep equality) while the field is watched, `fetch`
    * runs again. Unrelated store writes do **not** call `fetch`.
@@ -48,12 +52,12 @@ export interface RemoteOptions<T> {
    * deps: (get) => [get.windowLocation, get.windowQueryParams]
    * ```
    */
-  deps: DepsFn;
+  deps: (get: RemoteGet<S>) => K;
   /**
    * Loads data. Called on first watch and when `deps` change / stale — not on every
    * store write. Read the store with `get` inside.
    */
-  fetch: (get: RemoteGet, ctx: RemoteContext) => T | PromiseLike<T>;
+  fetch: (get: RemoteGet<S>, ctx: RemoteContext<S, K>) => T | PromiseLike<T>;
   /**
    * Keep unused remote data in memory this long after the last subscriber leaves.
    * `0` unloads immediately; `Infinity` keeps forever.
@@ -78,6 +82,18 @@ export interface RemoteOptions<T> {
   refetchOnReconnect?: boolean;
   /** Seed data before the first successful fetch (shown while pending). */
   placeholderData?: T | (() => T);
+  /**
+   * Wait this many ms after `deps` change before calling `fetch`, so typing in a
+   * search box makes one request. The first load is never delayed.
+   */
+  debounce?: number;
+  /**
+   * What `data` shows while new `deps` load. Default `false`: data resets to
+   * `placeholderData` (or `undefined`) and `status` is `pending`, so a field never
+   * shows data that belongs to other deps. `true` keeps the previous data and sets
+   * `status(...).isPreviousData`.
+   */
+  keepPreviousData?: boolean;
 }
 
 export interface RemoteDef<T> {
@@ -86,32 +102,58 @@ export interface RemoteDef<T> {
   readonly fetch: RemoteOptions<T>['fetch'];
   readonly gcTime?: number;
   readonly staleTime?: number;
-  readonly retry: number;
-  readonly retryDelay: RetryDelay;
-  readonly refetchOnFocus: boolean;
-  readonly refetchOnReconnect: boolean;
+  /** `undefined` until `createStore` fills it from its options. */
+  readonly retry?: number;
+  readonly retryDelay?: RetryDelay;
+  readonly refetchOnFocus?: boolean;
+  readonly refetchOnReconnect?: boolean;
   readonly placeholderData?: T | (() => T);
+  readonly debounce?: number;
+  readonly keepPreviousData?: boolean;
 }
 
 export function defaultRetryDelay(attempt: number): number {
   return Math.min(1000 * 2 ** attempt, 30_000);
 }
 
-export function remote<T>(options: RemoteOptions<T>): RemoteDef<T> {
+export function remote<T, K extends DepsKey = RemoteKey>(options: RemoteOptions<T, Record<string, unknown>, K>): RemoteDef<T> {
   if (!options.deps) throw new Error('@surgijs/store: remote() needs deps');
-  const retry = options.retry === false ? 0 : (options.retry ?? 2);
   return {
     [REMOTE]: true,
-    deps: options.deps,
-    fetch: options.fetch,
+    deps: options.deps as RemoteDef<T>['deps'],
+    fetch: options.fetch as RemoteDef<T>['fetch'],
     gcTime: options.gcTime,
     staleTime: options.staleTime,
-    retry,
-    retryDelay: options.retryDelay ?? defaultRetryDelay,
-    refetchOnFocus: options.refetchOnFocus ?? true,
-    refetchOnReconnect: options.refetchOnReconnect ?? true,
+    retry: options.retry === undefined ? undefined : options.retry === false ? 0 : options.retry,
+    retryDelay: options.retryDelay,
+    refetchOnFocus: options.refetchOnFocus,
+    refetchOnReconnect: options.refetchOnReconnect,
     placeholderData: options.placeholderData,
+    debounce: options.debounce,
+    keepPreviousData: options.keepPreviousData,
   };
+}
+
+/**
+ * `remote` with typed reads of the sync state: `get.cityId` and `get('cityId')` get
+ * their real types, and `ctx.deps` has the type `deps` returns.
+ *
+ * ```ts
+ * type State = { cityId: number };
+ * const remote = createRemote<State>();
+ * const store = createStore({
+ *   cityId: 1,
+ *   weather: remote({
+ *     deps: (get) => [get.cityId] as const,
+ *     fetch: async (get, { deps: [cityId] }) => loadWeather(cityId),
+ *   }),
+ * });
+ * ```
+ */
+export function createRemote<S extends object>(): <T, K extends DepsKey = RemoteKey>(
+  options: RemoteOptions<T, S, K>,
+) => RemoteDef<T> {
+  return remote as never;
 }
 
 export function isRemote(value: unknown): value is RemoteDef<unknown> {
@@ -237,6 +279,10 @@ export interface RemoteMeta<T> {
 
   /** Last `deps(get)` identity. */
   deps: RemoteKey | undefined;
+  /** The `deps` the current `data` was fetched for; compare with `deps` to detect stale data. */
+  dataDeps: RemoteKey | undefined;
+  /** `keepPreviousData` is on and `data` still belongs to older `deps` than `deps`. */
+  isPreviousData: boolean;
   /** `network` | `cache` | `optimistic`. */
   source: RemoteSource;
 

@@ -3,11 +3,11 @@
 ## Install
 
 ```bash
-npm i surgijs
-npm i -D @surgijs/compiler typescript
+npm i @surgijs/core
+npm i -D @surgijs/compiler
 ```
 
-`@surgijs/core` is the runtime. `@surgijs/compiler` turns JSX into DOM code at build time and needs `typescript` (5.x or 6.x) as a peer.
+`@surgijs/core` is the runtime. `@surgijs/compiler` turns JSX into DOM code at build time. It parses source with [oxc-parser](https://oxc.rs), so it has no TypeScript peer dependency and works with TypeScript 5, 6 and 7.
 
 ## Build plugin
 

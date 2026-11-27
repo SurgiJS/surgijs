@@ -1,4 +1,4 @@
-# surgijs
+# @surgijs/core
 
 ## Reactivity
 

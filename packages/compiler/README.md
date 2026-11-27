@@ -1,9 +1,9 @@
 # @surgijs/compiler
 
-JSX compiler for [SurgiJS](https://github.com/SurgiJS/surgijs). It hoists static markup into templates, turns dynamic expressions into direct bindings and emits source maps. `typescript` (5.x or 6.x) is its only peer dependency.
+JSX compiler for [SurgiJS](https://github.com/SurgiJS/surgijs). It hoists static markup into templates, turns dynamic expressions into direct bindings and emits source maps. It parses with [oxc-parser](https://oxc.rs), so it works with any TypeScript version, including TypeScript 7.
 
 ```bash
-npm i -D @surgijs/compiler typescript
+npm i -D @surgijs/compiler
 ```
 
 ```ts
