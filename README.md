@@ -1,6 +1,6 @@
 # SurgiJS
 
-Compiled Web Components on JSX/TSX. The compiler hoists static HTML into templates and turns every dynamic expression into a direct binding, so a state change performs one DOM write per affected binding. The runtime has zero dependencies: about 5.6 KB gzip for everything, about 3.5 KB for a compiled counter app.
+Compiled Web Components on JSX/TSX. The compiler hoists static HTML into templates and turns every dynamic expression into a direct binding, so a state change performs one DOM write per affected binding. The runtime has zero dependencies: about 5.9 KB gzip for everything, about 3.6 KB for a compiled counter app.
 
 - Signals with microtask batching, memos, effects, ownership and context.
 - `defineComponent` creates standard custom elements: typed attributes, property reflection, shadow or light DOM, form association.
@@ -24,13 +24,13 @@ export default { plugins: [surgi()] };
 
 ```json
 // tsconfig.json
-{ "compilerOptions": { "jsx": "react-jsx", "jsxImportSource": "surgijs" } }
+{ "compilerOptions": { "jsx": "react-jsx", "jsxImportSource": "@surgijs/core" } }
 ```
 
 ## Counter
 
 ```tsx
-import { defineComponent, useEffect, useState, type ReactiveProps } from 'surgijs';
+import { defineComponent, useEffect, useState, type ReactiveProps } from '@surgijs/core';
 
 export interface CounterProps {
   step?: number;
@@ -84,8 +84,9 @@ Run it locally with `pnpm bench` (`pnpm bench surgijs solid --rows 10000` for a 
 
 | Package | Contents |
 | --- | --- |
-| [`surgijs`](packages/surgijs) | runtime: `surgijs`, `surgijs/server`, `surgijs/hydrate`, `surgijs/jsx-runtime` |
+| [`@surgijs/core`](packages/surgijs) | runtime: `@surgijs/core`, `@surgijs/core/server`, `@surgijs/core/hydrate`, `@surgijs/core/jsx-runtime` |
 | [`@surgijs/compiler`](packages/compiler) | `compile()`, `@surgijs/compiler/vite`, `@surgijs/compiler/esbuild` |
+| [`@surgijs/store`](packages/store) | framework-agnostic store: one object, lazy remotes, deep-equal watches |
 
 ## Links
 

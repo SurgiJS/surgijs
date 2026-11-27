@@ -150,15 +150,15 @@ export function defineComponent<P extends object = {}>(
     }
 
     disconnectedCallback(): void {
-      const self = this as unknown as Host;
-      const root = self.__r;
-      if (!root) return;
-      if (closed) undelegateRoot(root);
-      if (self.__d) {
+      queueMicrotask(() => {
+        const self = this as unknown as Host;
+        const root = self.__r;
+        if (!root || !self.__d || this.isConnected) return;
+        if (closed) undelegateRoot(root);
         self.__d();
         self.__d = undefined;
-      }
-      root.replaceChildren();
+        root.replaceChildren();
+      });
     }
 
     setFormValue(value: File | string | FormData | null): void {

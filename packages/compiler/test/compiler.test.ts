@@ -1,3 +1,4 @@
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { compile } from '../src/index.ts';
 
@@ -14,7 +15,7 @@ describe('compile', () => {
     const out = dom('const el = <div class="a"><span>hi</span></div>;');
     expect(out).toContain('const _tmpl$1 = /*#__PURE__*/ _$template("<div class=\\"a\\"><span>hi</span></div>");');
     expect(out).toContain('const el = _tmpl$1();');
-    expect(out).toContain('import { template as _$template } from "surgijs";');
+    expect(out).toContain('import { template as _$template } from "@surgijs/core";');
   });
 
   it('honours moduleName', () => {
@@ -41,6 +42,27 @@ describe('compile', () => {
     const out = dom('const [label] = useState(""); const el = <span>{label}</span>;');
     expect(out).toContain('_$template("<span> </span>")');
     expect(out).toContain('_el$3 = _el$2.firstChild; _$bind(_el$3, label, _$setText);');
+  });
+
+  it('keeps parentheses around comma expressions and object literals', () => {
+    const syntaxErrors = (code: string) =>
+      ts.transpileModule(code, { reportDiagnostics: true, compilerOptions: { jsx: ts.JsxEmit.Preserve } }).diagnostics!.length;
+    const cases = [
+      'const el = <span>{(log(), n())}</span>;',
+      'const el = <p>a{(log(), n())}b</p>;',
+      'const el = <p title={(log(), n())} />;',
+      'const el = <input value={(log(), n())} />;',
+      'const el = <i style={{ color: (log(), n()) }} />;',
+      'const el = <p>{({ v: n() })}</p>;',
+      'const el = <Comp>a{(log(), n())}</Comp>;',
+    ];
+    for (const code of cases) {
+      const out = dom(code);
+      expect(syntaxErrors(out), out).toBe(0);
+      expect(out).not.toMatch(/=> log\(\), n\(\)|=> \{ v: n\(\) \}/);
+    }
+    expect(dom('const el = <span>{(log(), n())}</span>;')).toContain('_$insert(_el$2, () => (log(), n()));');
+    expect(ssr('const el = <p title={(log(), n())}>{(log(), n())}</p>;')).toContain('_$escape((log(), n()))');
   });
 
   it('inserts a marker for middle children', () => {
@@ -178,7 +200,7 @@ describe('compile', () => {
       const [count] = useState(0);
       const el = <div class={cls()} onClick={h}><p>Value: {count}</p><Show when={count() > 1}><b /></Show>{a()}<span /></div>;
     `);
-    expect(out).toContain('import { attrPart as _$attrPart, escape as _$escape } from "surgijs/server";');
+    expect(out).toContain('import { attrPart as _$attrPart, escape as _$escape } from "@surgijs/core/server";');
     expect(out).toContain('"<div" + _$attrPart("class", cls()) + "><p>Value: " + _$escape(count()) + "</p><!----><!----><span></span></div>"');
     expect(out).not.toContain('_$template');
     expect(out).not.toContain('onClick');

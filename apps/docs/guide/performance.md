@@ -56,9 +56,9 @@ Change every label, ms:
 
 | Bundle | min + gzip |
 | --- | ---: |
-| full runtime (`export *`) | 5.6 KB |
-| useState only | 0.7 KB |
-| counter app (compiled) | 3.5 KB |
-| dropdown app (compiled) | 5.0 KB |
+| full runtime (`export *`) | 5.9 KB |
+| useState only | 0.5 KB |
+| counter app (compiled) | 3.6 KB |
+| dropdown app (compiled) | 5.3 KB |
 
 `pnpm size` checks these on every pull request.

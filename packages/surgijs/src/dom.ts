@@ -215,7 +215,13 @@ export function attrNS(el: Element, name: string, value: unknown): void {
   else el.setAttributeNS(ns, name, value === true ? '' : (value as string));
 }
 
+type StyleObject = Record<string, string | number | null | undefined>;
+
+/** Sets `style` from a string or an object; keys of the previous object missing from the next one clear. */
 export function style(el: HTMLElement | SVGElement, value: unknown): void {
+  const host = el as unknown as { $style?: StyleObject | null };
+  const prev = host.$style;
+  host.$style = null;
   if (value == null || value === false) {
     el.removeAttribute('style');
     return;
@@ -225,14 +231,16 @@ export function style(el: HTMLElement | SVGElement, value: unknown): void {
     s.cssText = value;
     return;
   }
-  const v = value as Record<string, string | number | null | undefined>;
-  for (const k in v) {
-    const x = v[k];
-    if (k.includes('-')) {
-      if (x == null) s.removeProperty(k);
-      else s.setProperty(k, '' + x);
-    } else (s as unknown as Record<string, unknown>)[k] = x == null ? '' : x;
-  }
+  const v = (host.$style = value as StyleObject);
+  for (const k in prev) if (!(k in v)) setStyle(s, k, null);
+  for (const k in v) setStyle(s, k, v[k]);
+}
+
+function setStyle(s: CSSStyleDeclaration, k: string, x: string | number | null | undefined): void {
+  if (k.includes('-')) {
+    if (x == null) s.removeProperty(k);
+    else s.setProperty(k, '' + x);
+  } else (s as unknown as Record<string, unknown>)[k] = x == null ? '' : x;
 }
 
 export function use<T>(ref: ((el: T) => void) | { current: T | null } | null | undefined, el: T): void {

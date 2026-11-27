@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   batch,
   bind,
@@ -12,7 +12,7 @@ import {
   onCleanup,
   untrack,
   useEffect,
-} from 'surgijs';
+} from '@surgijs/core';
 
 describe('signals', () => {
   it('reads and writes with Object.is', () => {
@@ -155,6 +155,40 @@ describe('computations', () => {
     expect(log).toEqual(['body', 'effect']);
   });
 
+  it('drops the sources of a computation that disposes its own root while running', () => {
+    const [done, setDone] = createSignal(true);
+    let runs = 0;
+    createRoot((dispose) =>
+      createRenderEffect(() => {
+        runs++;
+        if (done()) dispose();
+      }),
+    );
+    expect(runs).toBe(1);
+    setDone(false);
+    flush();
+    expect(runs).toBe(1);
+    setDone(true);
+    flush();
+    expect(runs).toBe(1);
+  });
+
+  it('deferMount runs every effect before rethrowing the first error', () => {
+    const log: string[] = [];
+    expect(() =>
+      createRoot(() =>
+        deferMount(() => {
+          createEffect(() => log.push('first'));
+          createEffect(() => {
+            throw new Error('boom');
+          });
+          createEffect(() => log.push('third'));
+        }),
+      ),
+    ).toThrow('boom');
+    expect(log).toEqual(['first', 'third']);
+  });
+
   it('useEffect tracks deps only and runs cleanup', () => {
     const [a, setA] = createSignal(0);
     const [b, setB] = createSignal(0);
@@ -174,6 +208,26 @@ describe('computations', () => {
     setA(1);
     flush();
     expect(log).toEqual(['run 0 0', 'cleanup', 'run 1 1']);
+  });
+});
+
+describe('flush', () => {
+  it('stops an effect that keeps writing the signal it reads', () => {
+    const [n, setN] = createSignal(0);
+    let runs = 0;
+    createRoot(() =>
+      createEffect(() => {
+        runs++;
+        setN(n() + 1);
+      }),
+    );
+    flush();
+    setN(-1);
+    expect(() => flush()).toThrow(/Infinite update loop/);
+    expect(runs).toBeGreaterThan(1000);
+    const after = runs;
+    flush();
+    expect(runs).toBe(after);
   });
 });
 
@@ -265,5 +319,59 @@ describe('bind', () => {
     setN(4);
     flush();
     expect(node.v).toBe(8);
+  });
+
+  it('disposes many bindings of one source with at most one search of its observer list', () => {
+    const [sel, setSel] = createSignal(0);
+    const [label] = createSignal('x');
+    const disposers: (() => void)[] = [];
+    for (let i = 0; i < 500; i++)
+      createRoot((d) => {
+        disposers.push(d);
+        bind({}, () => (sel() === i ? label() : ''), () => {});
+      });
+    const search = vi.spyOn(Array.prototype, 'lastIndexOf');
+    try {
+      for (const d of disposers) d();
+      expect(search.mock.calls.length).toBeLessThanOrEqual(1);
+    } finally {
+      search.mockRestore();
+    }
+    setSel(1);
+    flush();
+  });
+
+  it('keeps exactly the surviving bindings after disposal in any order', () => {
+    const [n, setN] = createSignal(0);
+    const nodes = Array.from({ length: 200 }, () => ({ v: 0 }));
+    const disposers = nodes.map((node) => createRoot((d) => (bind(node, n, (el, v: number) => (el.v = v)), d)));
+    const gone = new Set<number>();
+    for (let k = 0; k < 120; k++) {
+      const i = (k * 37 + 11) % nodes.length;
+      if (!gone.has(i)) disposers[i]!(), gone.add(i);
+    }
+    setN(7);
+    flush();
+    nodes.forEach((node, i) => expect(node.v).toBe(gone.has(i) ? 0 : 7));
+  });
+
+  it('follows sources that a conditional read switches to', () => {
+    const [cond, setCond] = createSignal(true);
+    const [a, setA] = createSignal('a1');
+    const [b, setB] = createSignal('b1');
+    const node = { v: '' };
+    createRoot(() => bind(node, () => (cond() ? a() : b()), (el, v: string) => (el.v = v)));
+    setCond(false);
+    flush();
+    expect(node.v).toBe('b1');
+    setB('b2');
+    flush();
+    expect(node.v).toBe('b2');
+    setA('a2');
+    flush();
+    expect(node.v).toBe('b2');
+    setCond(true);
+    flush();
+    expect(node.v).toBe('a2');
   });
 });

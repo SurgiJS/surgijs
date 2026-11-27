@@ -8,6 +8,7 @@
       body { font-family: system-ui, sans-serif; margin: 2rem; color: #1c1f26; }
       section { margin-bottom: 2rem; }
       my-counter { display: block; max-width: 16rem; }
+      ui-virtual-table, ui-tile-grid { max-width: 60rem; }
     </style>
   </head>
   <body>
@@ -23,6 +24,14 @@
         options='[{"value":"ts","label":"TypeScript"},{"value":"go","label":"Go"},{"value":"rs","label":"Rust"}]'
       ></ui-dropdown>
       <p>Picked: <output id="picked">nothing</output></p>
+    </section>
+    <section>
+      <h2>Virtual table</h2>
+      <ui-virtual-table rows="100000" height="480"></ui-virtual-table>
+    </section>
+    <section>
+      <h2>Virtual tile grid</h2>
+      <ui-tile-grid count="200000" height="480"></ui-tile-grid>
     </section>
     <script type="module" src="/src/main.ts"></script>
   </body>

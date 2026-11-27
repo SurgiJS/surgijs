@@ -3,7 +3,7 @@
 ## Signals
 
 ```ts
-import { createSignal, createMemo, createEffect, batch } from 'surgijs';
+import { createSignal, createMemo, createEffect, batch } from '@surgijs/core';
 
 const [count, setCount] = createSignal(0);
 const double = createMemo(() => count() * 2);

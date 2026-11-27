@@ -1,7 +1,7 @@
 import { compile } from './index.ts';
 
 export interface SurgiVitePluginOptions {
-  /** Runtime module imported by compiled code. Default `surgijs`. */
+  /** Runtime module imported by compiled code. Default `@surgijs/core`. */
   moduleName?: string;
   /** Files to compile. Default: `.jsx`/`.tsx` outside `node_modules`. */
   include?: RegExp | ((id: string) => boolean);

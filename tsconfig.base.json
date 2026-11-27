@@ -16,7 +16,7 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "surgijs",
+    "jsxImportSource": "@surgijs/core",
     "types": []
   }
 }

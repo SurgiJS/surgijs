@@ -6,7 +6,7 @@ export { unwrapGetterReads, GETTER_FNS, toOriginal, type Insert, type UnwrapResu
 
 export interface CompileOptions {
   filename?: string;
-  /** Runtime module the output imports from. `surgijs` by default; SSR uses `<moduleName>/server`. */
+  /** Runtime module the output imports from. `@surgijs/core` by default; SSR uses `<moduleName>/server`. */
   moduleName?: string;
   generate?: 'dom' | 'ssr';
   /** Emit a source map (default `true`). */
@@ -95,6 +95,10 @@ const strip = (e: ts.Expression): ts.Expression => {
   while (ts.isParenthesizedExpression(e)) e = e.expression;
   return e;
 };
+
+/** Expressions that change meaning without parentheses inside an argument list or an arrow body. */
+const needsParens = (x: ts.Expression): boolean =>
+  ts.isObjectLiteralExpression(x) || (ts.isBinaryExpression(x) && x.operatorToken.kind === ts.SyntaxKind.CommaToken);
 
 const isFn = (e: ts.Expression): e is ts.ArrowFunction | ts.FunctionExpression => {
   const x = strip(e);
@@ -242,6 +246,12 @@ class Compiler {
     return this.src.slice(n.getStart(this.sf), n.end);
   }
 
+  /** `rewrite(x)` for an expression placed in an argument list, an assignment or an arrow body. */
+  expr(x: ts.Expression): string {
+    const code = this.rewrite(x);
+    return needsParens(x) ? `(${code})` : code;
+  }
+
   /** Source text of `node` with nested JSX compiled. */
   rewrite(node: ts.Node): string {
     if (isJsx(node)) return this.jsx(node);
@@ -330,13 +340,13 @@ class Compiler {
       ts.forEachChild(n, walk);
     };
     walk(x);
-    if (!ok || params.size !== 1) return { read: `() => ${this.rewrite(x)}`, args: [] };
+    if (!ok || params.size !== 1) return { read: `() => ${this.expr(x)}`, args: [] };
     let body = this.text(x);
     for (let i = edits.length - 1; i >= 0; i--) {
       const [s, end, name] = edits[i]!;
       body = body.slice(0, s) + name + body.slice(end);
     }
-    const read = this.hoist('_b$', `(${[...params.values()].join(', ')}) => ${body}`);
+    const read = this.hoist('_b$', `(${[...params.values()].join(', ')}) => ${needsParens(x) ? `(${body})` : body}`);
     return { read, args: [...params.keys()] };
   }
 
@@ -348,12 +358,12 @@ class Compiler {
   /** One DOM write per change: direct call, `bind` for stable reads, `effect` otherwise. */
   watch(node: string, e: ts.Expression, s: Setter): string {
     const x = getterBody(e) ?? strip(e);
-    if (!isDynamic(x)) return `${s.direct(node, this.rewrite(x))};`;
+    if (!isDynamic(x)) return `${s.direct(node, this.expr(x))};`;
     if (isStable(x)) {
       const { read, args } = this.reader(x);
       return `${this.h('bind')}(${node}, ${read}, ${this.setterFn(s)}${args.map((a) => ', ' + a).join('')});`;
     }
-    return `${this.h('effect')}(() => ${s.direct(node, this.rewrite(x))});`;
+    return `${this.h('effect')}(() => ${s.direct(node, this.expr(x))});`;
   }
 
   children(list: readonly ts.JsxChild[]): Item[] {
@@ -391,8 +401,8 @@ class Compiler {
     const x = strip(e);
     if (isJsx(x)) return this.jsx(x);
     if (isFn(x)) return this.rewrite(x);
-    if (!isDynamic(x)) return this.rewrite(x);
-    return directRead(x) ?? `() => ${this.rewrite(x)}`;
+    if (!isDynamic(x)) return this.expr(x);
+    return directRead(x) ?? `() => ${this.expr(x)}`;
   }
 
   // ---------------------------------------------------------------- DOM elements
@@ -605,8 +615,8 @@ class Compiler {
       const e = it.expr!;
       if (isJsx(e)) return this.jsx(e);
       const x = strip(e);
-      if (isFn(x) || !isDynamic(x) || items.length === 1) return this.rewrite(x);
-      return directRead(x) ?? `() => ${this.rewrite(x)}`;
+      if (isFn(x) || !isDynamic(x) || items.length === 1) return this.expr(x);
+      return directRead(x) ?? `() => ${this.expr(x)}`;
     });
   }
 
@@ -719,7 +729,7 @@ class Compiler {
         if (!only && !last) parts.push('<!---->');
         else if (!hole) {
           const x = getterBody(e as ts.Expression) ?? strip(e as ts.Expression);
-          const code = `${this.h('escape')}(${this.rewrite(x)})`;
+          const code = `${this.h('escape')}(${this.expr(x)})`;
           parts.push({ code: only && isDynamic(x) && this.isTextual(x) ? `(${code} || " ")` : code });
         }
       }
@@ -773,7 +783,7 @@ class Compiler {
         continue;
       }
       const x = getterBody(expr!) ?? strip(expr!);
-      parts.push({ code: `${this.h('attrPart')}(${JSON.stringify(name)}, ${this.rewrite(x)})` });
+      parts.push({ code: `${this.h('attrPart')}(${JSON.stringify(name)}, ${this.expr(x)})` });
     }
     parts.push('>');
     if (!VOID.has(tag)) {
@@ -794,7 +804,7 @@ export function compile(code: string, options: CompileOptions = {}): CompileResu
   if (!/<[A-Za-z>]/.test(code)) return { code, changed: false };
   const filename = options.filename ?? 'input.tsx';
   const ssr = options.generate === 'ssr';
-  const moduleName = options.moduleName ?? 'surgijs';
+  const moduleName = options.moduleName ?? '@surgijs/core';
   const unwrapped = unwrapGetterReads(code, filename);
   const src = unwrapped.code;
   const sf = ts.createSourceFile(filename, src, ts.ScriptTarget.Latest, true, KIND(filename));
