@@ -46,6 +46,7 @@ const dispose = createRoot((dispose) => {
 | Hook | Behavior |
 | --- | --- |
 | `useState(init)` | `createSignal` |
+| `useReducer(reducer, init)` | `[state, dispatch]`; `state` is a getter, `dispatch(action)` stores `reducer(state, action)` and skips the update when the result is the same value |
 | `useMemo(fn)` | `createMemo` |
 | `useEffect(fn, deps?)` | effect after mount; the returned function runs as cleanup. With a `deps` function, only the signals it reads trigger `fn` |
 | `useRef()` | `{ current: null }` for `ref={...}` |

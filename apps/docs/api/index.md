@@ -24,6 +24,7 @@
 | Export | Signature |
 | --- | --- |
 | `useState` | same as `createSignal` |
+| `useReducer` | `(reducer, init) => [state, dispatch]`; `state` is a getter |
 | `useMemo` | same as `createMemo` |
 | `useEffect` | `(fn, deps?)` |
 | `useRef` | `() => { current: null }` |
