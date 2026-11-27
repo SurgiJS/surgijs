@@ -50,6 +50,8 @@ export const Latest = async () => {
 };
 ```
 
+Reactive context is read while a component runs, so read it before the first `await`: after an `await` the component no longer sees its provider. Async siblings start together, so a list of async components starts all of them at once; bound the list in your data layer if the backend cannot take that many requests. Cancelling the stream stops it at the next chunk boundary. A part that is already waiting on a promise is not interrupted, and its output is dropped.
+
 `ReadableStream` and `Response` are web standards, so the same code runs in a route handler (Next.js, for example) or in an endpoint of any framework that returns a `Response`.
 
 ## Hydration
