@@ -10,7 +10,8 @@ const names: string[] = [];
 const connections: Conn[] = [];
 
 function install(): void {
-  (globalThis as { __REDUX_DEVTOOLS_EXTENSION__?: unknown }).__REDUX_DEVTOOLS_EXTENSION__ = {
+  const enhancer = () => (next: unknown) => next;
+  (globalThis as { __REDUX_DEVTOOLS_EXTENSION__?: unknown }).__REDUX_DEVTOOLS_EXTENSION__ = Object.assign(enhancer, {
     connect(options?: { name?: string }) {
       names.push(options?.name ?? '');
       const sent: unknown[][] = [];
@@ -34,8 +35,10 @@ function install(): void {
         },
       };
     },
-  };
+  });
 }
+
+const jump = (state: unknown) => connections[0]!.emit({ type: 'DISPATCH', state: JSON.stringify(state) });
 
 afterEach(() => {
   delete (globalThis as { __REDUX_DEVTOOLS_EXTENSION__?: unknown }).__REDUX_DEVTOOLS_EXTENSION__;
@@ -90,9 +93,70 @@ describe('redux devtools', () => {
       () => {},
     );
     expect(fetches).toBe(1);
-    connections[0]!.emit({ type: 'DISPATCH', state: JSON.stringify({ n: 9, item: 'old' }) });
+    jump({ n: 9, item: 'old' });
     expect(store.get()).toEqual({ n: 9, item: 'old' });
     expect(fetches).toBe(1);
+  });
+
+  it('does not fetch a remote that a jump makes a subscriber read', () => {
+    install();
+    let fetches = 0;
+    const store = createStore({
+      n: 0,
+      item: remote({
+        deps: () => 'k',
+        retry: 0,
+        fetch: () => {
+          fetches += 1;
+          return 'net';
+        },
+      }),
+    });
+    store.subscribe(
+      (s) => (s.n === 1 ? s.item : null),
+      () => {},
+    );
+    jump({ n: 1, item: 'old' });
+    expect(store.get()).toEqual({ n: 1, item: 'old' });
+    expect(fetches).toBe(0);
+  });
+
+  it('compares later deps against the restored state', () => {
+    install();
+    const store = createStore({
+      n: 1,
+      item: remote({ deps: (get) => get('n'), retry: 0, fetch: (get) => get('n') }),
+    });
+    store.subscribe(
+      (s) => s.item,
+      () => {},
+    );
+    jump({ n: 2, item: 2 });
+    store.set('n', 1);
+    expect(store.get()).toEqual({ n: 1, item: 1 });
+  });
+
+  it('drops a request in flight when a jump restores its remote', async () => {
+    install();
+    let resolve = (_v: string) => {};
+    const store = createStore({
+      item: remote({
+        deps: () => 'k',
+        retry: 0,
+        fetch: () => new Promise<string>((r) => (resolve = r)),
+      }),
+    });
+    store.subscribe(
+      (s) => s.item,
+      () => {},
+    );
+    expect(store.status('item').isFetching).toBe(true);
+    jump({ item: 'old' });
+    expect(store.status('item').isFetching).toBe(false);
+    resolve('net');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(store.get()).toEqual({ item: 'old' });
   });
 
   it('applies a set typed into the monitor and refetches', () => {

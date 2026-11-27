@@ -657,7 +657,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     }
     entry.refs++;
     registerFocus(name, entry);
-    if (entry.refs === 1) void load(name, entry, false).catch(() => {});
+    if (entry.refs === 1 && !restoring) void load(name, entry, false).catch(() => {});
   };
 
   const release = (name: string): void => {
@@ -867,13 +867,26 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     quiet = true;
     restoring = true;
     try {
+      const restored: [string, RemoteEntry][] = [];
+      for (const [key, entry] of remotes) {
+        if (!Object.prototype.hasOwnProperty.call(next, key)) continue;
+        clearTimer(entry);
+        entry.ctrl?.abort();
+        entry.ctrl = null;
+        entry.seq++;
+        entry.fetching = false;
+        restored.push([key, entry]);
+      }
       const partial: Record<string, unknown> = {};
       for (const key of Object.keys(sync)) {
         if (Object.prototype.hasOwnProperty.call(next, key)) partial[key] = next[key];
       }
       if (Object.keys(partial).length) (store.set as (value: Record<string, unknown>) => void)(partial);
-      for (const key of remotes.keys()) {
-        if (Object.prototype.hasOwnProperty.call(next, key)) store.setData(key as never, next[key] as never);
+      for (const [key, entry] of restored) {
+        store.setData(key as never, next[key] as never);
+        entry.key = entry.dataKey = readDeps(entry);
+        bump();
+        notifyKey(key);
       }
     } finally {
       quiet = false;

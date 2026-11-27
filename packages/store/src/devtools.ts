@@ -4,7 +4,8 @@ interface Connection {
   subscribe(listener: (message: { type?: string; state?: unknown; payload?: unknown }) => void): void;
 }
 
-type Extension = { connect?: (options?: { name?: string }) => Connection } | ((options?: { name?: string }) => Connection);
+/** The extension global is an enhancer function that also carries `connect`. */
+type Extension = { connect?: (options?: { name?: string }) => Connection };
 
 export interface DevAction {
   type: string;
@@ -47,9 +48,8 @@ export function connectDevtools(binding: DevtoolsBinding): ((action: DevAction) 
   if (!raw) return null;
   let conn: Connection;
   try {
-    const connect = typeof raw === 'function' ? raw : raw.connect?.bind(raw);
-    if (!connect) return null;
-    conn = connect({ name: storeName() });
+    if (typeof raw.connect !== 'function') return null;
+    conn = raw.connect({ name: storeName() });
   } catch {
     return null;
   }
