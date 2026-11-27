@@ -1,0 +1,6 @@
+html,
+body {
+  background: var(--s-color-surface);
+  color: var(--s-color-text);
+  font-family: var(--s-font-family);
+}
