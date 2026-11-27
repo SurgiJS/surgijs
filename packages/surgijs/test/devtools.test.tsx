@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { defineComponent, flush, For, Show, useMemo, useState, type ReactiveProps } from '@surgijs/core';
+import { createComponent, defineComponent, flush, For, Show, useMemo, useState, type ReactiveProps } from '@surgijs/core';
 import { installDevtools, uninstallDevtools } from '@surgijs/core/devtools';
 
 interface Fiber {
@@ -37,7 +37,7 @@ const hook = vi.hoisted(() => {
   return state;
 });
 
-const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const tick = () => new Promise<void>((resolve) => queueMicrotask(resolve));
 const last = () => hook.commits.at(-1)!.current;
 const nameOf = (f: Fiber) => (typeof f.type === 'function' ? f.type.name : String(f.type));
 
@@ -70,12 +70,18 @@ function Child(_props: ReactiveProps<{ onSave: () => void }>) {
   return <em onClick={() => setN(n() + 1)}>{twice()}</em>;
 }
 
+function Plain(props: { onSave: () => number }) {
+  props.onSave();
+  return <b />;
+}
+
 function Box(props: ReactiveProps<{ open?: boolean; items?: string[] }>) {
   return (
     <div>
       <Show when={props.open()} fallback={<span>closed</span>}>
         <Child onSave={() => saves++} />
       </Show>
+      {createComponent(Plain, { onSave: () => saves++ })}
       <ul>
         <For each={props.items() ?? []}>{(item) => <Row label={item} />}</For>
       </ul>
@@ -112,7 +118,7 @@ describe('react devtools', () => {
     await tick();
 
     const root = last();
-    expect(walk(root)).toEqual(['x-dev-box', 'Box', 'div', 'Show', 'Child', 'em', 'For', 'Row', 'li', 'Row', 'li']);
+    expect(walk(root)).toEqual(['x-dev-box', 'Box', 'div', 'Show', 'Child', 'em', 'Plain', 'b', 'For', 'Row', 'li', 'Row', 'li']);
     expect(find(root, 'Box')!.memoizedProps).toEqual({ open: true, items: ['a', 'b'] });
     expect(find(root, 'Child')!.memoizedState).toEqual({ useState: 1, useMemo: 2 });
     expect(find(root, 'Row')!.memoizedProps).toEqual({ label: 'a' });
@@ -158,7 +164,7 @@ describe('react devtools', () => {
     el.removeAttribute('open');
     flush();
     await tick();
-    expect(walk(last())).toEqual(['x-dev-box', 'Box', 'div', 'Show', 'span', 'For', 'Row', 'li', 'Row', 'li', 'Row', 'li']);
+    expect(walk(last())).toEqual(['x-dev-box', 'Box', 'div', 'Show', 'span', 'Plain', 'b', 'For', 'Row', 'li', 'Row', 'li', 'Row', 'li']);
 
     el.setAttribute('open', '');
     flush();
@@ -173,13 +179,15 @@ describe('react devtools', () => {
     expect(walk(last()).filter((n) => n === 'Row')).toHaveLength(1);
   });
 
-  it('never calls callback props', async () => {
+  it('keeps callback props as functions after the component calls them', async () => {
+    const before = saves;
     const el = document.createElement('x-dev-box');
     el.setAttribute('open', '');
     document.body.appendChild(el);
     await tick();
     expect(typeof find(last(), 'Child')!.memoizedProps!.onSave).toBe('function');
-    expect(saves).toBe(0);
+    expect(saves).toBe(before + 1);
+    expect(typeof find(last(), 'Plain')!.memoizedProps!.onSave).toBe('function');
   });
 
   it('empties the root when the element is removed', async () => {

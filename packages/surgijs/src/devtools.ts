@@ -8,6 +8,7 @@ const ClassComponent = 1;
 const HostRoot = 3;
 const HostComponent = 5;
 const PerformedWork = 1;
+const HANDLER = /^on[A-Z]/;
 
 interface Fiber {
   tag: number;
@@ -176,7 +177,9 @@ function watch(inst: Inst, props: object): object {
         const fn = d.value as (...args: unknown[]) => unknown;
         inst.props[key] = fn;
         d.value = function (this: unknown, ...args: unknown[]) {
-          return note(inst, key, fn.apply(this, args));
+          const value = fn.apply(this, args);
+          // A handler called without the compiler returns its own result: keep the function shown.
+          return HANDLER.test(key) && typeof value !== 'function' ? value : note(inst, key, value);
         };
       } else inst.props[key] = d.value;
     }
