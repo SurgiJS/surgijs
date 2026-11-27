@@ -12,7 +12,45 @@ const html = renderToString('my-counter', Counter, { title: 'Clicks', step: 2 })
 // <my-counter title="Clicks" step="2"><template shadowrootmode="open"><div class="card">…</div></template></my-counter>
 ```
 
-The SSR output concatenates strings with `escape` and `attrPart` and never touches a DOM. `shadowHTML(tag, inner, attrs, options)` builds the declarative shadow DOM wrapper for custom markup. Both take `options.children`, light DOM markup placed after the template and projected into slots (it is not escaped), and `options.delegatesFocus`, which renders `shadowrootdelegatesfocus` to match `attachShadow({ delegatesFocus: true })`.
+The SSR output is a tree of parts that never touches a DOM. Text holes escape their values, so any markup you pass through a hole is escaped. `shadowHTML(tag, inner, attrs, options)` builds the declarative shadow DOM wrapper for custom markup. Both take `options.children`, light DOM markup placed after the template and projected into slots (it is not escaped), and `options.delegatesFocus`, which renders `shadowrootdelegatesfocus` to match `attachShadow({ delegatesFocus: true })`.
+
+## Nested components
+
+A component used inside another component renders on the server too. Its props are getters, as on the client, and its children are passed as a function:
+
+```tsx
+export const Panel = (props: ReactiveProps<{ title?: string }>) => (
+  <section>
+    <h2>{props.title}</h2>
+    {props.children}
+  </section>
+);
+```
+
+`Show`, `Switch`/`Match`, `For` and `ErrorBoundary` render on the server with the same props as on the client. `Portal` renders nothing, because its content mounts into the live document. Context works: a `Provider` value reaches every component rendered inside it, including components rendered later by a stream.
+
+## Streaming
+
+`renderToString` returns the whole document at once and throws if a part is async. `renderToStream` returns a `ReadableStream` of HTML chunks. The shell goes out first, then each run of markup up to an async value, which is sent when it resolves:
+
+```ts
+import { renderToStream } from '@surgijs/core/server';
+import { Page } from './page.tsx?ssr';
+
+const stream = renderToStream('my-page', Page, { title: 'Clicks' });
+return new Response(stream, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+```
+
+An async component returns a promise, and a text hole can hold a promise. Both wait for the stream:
+
+```tsx
+export const Latest = async () => {
+  const post = await loadPost();
+  return <article>{post.title}</article>;
+};
+```
+
+`ReadableStream` and `Response` are web standards, so the same code runs in a route handler (Next.js, for example) or in an endpoint of any framework that returns a `Response`.
 
 ## Hydration
 
