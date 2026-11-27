@@ -92,6 +92,8 @@ function cleanText(value: string): string {
 }
 
 const escText = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const RAW = new Set(['style', 'script']);
+const escRaw = (s: string, tag: string): string => s.replace(new RegExp(`</(${tag})`, 'gi'), '<\\/$1');
 const escAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 const kebab = (s: string): string => (s.startsWith('--') ? s : s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()));
 
@@ -453,7 +455,7 @@ class Compiler {
       };
       items.forEach((it, i) => {
         if (it.k === 'text') {
-          html += escText(it.text!);
+          html += RAW.has(tag) ? escRaw(it.text!, tag) : escText(it.text!);
           child();
         } else if (it.k === 'el') html += build(it.node!, child());
         else {
@@ -732,10 +734,11 @@ class Compiler {
     return found;
   }
 
-  ssrItems(items: Item[]): (string | { code: string })[] {
+  ssrItems(items: Item[], tag = ''): (string | { code: string })[] {
     const parts: (string | { code: string })[] = [];
+    const raw = RAW.has(tag);
     items.forEach((it, i) => {
-      if (it.k === 'text') parts.push(escText(it.text!));
+      if (it.k === 'text') parts.push(raw ? escRaw(it.text!, tag) : escText(it.text!));
       else if (it.k === 'el') parts.push(...this.ssrParts(it.node!));
       else {
         const only = items.length === 1;
@@ -745,7 +748,9 @@ class Compiler {
         if (!only && !last) parts.push('<!---->');
         else if (!hole) {
           const x = getterBody(e as Expression) ?? strip(e as Expression);
-          const code = `${this.h('escape')}(${this.expr(x)})`;
+          const code = raw
+            ? `${this.h('escapeRaw')}(${this.expr(x)}, ${JSON.stringify(tag)})`
+            : `${this.h('escape')}(${this.expr(x)})`;
           parts.push({ code: only && isDynamic(x) && this.isTextual(x) ? `(${code} || " ")` : code });
         }
       }
@@ -804,7 +809,7 @@ class Compiler {
     }
     parts.push('>');
     if (!VOID.has(tag)) {
-      parts.push(...this.ssrItems(this.children(node.children)));
+      parts.push(...this.ssrItems(this.children(node.children), tag));
       parts.push(`</${tag}>`);
     }
     return parts;

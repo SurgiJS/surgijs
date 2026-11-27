@@ -1,5 +1,4 @@
 import type { FormHost, ReactiveProps } from '@surgijs/core';
-import { buttonStyles } from './button.styles';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -44,23 +43,20 @@ export const Button = (props: ReactiveProps<ButtonProps>, host?: HTMLElement) =>
   };
 
   return (
-    <>
-      <style>{buttonStyles}</style>
-      <button
-        type="button"
-        class="base"
-        part="base"
-        disabled={isDisabled()}
-        aria-disabled={isBusy() ? 'true' : undefined}
-        aria-busy={isBusy() ? 'true' : undefined}
-        aria-label={label()}
-        on:click={onClick}
-      >
-        <span class="spinner" part="spinner" aria-hidden="true" hidden={!isBusy()}></span>
-        <slot name="start"></slot>
-        <slot></slot>
-        <slot name="end"></slot>
-      </button>
-    </>
+    <button
+      type="button"
+      class="base"
+      part="base"
+      disabled={isDisabled()}
+      aria-disabled={isBusy() ? 'true' : undefined}
+      aria-busy={isBusy() ? 'true' : undefined}
+      aria-label={label()}
+      on:click={onClick}
+    >
+      <span class="spinner" part="spinner" aria-hidden="true" hidden={!isBusy()}></span>
+      <slot name="start"></slot>
+      <slot></slot>
+      <slot name="end"></slot>
+    </button>
   );
 };

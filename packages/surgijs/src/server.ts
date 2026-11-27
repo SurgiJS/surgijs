@@ -9,6 +9,16 @@ export function escape(value: unknown): string {
   return ('' + (value as string)).replace(/[&<>"]/g, (c) => ESC[c]!);
 }
 
+/**
+ * Text for raw text elements (`<style>`, `<script>`), where entities are not decoded: only
+ * the closing tag is neutralised, so `a > b` and `&` survive as written.
+ */
+export function escapeRaw(value: unknown, tag: string): string {
+  if (value == null || typeof value === 'boolean') return '';
+  if (Array.isArray(value)) return value.map((v) => escapeRaw(v, tag)).join('');
+  return ('' + (value as string)).replace(new RegExp(`</(${tag})`, 'gi'), '<\\/$1');
+}
+
 /** ` name="value"`, ` name` for `true`, `''` for `null`/`false`. */
 export function attrPart(name: string, value: unknown): string {
   if (value == null || value === false) return '';
@@ -23,6 +33,8 @@ export interface ShadowOptions {
   children?: string;
   /** Adds `shadowrootdelegatesfocus`, matching `attachShadow({ delegatesFocus: true })`. */
   delegatesFocus?: boolean;
+  /** CSS rendered as `<style data-s>` inside the shadow root; the client swaps it for a shared adopted sheet. */
+  styles?: string | string[];
 }
 
 /** `<tag a="1"><template shadowrootmode="open">inner</template>children</tag>`. */
@@ -30,7 +42,8 @@ export function shadowHTML(tag: string, inner: string, attrs: Record<string, unk
   let a = '';
   for (const k in attrs) a += attrPart(kebab(k), attrs[k]);
   const focus = options.delegatesFocus ? ' shadowrootdelegatesfocus' : '';
-  return `<${tag}${a}><template shadowrootmode="open"${focus}>${inner}</template>${options.children ?? ''}</${tag}>`;
+  const css = ([] as string[]).concat(options.styles ?? []).map((c) => `<style data-s>${escapeRaw(c, 'style')}</style>`);
+  return `<${tag}${a}><template shadowrootmode="open"${focus}>${css.join('')}${inner}</template>${options.children ?? ''}</${tag}>`;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { defineComponent, type ComponentClass, type FormHost } from '@surgijs/core';
 import { Button, type ButtonProps } from './button.view';
+import { buttonStyles } from './button.styles';
 
 export { Button, type ButtonProps, type ButtonSize, type ButtonType, type ButtonVariant } from './button.view';
 export { buttonStyles } from './button.styles';
@@ -22,6 +23,7 @@ export type SButtonElement = FormHost & ButtonProps;
 export const SButton: ComponentClass<ButtonProps> = defineComponent<ButtonProps>('s-button', Button, buttonSchema, {
   shadow: { mode: 'open', delegatesFocus: true },
   form: true,
+  styles: buttonStyles,
 });
 
 declare global {

@@ -20,6 +20,12 @@ export interface ComponentOptions {
   shadow?: boolean | ShadowRootInit;
   /** Form-associated element with `ElementInternals`. */
   form?: boolean;
+  /**
+   * CSS for the shadow root. Parsed into one `CSSStyleSheet` per component definition and
+   * adopted by every instance, so a hundred elements share one copy. Falls back to a
+   * `<style>` per root where constructable stylesheets are missing. Ignored in light DOM.
+   */
+  styles?: string | string[];
 }
 
 export interface FormHost extends HTMLElement {
@@ -39,6 +45,12 @@ let hydrateRoot: HydrateRoot | null = null;
 
 export function setHydrateRoot(fn: HydrateRoot | null): void {
   hydrateRoot = fn;
+}
+
+function makeSheet(text: string): CSSStyleSheet {
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(text);
+  return sheet;
 }
 
 const kebab = (s: string): string => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
@@ -95,6 +107,9 @@ export function defineComponent<P extends object = {}>(
   const closed = shadow && shadow.mode === 'closed';
   const form = !!options.form;
   const light = !shadow && !('children' in types);
+  const css = shadow && options.styles ? ([] as string[]).concat(options.styles) : null;
+  const adopt = typeof CSSStyleSheet != 'undefined' && 'replaceSync' in CSSStyleSheet.prototype;
+  let sheets: CSSStyleSheet[] | undefined;
 
   class Element extends HTMLElement {
     static observedAttributes = attrs;
@@ -134,6 +149,11 @@ export function defineComponent<P extends object = {}>(
       }
       const root = (self.__r ||= shadow ? this.shadowRoot || this.attachShadow(shadow) : this);
       if (closed) delegateRoot(root);
+      if (css) {
+        // Server markup carries its own copy of the CSS so it paints before upgrade.
+        root.querySelectorAll('style[data-s]').forEach((el) => el.remove());
+        if (adopt) (root as ShadowRoot).adoptedStyleSheets = sheets ||= css.map(makeSheet);
+      }
       const end = hydrateRoot ? hydrateRoot(root) : null;
       if (!end) {
         if (light && !self.__c) self.__c = Array.from(this.childNodes);
@@ -147,6 +167,7 @@ export function defineComponent<P extends object = {}>(
       } finally {
         if (end) end();
       }
+      if (css && !adopt) root.append(...css.map((text) => Object.assign(document.createElement('style'), { textContent: text })));
     }
 
     disconnectedCallback(): void {
