@@ -26,6 +26,14 @@ jobs:
       - run: pnpm test
       - run: pnpm size
       - run: pnpm build
+      - name: Astro example renders declarative shadow DOM
+        run: |
+          pnpm --filter @surgijs/astro-example build
+          grep -q 'shadowrootmode="open"' apps/astro/dist/index.html
+      - name: Next.js example renders declarative shadow DOM
+        run: |
+          pnpm --filter @surgijs/next-example build
+          grep -q 'shadowrootmode="open"' apps/next/.next/server/app/index.html
 
   min-core:
     # The peer range of @surgijs/ui and @surgijs/store admits releases of @surgijs/core older than the

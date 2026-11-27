@@ -61,6 +61,8 @@ export default defineConfig({
           { text: 'Components', link: '/guide/components' },
           { text: 'Control flow', link: '/guide/control-flow' },
           { text: 'SSR and hydration', link: '/guide/ssr' },
+          { text: 'Astro', link: '/guide/astro' },
+          { text: 'Next.js App Router', link: '/guide/nextjs' },
           { text: 'Performance', link: '/guide/performance' },
         ],
       },

@@ -1,0 +1,17 @@
+{
+  "name": "@surgijs/astro-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@surgijs/astro": "workspace:*",
+    "@surgijs/compiler": "workspace:*",
+    "@surgijs/core": "workspace:*",
+    "astro": "^7.4.13"
+  }
+}
