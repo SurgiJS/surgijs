@@ -1,0 +1,89 @@
+/*
+ * @surgijs/ui design tokens. Components read them through their own --s-<component>-*
+ * properties, so a page can retheme everything here or override one component locally.
+ *
+ * Light is the default. `data-theme="dark"` on any ancestor switches to dark;
+ * without a data-theme on the root, the OS preference picks the theme.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  --s-font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --s-font-size-sm: 0.875rem;
+  --s-font-size-md: 1rem;
+  --s-font-size-lg: 1.125rem;
+  --s-font-weight-medium: 500;
+
+  --s-radius-sm: 4px;
+  --s-radius-md: 6px;
+  --s-radius-lg: 8px;
+  --s-radius-full: 999px;
+
+  --s-duration-fast: 120ms;
+
+  --s-color-primary: #3451d1;
+  --s-color-primary-hover: #2a43b3;
+  --s-color-primary-active: #223896;
+  --s-color-primary-text: #3451d1;
+  --s-color-on-primary: #ffffff;
+
+  --s-color-danger: #c92a2a;
+  --s-color-danger-hover: #a51f1f;
+  --s-color-danger-active: #861818;
+  --s-color-on-danger: #ffffff;
+
+  --s-color-surface: #ffffff;
+  --s-color-surface-hover: #f1f3f5;
+  --s-color-surface-active: #e3e7eb;
+  --s-color-text: #1c1f26;
+  --s-color-border: #c4c9d2;
+  --s-color-focus: #4c6ef5;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --s-color-primary: #4263eb;
+  --s-color-primary-hover: #3b5bdb;
+  --s-color-primary-active: #364fc7;
+  --s-color-primary-text: #91a7ff;
+  --s-color-on-primary: #ffffff;
+
+  --s-color-danger: #c92a2a;
+  --s-color-danger-hover: #b02525;
+  --s-color-danger-active: #962020;
+  --s-color-on-danger: #ffffff;
+
+  --s-color-surface: #1f2126;
+  --s-color-surface-hover: #2a2d34;
+  --s-color-surface-active: #353943;
+  --s-color-text: #e9ecef;
+  --s-color-border: #4a505c;
+  --s-color-focus: #748ffc;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --s-color-primary: #4263eb;
+    --s-color-primary-hover: #3b5bdb;
+    --s-color-primary-active: #364fc7;
+    --s-color-primary-text: #91a7ff;
+    --s-color-on-primary: #ffffff;
+
+    --s-color-danger: #c92a2a;
+    --s-color-danger-hover: #b02525;
+    --s-color-danger-active: #962020;
+    --s-color-on-danger: #ffffff;
+
+    --s-color-surface: #1f2126;
+    --s-color-surface-hover: #2a2d34;
+    --s-color-surface-active: #353943;
+    --s-color-text: #e9ecef;
+    --s-color-border: #4a505c;
+    --s-color-focus: #748ffc;
+  }
+}

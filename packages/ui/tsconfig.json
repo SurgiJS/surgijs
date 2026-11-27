@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {
+      "@surgijs/core": ["../surgijs/src/index.ts"],
+      "@surgijs/core/*": ["../surgijs/src/*.ts"],
+      "@surgijs/ui": ["./src/index.ts"],
+      "@surgijs/ui/button": ["./src/button/index.ts"],
+      "@surgijs/ui/server": ["./src/server.ts"]
+    }
+  },
+  "include": ["src", "test", "tsup.config.ts", "vitest.config.ts"]
+}
