@@ -1,5 +1,17 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { defineComponent, flush, onCleanup, useEffect, useRef, useState, type FormHost, type ReactiveProps } from '@surgijs/core';
+import {
+  createContext,
+  createRoot,
+  defineComponent,
+  flush,
+  onCleanup,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type FormHost,
+  type ReactiveProps,
+} from '@surgijs/core';
 import { MyCounter } from '../../../apps/playground/src/counter.tsx';
 
 interface FakeInternals {
@@ -236,6 +248,31 @@ describe('defineComponent', () => {
     defineComponent<{}>('x-hot-light', (props) => <div>{props.children}</div>, {}, { shadow: false });
     expect(kept.innerHTML).toBe('<div><b>kept</b></div>');
     expect(gone.childNodes.length).toBe(0);
+  });
+
+  it('keeps provided context when re-rendering on redefine', () => {
+    const Theme = createContext('light');
+    defineComponent('x-hot-ctx', () => <i>{useContext(Theme)()}</i>);
+    const inner = document.createElement('x-hot-ctx');
+    createRoot(() => Theme.Provider({ value: 'dark', children: () => (document.body.appendChild(inner), null) }));
+    expect(inner.shadowRoot!.innerHTML).toBe('<i>dark</i>');
+    defineComponent('x-hot-ctx', () => <b>{useContext(Theme)()}</b>);
+    expect(inner.shadowRoot!.innerHTML).toBe('<b>dark</b>');
+  });
+
+  it('does not render detached instances on redefine but renders them when reinserted', async () => {
+    let renders = 0;
+    defineComponent('x-hot-detached', () => (renders++, <p>one</p>));
+    const el = document.createElement('x-hot-detached');
+    document.body.appendChild(el);
+    el.remove();
+    defineComponent('x-hot-detached', () => (renders++, <p>two</p>));
+    expect(renders).toBe(1);
+    expect(el.shadowRoot!.childNodes.length).toBe(0);
+    document.body.appendChild(el);
+    await Promise.resolve();
+    expect(el.shadowRoot!.innerHTML).toBe('<p>two</p>');
+    expect(renders).toBe(2);
   });
 
   it('runs effects after the shadow root holds the nodes', () => {

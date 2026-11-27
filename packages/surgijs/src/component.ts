@@ -1,5 +1,5 @@
 import { delegateRoot, insert, undelegateRoot } from './dom';
-import { createRoot, createSignal, deferMount, type Accessor, type Setter } from './reactivity';
+import { createRoot, createSignal, deferMount, getOwner, type Accessor, type OwnerNode, type Setter } from './reactivity';
 import type { JSX } from './jsx-runtime';
 
 export type PropType = StringConstructor | NumberConstructor | BooleanConstructor | ObjectConstructor | ArrayConstructor;
@@ -63,6 +63,7 @@ interface Host extends HTMLElement {
   __s: Record<string, [Accessor<unknown>, Setter<unknown>]>;
   __p: Record<string, Accessor<unknown>>;
   __d: (() => void) | undefined;
+  __o: OwnerNode | null;
   __r: ShadowRoot | HTMLElement | undefined;
   __c: Node[] | undefined;
   __u: boolean;
@@ -105,13 +106,23 @@ export function defineComponent<P extends object = {}>(
   const hosts = new Set<HTMLElement>();
   let current = render;
 
-  const mount = (el: HTMLElement, root: Node): void => {
+  const mount = (el: HTMLElement, root: Node, owner: OwnerNode | null): void => {
     const self = el as unknown as Host;
+    self.__o = owner;
     hosts.add(el);
     createRoot((dispose) => {
       self.__d = dispose;
       deferMount(() => insert(root, current(self.__p as ReactiveProps<P>, el)));
-    });
+    }, owner);
+  };
+
+  const unmount = (self: Host): void => {
+    const root = self.__r!;
+    if (closed) undelegateRoot(root);
+    self.__d!();
+    self.__d = undefined;
+    hosts.delete(self);
+    root.replaceChildren();
   };
 
   class Element extends HTMLElement {
@@ -158,7 +169,7 @@ export function defineComponent<P extends object = {}>(
         root.replaceChildren();
       }
       try {
-        mount(this, root);
+        mount(this, root, getOwner());
       } finally {
         if (end) end();
       }
@@ -167,13 +178,7 @@ export function defineComponent<P extends object = {}>(
     disconnectedCallback(): void {
       queueMicrotask(() => {
         const self = this as unknown as Host;
-        const root = self.__r;
-        if (!root || !self.__d || this.isConnected) return;
-        if (closed) undelegateRoot(root);
-        self.__d();
-        self.__d = undefined;
-        hosts.delete(this);
-        root.replaceChildren();
+        if (self.__d && !this.isConnected) unmount(self);
       });
     }
 
@@ -222,9 +227,14 @@ export function defineComponent<P extends object = {}>(
     current = next as typeof render;
     for (const el of [...hosts]) {
       const self = el as unknown as Host;
-      self.__d!();
+      if (!self.__d) continue;
+      if (!el.isConnected) {
+        unmount(self);
+        continue;
+      }
+      self.__d();
       self.__r!.replaceChildren();
-      mount(el, self.__r!);
+      mount(el, self.__r!, self.__o);
     }
   });
   customElements.define(tag, Element);
