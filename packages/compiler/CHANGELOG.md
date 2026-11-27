@@ -1,5 +1,11 @@
 # @surgijs/compiler
 
+## 0.3.1
+
+### Patch Changes
+
+- [#13](https://github.com/SurgiJS/surgijs/pull/13) [`6b4907a`](https://github.com/SurgiJS/surgijs/commit/6b4907a97b72058ad80438476611344b59379627) Thanks [@banzalik](https://github.com/banzalik)! - The esbuild plugin compiles `.tsx?ssr` / `.jsx?ssr` imports with `generate: 'ssr'`, like the Vite plugin, so one source can feed both the client and the server bundle.
+
 ## 0.3.0
 
 ### Minor Changes
