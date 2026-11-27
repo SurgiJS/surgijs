@@ -41,6 +41,17 @@ export interface OwnerNode {
 
 let Owner: OwnerNode | null = null;
 let Listener: Comp | null = null;
+let devOwn: ((owner: OwnerNode) => void) | null = null;
+let devFlush: (() => void) | null = null;
+
+export function setDevOwn(fn: typeof devOwn): void {
+  devOwn = fn;
+}
+
+export function setDevFlush(fn: typeof devFlush): void {
+  devFlush = fn;
+}
+
 /** Set while `bind` collects sources: the first goes to `First`; with more, `More` lists all of them. */
 let Collect: true | null = null;
 let First: Source | null = null;
@@ -172,6 +183,7 @@ export function flush(): void {
   } finally {
     running = false;
   }
+  devFlush?.();
   if (error) throw error[0];
 }
 
@@ -193,6 +205,7 @@ class Comp implements OwnerNode, Source, Observer {
     this.v = v;
     this.t = t;
     own(this);
+    if (devOwn) devOwn(this);
   }
 
   run(): void {

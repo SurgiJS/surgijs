@@ -99,4 +99,6 @@ function Profile() {
 | `derived` | cached selector |
 | `useStore` / `StoreProvider` | React |
 
+With the Redux DevTools extension installed, each store shows up as **SurgiJS**. No import and no `connect()` call.
+
 Docs: [guide](../../apps/docs/guide/store.md).

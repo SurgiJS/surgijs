@@ -30,6 +30,10 @@ In light DOM the original children move into `props.children` before the first r
 
 Disconnecting disposes the render root and clears it in the next microtask. An element moved within the document (removed and inserted again in the same task) keeps its rendered tree and state. Reconnecting after disposal renders again with the current property values.
 
+## React DevTools
+
+With the React DevTools extension installed, each custom element shows up while `vite` is serving: the element, its render function, nested components (`Show`, `For`, `Switch`, and your own), and their DOM elements. Props are the values the component last read. `useState`, `useMemo`, `useRef` and `useId` values show under "state". Picking an element on the page selects it in the tree. The Vite plugin loads `@surgijs/core/devtools` for that session. A production build does not include it.
+
 ## Forms
 
 With `{ form: true }` the element calls `attachInternals()` and gains:
