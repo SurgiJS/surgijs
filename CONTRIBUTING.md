@@ -69,6 +69,18 @@ Every visual value goes through a `--s-<component>-*` custom property that defau
 
 Screenshots come from the official Playwright image, so they only match when taken there: run `pnpm test:e2e` (Docker or Podman) rather than Playwright on the host. After an intended visual change, run `pnpm test:e2e:update`, look at the new images in `apps/storybook/e2e/__screenshots__`, and commit them.
 
+## Design tokens
+
+`packages/ui/tokens` is the source of every theme value. `base.json` holds the tokens that do not change between themes (font, corners, motion), and `light.json` and `dark.json` hold the colors of each theme. Tokens use the W3C design tokens format: `$type`, `$value` and `$description`.
+
+`pnpm --filter @surgijs/ui generate` builds the outputs with Style Dictionary (`packages/ui/scripts/tokens.mjs`):
+
+- `packages/ui/src/themes.css`, the stylesheet behind `@surgijs/ui/themes.css`;
+- `packages/ui/tokens/figma/light.json` and `dark.json`, one complete set per theme, named by token path (`color/primary-hover` in Figma, `--s-color-primary-hover` in CSS);
+- `apps/docs/ui/tokens.md`, the design tokens page.
+
+Commit the generated files with the token change. The `tokens` test fails while any of them is stale, and it fails when a component reads a `--s-color-*`, `--s-font-*`, `--s-radius-*` or `--s-duration-*` token that `themes.css` does not define.
+
 ## Code review
 
 [CodeRabbit](https://coderabbit.ai) reviews every non-draft pull request to `main`; its settings live in `.coderabbit.yaml`. Mention `@coderabbitai` in a PR comment to ask it a question. `@coderabbitai review` reviews the commits pushed since its last review; `@coderabbitai full review` reviews the whole PR again. PRs with "Version Packages" (release PRs) or "WIP" in the title are skipped.
