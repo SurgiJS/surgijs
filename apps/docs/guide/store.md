@@ -321,6 +321,10 @@ store.write((get, set) => {
 })();
 ```
 
+## Redux DevTools
+
+When the Redux DevTools extension is installed, every `createStore` appears on its own: **SurgiJS**, then **SurgiJS 2**, and so on. `set`, `setData` and a settled fetch are actions. Jumping to a state writes those fields back and does not refetch. Nothing is imported or passed to `createStore` for this.
+
 ## React snapshot
 
 ```tsx

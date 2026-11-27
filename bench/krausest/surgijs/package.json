@@ -1,0 +1,19 @@
+{
+  "name": "js-framework-benchmark-surgijs",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "js-framework-benchmark": {
+    "frameworkVersion": "0.3.0",
+    "frameworkHomeURL": "https://surgijs.github.io/surgijs/",
+    "language": "TypeScript",
+    "repoURL": "https://github.com/SurgiJS/surgijs"
+  },
+  "scripts": {
+    "dev": "node build.mjs",
+    "build-prod": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

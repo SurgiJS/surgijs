@@ -90,6 +90,17 @@ const plugins = {
       });
     },
   },
+  vue: {
+    name: 'vue',
+    setup(b) {
+      b.onLoad({ filter: /\.vue$/ }, async (args) => {
+        const { parse, compileScript } = await import('vue/compiler-sfc');
+        const { descriptor } = parse(await readFile(args.path, 'utf8'), { filename: args.path });
+        const { content } = compileScript(descriptor, { id: args.path, inlineTemplate: true, isProd: true });
+        return { contents: content, loader: 'js' };
+      });
+    },
+  },
 };
 
 async function bundle(c) {

@@ -39,7 +39,7 @@ Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit
 
 ## Changesets
 
-Every change to `@surgijs/core`, `@surgijs/compiler`, or `@surgijs/store` comes with a changeset:
+Every change to `@surgijs/core`, `@surgijs/compiler`, `@surgijs/store` or `@surgijs/ui` comes with a changeset:
 
 ```bash
 pnpm changeset
@@ -58,6 +58,8 @@ Each component in `packages/ui/src/<name>/` has a view (`<name>.view.tsx`) share
 - unit and SSR tests in `packages/ui/test`;
 - stories in `apps/storybook/stories`, which the Playwright suite picks up for axe audits and screenshots in both themes;
 - a docs page in `apps/docs/ui`.
+
+`packages/ui/custom-elements.json`, `src/react.ts` and `src/vue.ts` are generated from the `defineComponent` calls and props interfaces: run `pnpm --filter @surgijs/ui generate` after a change. The `manifest` test fails while they are stale.
 
 Every visual value goes through a `--s-<component>-*` custom property that defaults to a token from `themes.css`. Component CSS avoids `<`, `>`, `&` and `"`, which the SSR compiler escapes inside `<style>`.
 

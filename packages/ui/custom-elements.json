@@ -1,0 +1,222 @@
+{
+  "schemaVersion": "1.0.0",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "dist/button.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "name": "SButton",
+          "customElement": true,
+          "tagName": "s-button",
+          "description": "`<s-button>`: form-associated (so a disabled `<fieldset>` disables it), with focus delegated to the inner `<button>`.",
+          "members": [
+            {
+              "kind": "field",
+              "name": "variant",
+              "type": {
+                "text": "\"primary\" | \"secondary\" | \"ghost\" | \"danger\""
+              },
+              "description": "Visual style.",
+              "default": "'primary'",
+              "attribute": "variant",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "size",
+              "type": {
+                "text": "\"sm\" | \"md\" | \"lg\""
+              },
+              "description": "Height, padding and font size.",
+              "default": "'md'",
+              "attribute": "size",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "type",
+              "type": {
+                "text": "\"button\" | \"submit\" | \"reset\""
+              },
+              "description": "`submit` submits and `reset` resets the closest form.",
+              "default": "'button'",
+              "attribute": "type",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "disabled",
+              "type": {
+                "text": "boolean"
+              },
+              "description": "Removes the button from the tab order and blocks clicks.",
+              "default": "false",
+              "attribute": "disabled",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "loading",
+              "type": {
+                "text": "boolean"
+              },
+              "description": "Shows a spinner, sets `aria-busy` and blocks clicks while keeping focus.",
+              "default": "false",
+              "attribute": "loading",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "label",
+              "type": {
+                "text": "string"
+              },
+              "description": "Accessible name for buttons without text, such as icon-only buttons.",
+              "attribute": "label",
+              "reflects": true
+            }
+          ],
+          "attributes": [
+            {
+              "name": "variant",
+              "fieldName": "variant",
+              "type": {
+                "text": "\"primary\" | \"secondary\" | \"ghost\" | \"danger\""
+              },
+              "description": "Visual style.",
+              "default": "'primary'"
+            },
+            {
+              "name": "size",
+              "fieldName": "size",
+              "type": {
+                "text": "\"sm\" | \"md\" | \"lg\""
+              },
+              "description": "Height, padding and font size.",
+              "default": "'md'"
+            },
+            {
+              "name": "type",
+              "fieldName": "type",
+              "type": {
+                "text": "\"button\" | \"submit\" | \"reset\""
+              },
+              "description": "`submit` submits and `reset` resets the closest form.",
+              "default": "'button'"
+            },
+            {
+              "name": "disabled",
+              "fieldName": "disabled",
+              "type": {
+                "text": "boolean"
+              },
+              "description": "Removes the button from the tab order and blocks clicks.",
+              "default": "false"
+            },
+            {
+              "name": "loading",
+              "fieldName": "loading",
+              "type": {
+                "text": "boolean"
+              },
+              "description": "Shows a spinner, sets `aria-busy` and blocks clicks while keeping focus.",
+              "default": "false"
+            },
+            {
+              "name": "label",
+              "fieldName": "label",
+              "type": {
+                "text": "string"
+              },
+              "description": "Accessible name for buttons without text, such as icon-only buttons."
+            }
+          ],
+          "slots": [
+            {
+              "name": "start"
+            },
+            {
+              "name": ""
+            },
+            {
+              "name": "end"
+            }
+          ],
+          "cssParts": [
+            {
+              "name": "base"
+            },
+            {
+              "name": "spinner"
+            }
+          ],
+          "cssProperties": [
+            {
+              "name": "--s-button-bg"
+            },
+            {
+              "name": "--s-button-bg-active"
+            },
+            {
+              "name": "--s-button-bg-hover"
+            },
+            {
+              "name": "--s-button-border-color"
+            },
+            {
+              "name": "--s-button-border-width"
+            },
+            {
+              "name": "--s-button-disabled-opacity"
+            },
+            {
+              "name": "--s-button-fg"
+            },
+            {
+              "name": "--s-button-focus-ring-color"
+            },
+            {
+              "name": "--s-button-focus-ring-offset"
+            },
+            {
+              "name": "--s-button-focus-ring-width"
+            },
+            {
+              "name": "--s-button-font-family"
+            },
+            {
+              "name": "--s-button-font-size"
+            },
+            {
+              "name": "--s-button-font-weight"
+            },
+            {
+              "name": "--s-button-gap"
+            },
+            {
+              "name": "--s-button-height"
+            },
+            {
+              "name": "--s-button-padding-x"
+            },
+            {
+              "name": "--s-button-radius"
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "s-button",
+          "declaration": {
+            "name": "SButton",
+            "module": "dist/button.js"
+          }
+        }
+      ]
+    }
+  ]
+}

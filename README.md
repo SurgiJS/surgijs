@@ -5,7 +5,7 @@ Compiled Web Components on JSX/TSX. The compiler hoists static HTML into templat
 - Signals with microtask batching, memos, effects, ownership and context.
 - `defineComponent` creates standard custom elements: typed attributes, property reflection, shadow or light DOM, form association.
 - `For`, `Show`, `Switch`, `Portal`, `ErrorBoundary`, `createResource`.
-- SSR to declarative shadow DOM and hydration that adopts server nodes.
+- SSR to declarative shadow DOM with nested components, control flow, streaming (`renderToStream`) and hydration that adopts server nodes.
 - Vite / Rollup and esbuild plugins with source maps.
 
 ## Install
@@ -68,15 +68,15 @@ Changing every label, ms, headless Chrome 157 ([method and full results](https:/
 
 | Library | 1 000 rows | 10 000 rows |
 | --- | ---: | ---: |
-| Native | 0.34 | 3.38 |
-| **SurgiJS** | **0.41** | **3.97** |
-| lit-html 3.3 | 0.54 | 5.02 |
-| FAST Element 3.1 | 0.58 | 5.67 |
-| Solid 1.9 | 0.83 | 6.98 |
-| Inferno 10 | 0.77 | 7.58 |
-| React 19 | 1.21 | 11.32 |
-| Svelte 5 | 2.69 | 14.65 |
-| Vue 3 | 2.18 | 30.61 |
+| Native | 0.34 | 3.48 |
+| **SurgiJS** | **0.44** | **4.25** |
+| lit-html 3.3 | 0.53 | 4.90 |
+| FAST Element 3.1 | 0.58 | 6.83 |
+| Inferno 10 | 0.75 | 7.76 |
+| Solid 1.9 | 0.77 | 7.45 |
+| React 19 | 1.23 | 11.19 |
+| Svelte 5 | 1.36 | 8.83 |
+| Vue 3 | 1.71 | 18.52 |
 
 Run it locally with `pnpm bench` (`pnpm bench surgijs solid --rows 10000` for a subset).
 
@@ -87,7 +87,7 @@ Run it locally with `pnpm bench` (`pnpm bench surgijs solid --rows 10000` for a 
 | [`@surgijs/core`](packages/surgijs) | runtime: `@surgijs/core`, `@surgijs/core/server`, `@surgijs/core/hydrate`, `@surgijs/core/jsx-runtime` |
 | [`@surgijs/compiler`](packages/compiler) | `compile()`, `@surgijs/compiler/vite`, `@surgijs/compiler/esbuild` |
 | [`@surgijs/store`](packages/store) | framework-agnostic store: one object, lazy remotes, deep-equal watches |
-| [`@surgijs/ui`](packages/ui) | accessible web components themed with CSS custom properties, with SSR (not published yet) |
+| [`@surgijs/ui`](packages/ui) | accessible web components themed with CSS custom properties, with SSR |
 
 ## Links
 

@@ -6,7 +6,7 @@
 defineComponent<P, X>(tag, render, schema?, options?)
 ```
 
-- `tag`: custom element name. A second call with a defined tag returns the existing class.
+- `tag`: custom element name. A second call with a defined tag returns the existing class and swaps in the new `render`: connected instances re-render with it. This is how hot module replacement updates a component in place. The schema and options keep their first values, and component state resets on a hot update. A module that calls `defineComponent` accepts its own updates, so modules importing its other exports keep the old values until the page reloads.
 - `render(props, host, emit)`: a function component. `props` holds a getter per schema key, `emit` dispatches the events declared in `options.events`.
 - `schema`: `{ name: String | Number | Boolean | Object | Array }`. Keys become observed attributes in kebab case (`maxItems` ↔ `max-items`) and properties on the element.
 - `options.shadow`: `true` (open shadow root, the default), a `ShadowRootInit`, or `false` for light DOM.
@@ -30,6 +30,18 @@ With a shadow root the component renders into it and slots work as usual. A clos
 In light DOM the original children move into `props.children` before the first render, and the component places them wherever it inserts `{props.children}`.
 
 Disconnecting disposes the render root and clears it in the next microtask. An element moved within the document (removed and inserted again in the same task) keeps its rendered tree and state. Reconnecting after disposal renders again with the current property values.
+
+## Styles
+
+`{ styles: css }` (a string or an array of strings) is parsed once per `defineComponent` into a `CSSStyleSheet` and adopted by every instance through `adoptedStyleSheets`, so a hundred elements share one copy of the CSS. Without constructable stylesheets, or when the CSS contains `@import` (which `replaceSync` drops), each root gets a `<style>` element instead. The option applies to shadow roots only.
+
+```ts
+defineComponent('ui-badge', Badge, {}, { styles: ':host { display: inline-block } .dot > b { color: red }' });
+```
+
+## React DevTools
+
+With the React DevTools extension installed, each custom element shows up while `vite` is serving: the element, its render function, nested components (`Show`, `For`, `Switch`, and your own), and their DOM elements. Props are the values the component last read. `useState`, `useMemo`, `useRef` and `useId` values show under "state". Picking an element on the page selects it in the tree. The Vite plugin loads `@surgijs/core/devtools` for that session. A production build does not include it.
 
 ## Forms
 

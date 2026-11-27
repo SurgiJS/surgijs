@@ -209,9 +209,21 @@ importers:
       '@surgijs/core':
         specifier: workspace:*
         version: link:../surgijs
+      '@types/react':
+        specifier: ^19.2.2
+        version: 19.3.0
       happy-dom:
         specifier: ^20.0.10
         version: 20.14.6
+      react:
+        specifier: ^19.2.0
+        version: 19.3.1
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vue:
+        specifier: ^3.5.45
+        version: 3.5.45(typescript@6.0.3)
 
 packages:
 

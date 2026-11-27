@@ -64,7 +64,8 @@ The compiler emits these; they are public for hand-written integrations.
 
 | Export | Purpose |
 | --- | --- |
-| `renderToString(tag, view, props?, options?)` | HTML with a declarative shadow root; `options.children` adds light DOM, `options.delegatesFocus` adds `shadowrootdelegatesfocus` |
+| `renderToString(tag, view, props?, options?)` | HTML with a declarative shadow root; `options.children` adds light DOM, `options.delegatesFocus` adds `shadowrootdelegatesfocus`; `options.styles` renders `<style data-s>`. Throws on an async part |
+| `renderToStream(tag, view, props?, options?)` | the same markup as a `ReadableStream<string>`, sent in chunks as async parts resolve |
 | `shadowHTML(tag, inner, attrs?, options?)` | host tag wrapper, same `options` |
 | `escape(value)`, `attrPart(name, value)` | helpers used by SSR output |
 

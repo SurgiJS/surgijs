@@ -20,6 +20,8 @@ import surgi from '@surgijs/compiler/vite';
 export default { plugins: [surgi()] };
 ```
 
+While Vite is serving, the plugin loads React DevTools support. A production build leaves it out. With the extension installed, the component tree shows up; nothing is imported by hand.
+
 esbuild:
 
 ```ts

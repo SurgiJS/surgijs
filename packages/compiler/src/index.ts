@@ -3,7 +3,7 @@ import { forEachChild, parse, type FunctionNode, type Node, type NodeOf } from '
 import { encodeMap, lineCol, lineStarts } from './map.ts';
 import { toOriginal, unwrapGetterReads } from './values.ts';
 
-export { unwrapGetterReads, GETTER_FNS, toOriginal, type Insert, type UnwrapResult } from './values.ts';
+export { unwrapGetterReads, GETTER_FNS, toOriginal, type Insert, type ShorthandRead, type UnwrapResult } from './values.ts';
 
 export interface CompileOptions {
   filename?: string;
@@ -14,13 +14,25 @@ export interface CompileOptions {
   sourceMap?: boolean;
 }
 
+export interface CompileWarning {
+  message: string;
+  /** 1-based line in the original text. */
+  line: number;
+  /** 0-based column in the original text. */
+  column: number;
+}
+
 export interface CompileResult {
   code: string;
   changed: boolean;
   map?: string;
+  warnings: CompileWarning[];
 }
 
 type Jsx = JSXElement | JSXFragment;
+
+/** A piece of server output: static HTML, or a code expression. */
+type SsrPart = string | { code: string };
 
 const isJsx = (n: Node): n is Jsx => n.type === 'JSXElement' || n.type === 'JSXFragment';
 
@@ -92,6 +104,11 @@ function cleanText(value: string): string {
 }
 
 const escText = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const RAW = new Set(['style', 'script']);
+const escRaw = (s: string, tag: string): string =>
+  s.replace(tag === 'script' ? /<(\/)?(script)(?=[\t\n\f />])/gi : /<(\/)(style)(?=[\t\n\f />])/gi, (_, slash, word) =>
+    slash ? `<\\/${word}` : `\\u003c${word}`,
+  );
 const escAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 const kebab = (s: string): string => (s.startsWith('--') ? s : s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()));
 
@@ -435,11 +452,13 @@ class Compiler {
       return () => r.name;
     };
 
-    const build = (n: JSXElement, ref: NodeRef): string => {
+    const build = (n: JSXElement, ref: NodeRef, svg = false): string => {
       const tag = this.tagName(n);
       const custom = tag.includes('-');
       if (custom) flags |= 1;
       const el = need.bind(null, ref);
+      const raw = RAW.has(tag) && !svg;
+      const inner = tag === 'svg' || (svg && tag !== 'foreignObject');
       let html = `<${tag}`;
       for (const a of n.openingElement.attributes) html += this.attribute(a, tag, custom, el, ops);
       html += '>';
@@ -453,9 +472,9 @@ class Compiler {
       };
       items.forEach((it, i) => {
         if (it.k === 'text') {
-          html += escText(it.text!);
+          html += raw ? escRaw(it.text!, tag) : escText(it.text!);
           child();
-        } else if (it.k === 'el') html += build(it.node!, child());
+        } else if (it.k === 'el') html += build(it.node!, child(), inner);
         else {
           const e = it.expr!;
           const only = items.length === 1;
@@ -627,6 +646,17 @@ class Compiler {
   // ---------------------------------------------------------------- components
 
   componentChildren(items: Item[]): string[] {
+    if (this.ssr) {
+      return items.map((it) => {
+        if (it.k === 'text') return `${this.h('element')}([${JSON.stringify(escText(it.text!))}])`;
+        if (it.k === 'el') return this.jsx(it.node!);
+        const e = it.expr!;
+        if (isJsx(e)) return this.jsx(e);
+        const x = strip(e);
+        if (isFn(x)) return this.expr(x);
+        return `${this.h('text')}(${this.expr(x)})`;
+      });
+    }
     return items.map((it) => {
       if (it.k === 'text') return JSON.stringify(it.text);
       if (it.k === 'el') return this.jsx(it.node!);
@@ -639,7 +669,6 @@ class Compiler {
   }
 
   component(node: JSXElement, tag: string): string {
-    if (this.ssr) return '""';
     const short = tag.split('.').pop()!;
     const provider = short === 'Provider';
     const builtin = BUILTIN.has(tag) || provider;
@@ -689,12 +718,13 @@ class Compiler {
       else if (builtin) props.push(`children: ${value}`);
       else props.push(`children: () => ${value}`);
     }
+    if (this.ssr) return `${this.h('component')}(${BUILTIN.has(tag) ? this.h(tag) : tag}, { ${props.join(', ')} })`;
     return `${this.h('createComponent')}(${tag}, { ${props.join(', ')} })`;
   }
 
   fragment(children: readonly JSXChild[]): string {
     const items = this.children(children);
-    if (this.ssr) return this.ssrConcat(this.ssrItems(items));
+    if (this.ssr) return this.ssrNode(this.ssrItems(items, false), 'fragment');
     const values = items.map((it) => {
       if (it.k === 'text') return JSON.stringify(it.text);
       if (it.k === 'el') return this.jsx(it.node!);
@@ -706,7 +736,11 @@ class Compiler {
 
   // ---------------------------------------------------------------- SSR
 
-  ssrConcat(parts: (string | { code: string })[]): string {
+  /**
+   * `element([...])`: a string part is HTML already, a `{ code }` part evaluates to an attribute
+   * string, a text hole (`text(value)`), a nested component thunk or a child element.
+   */
+  ssrNode(parts: SsrPart[], helper = 'element'): string {
     const out: string[] = [];
     let buf = '';
     for (const p of parts) {
@@ -718,7 +752,7 @@ class Compiler {
       }
     }
     if (buf || !out.length) out.push(JSON.stringify(buf));
-    return out.length === 1 ? out[0]! : `(${out.join(' + ')})`;
+    return `${this.h(helper)}([${out.join(', ')}])`;
   }
 
   hasJsx(e: Node): boolean {
@@ -732,36 +766,59 @@ class Compiler {
     return found;
   }
 
-  ssrItems(items: Item[]): (string | { code: string })[] {
-    const parts: (string | { code: string })[] = [];
+  /**
+   * Parts for a list of children. `markers` writes a placeholder after each dynamic child except the last.
+   * `tag` is set only for raw text elements (HTML `style`/`script`); `svg` is the namespace of the children.
+   */
+  ssrItems(items: Item[], markers = true, tag = '', svg = false): SsrPart[] {
+    if (tag && items.some((it) => it.k === 'dyn')) return this.ssrRaw(items, tag);
+    const parts: SsrPart[] = [];
+    const only = items.length === 1;
     items.forEach((it, i) => {
-      if (it.k === 'text') parts.push(escText(it.text!));
-      else if (it.k === 'el') parts.push(...this.ssrParts(it.node!));
-      else {
-        const only = items.length === 1;
-        const last = i === items.length - 1;
-        const e = it.expr!;
-        const hole = isJsx(e) || this.hasJsx(e) || isFn(e as Expression);
-        if (!only && !last) parts.push('<!---->');
-        else if (!hole) {
-          const x = getterBody(e as Expression) ?? strip(e as Expression);
-          const code = `${this.h('escape')}(${this.expr(x)})`;
-          parts.push({ code: only && isDynamic(x) && this.isTextual(x) ? `(${code} || " ")` : code });
-        }
+      if (it.k === 'text') {
+        parts.push(tag ? escRaw(it.text!, tag) : escText(it.text!));
+        return;
       }
+      if (it.k === 'el') {
+        parts.push(...this.ssrParts(it.node!, svg));
+        return;
+      }
+      const e = it.expr!;
+      if (isJsx(e)) parts.push({ code: this.jsx(e) });
+      else {
+        const x = getterBody(e as Expression) ?? strip(e as Expression);
+        const code = `${this.h('text')}(${this.expr(x)})`;
+        parts.push({ code: only && isDynamic(x) && this.isTextual(x) ? `(${code} || " ")` : code });
+      }
+      if (markers && i < items.length - 1) parts.push('<!---->');
     });
     return parts;
   }
 
-  ssrElement(node: JSXElement): string {
-    return this.ssrConcat(this.ssrParts(node));
+  /** `<style>`/`<script>` with dynamic text: escaped as a whole, since a closing tag can span fragments. */
+  ssrRaw(items: Item[], tag: string): SsrPart[] {
+    const values: string[] = [];
+    for (const it of items) {
+      if (it.k === 'text') values.push(JSON.stringify(it.text));
+      else if (it.k === 'dyn') {
+        const e = it.expr!;
+        if (isJsx(e) || this.hasJsx(e) || isFn(e as Expression)) continue;
+        values.push(this.expr(getterBody(e as Expression) ?? strip(e as Expression)));
+      }
+    }
+    const code = `${this.h('escapeRaw')}([${values.join(', ')}], ${JSON.stringify(tag)})`;
+    return [{ code: `(${code} || " ")` }];
   }
 
-  ssrParts(node: JSXElement): (string | { code: string })[] {
+  ssrElement(node: JSXElement): string {
+    return this.ssrNode(this.ssrParts(node));
+  }
+
+  ssrParts(node: JSXElement, svg = false): SsrPart[] {
     const opening = node.openingElement;
     const tag = this.tagName(node);
     const custom = tag.includes('-');
-    const parts: (string | { code: string })[] = [`<${tag}`];
+    const parts: SsrPart[] = [`<${tag}`];
     for (const a of opening.attributes) {
       if (a.type === 'JSXSpreadAttribute') continue;
       const { ns, local } = attrName(a);
@@ -804,7 +861,7 @@ class Compiler {
     }
     parts.push('>');
     if (!VOID.has(tag)) {
-      parts.push(...this.ssrItems(this.children(node.children)));
+      parts.push(...this.ssrItems(this.children(node.children), true, RAW.has(tag) && !svg ? tag : '', tag === 'svg' || (svg && tag !== 'foreignObject')));
       parts.push(`</${tag}>`);
     }
     return parts;
@@ -816,11 +873,22 @@ class Compiler {
  * `generate: 'ssr'`, into string concatenation). Code without JSX returns unchanged.
  */
 export function compile(code: string, options: CompileOptions = {}): CompileResult {
-  if (!/<[A-Za-z>]/.test(code)) return { code, changed: false };
+  if (!/<[A-Za-z>]/.test(code)) return { code, changed: false, warnings: [] };
   const filename = options.filename ?? 'input.tsx';
   const ssr = options.generate === 'ssr';
   const moduleName = options.moduleName ?? '@surgijs/core';
   const unwrapped = unwrapGetterReads(code, filename);
+  const origStarts = lineStarts(code);
+  const warnings = unwrapped.shorthand.map(({ name, pos }): CompileWarning => {
+    const [line, column] = lineCol(origStarts, pos);
+    return {
+      message:
+        `Shorthand \`{ ${name} }\` reads the signal once, when the object is created, and compiles to \`${name}: ${name}()\`. ` +
+        `Write \`${name}: () => ${name}()\` to keep it live, or \`${name}: ${name}()\` if the snapshot is intended.`,
+      line: line + 1,
+      column,
+    };
+  });
   const src = unwrapped.code;
   const program = parse(filename, src);
   const c = new Compiler(src, ssr, unwrapped.textual);
@@ -843,7 +911,7 @@ export function compile(code: string, options: CompileOptions = {}): CompileResu
     forEachChild(n, find);
   };
   find(program);
-  if (!chunks.length && !unwrapped.inserts.length) return { code, changed: false };
+  if (!chunks.length && !unwrapped.inserts.length) return { code, changed: false, warnings };
   chunks.push({ text: src.slice(pos), at: pos, copy: true });
 
   if (c.events.size) c.h('delegate');
@@ -858,10 +926,9 @@ export function compile(code: string, options: CompileOptions = {}): CompileResu
   const suffix = c.events.size ? `\n_$delegate(${JSON.stringify([...c.events])});\n` : '';
   const out = prefix + body + suffix;
 
-  const result: CompileResult = { code: out, changed: true };
+  const result: CompileResult = { code: out, changed: true, warnings };
   if (options.sourceMap === false) return result;
 
-  const origStarts = lineStarts(code);
   const lines: ([number, number] | null)[] = [];
   const prefixLines = prefix.split('\n').length - 1;
   for (let i = 0; i < prefixLines; i++) lines.push(null);

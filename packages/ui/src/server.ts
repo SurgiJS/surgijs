@@ -1,5 +1,6 @@
 import { renderToString } from '@surgijs/core/server';
 import * as button from './button/button.view.tsx?ssr';
+import { buttonStyles } from './button/button.styles';
 import type { ButtonProps } from './button/button.view';
 
 /**
@@ -8,5 +9,5 @@ import type { ButtonProps } from './button/button.view';
  * with `enableHydration()` from `@surgijs/core/hydrate`.
  */
 export function renderButton(props: ButtonProps = {}, children = ''): string {
-  return renderToString('s-button', button.Button!, props as Record<string, unknown>, { children, delegatesFocus: true });
+  return renderToString('s-button', button.Button!, props as Record<string, unknown>, { children, delegatesFocus: true, styles: buttonStyles });
 }
