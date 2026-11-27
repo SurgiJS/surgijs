@@ -863,13 +863,13 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     },
   };
 
-  const replace = (next: Record<string, unknown>): void => {
+  const replace = (next: Record<string, unknown>, full = true): void => {
     quiet = true;
     restoring = true;
     try {
       const restored: [string, RemoteEntry][] = [];
       for (const [key, entry] of remotes) {
-        if (!Object.prototype.hasOwnProperty.call(next, key)) continue;
+        if (!full && !Object.prototype.hasOwnProperty.call(next, key)) continue;
         clearTimer(entry);
         entry.ctrl?.abort();
         entry.ctrl = null;
@@ -901,7 +901,7 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
       else if (action.type === 'set' && typeof action.key === 'string') store.set(action.key as never, action.value as never);
       else if (action.type === 'set' && action.payload && typeof action.payload === 'object' && !Array.isArray(action.payload))
         (store.set as (value: Record<string, unknown>) => void)(action.payload as Record<string, unknown>);
-      else if (action.type == null) replace(action);
+      else if (action.type == null) replace(action, false);
     } finally {
       quiet = false;
     }

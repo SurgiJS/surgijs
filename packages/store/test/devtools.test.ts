@@ -159,6 +159,39 @@ describe('redux devtools', () => {
     expect(store.get()).toEqual({ item: 'old' });
   });
 
+  it('resets a remote that the restored state omits', async () => {
+    install();
+    let resolve = (_v: string) => {};
+    let calls = 0;
+    const store = createStore({
+      n: 1,
+      item: remote({
+        deps: () => 'k',
+        retry: 0,
+        fetch: () => {
+          calls += 1;
+          return calls === 1 ? 'loaded' : new Promise<string>((r) => (resolve = r));
+        },
+      }),
+    });
+    store.subscribe(
+      (s) => s.item,
+      () => {},
+    );
+    expect(store.get()).toEqual({ n: 1, item: 'loaded' });
+    void store.refetch('item');
+    expect(store.status('item').isFetching).toBe(true);
+
+    jump({ n: 2 });
+    expect(store.get().item).toBeUndefined();
+    expect(store.status('item').isFetching).toBe(false);
+    resolve('late');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(store.get()).toEqual({ n: 2, item: undefined });
+    expect(calls).toBe(2);
+  });
+
   it('applies a set typed into the monitor and refetches', () => {
     install();
     let fetches = 0;
