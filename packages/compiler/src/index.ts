@@ -6,7 +6,7 @@ export { unwrapGetterReads, GETTER_FNS, toOriginal, type Insert, type UnwrapResu
 
 export interface CompileOptions {
   filename?: string;
-  /** Runtime module the output imports from. `surgijs` by default; SSR uses `<moduleName>/server`. */
+  /** Runtime module the output imports from. `@surgijs/core` by default; SSR uses `<moduleName>/server`. */
   moduleName?: string;
   generate?: 'dom' | 'ssr';
   /** Emit a source map (default `true`). */
@@ -804,7 +804,7 @@ export function compile(code: string, options: CompileOptions = {}): CompileResu
   if (!/<[A-Za-z>]/.test(code)) return { code, changed: false };
   const filename = options.filename ?? 'input.tsx';
   const ssr = options.generate === 'ssr';
-  const moduleName = options.moduleName ?? 'surgijs';
+  const moduleName = options.moduleName ?? '@surgijs/core';
   const unwrapped = unwrapGetterReads(code, filename);
   const src = unwrapped.code;
   const sf = ts.createSourceFile(filename, src, ts.ScriptTarget.Latest, true, KIND(filename));

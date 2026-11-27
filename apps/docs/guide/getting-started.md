@@ -7,7 +7,7 @@ npm i surgijs
 npm i -D @surgijs/compiler typescript
 ```
 
-`surgijs` is the runtime. `@surgijs/compiler` turns JSX into DOM code at build time and needs `typescript` (5.x or 6.x) as a peer.
+`@surgijs/core` is the runtime. `@surgijs/compiler` turns JSX into DOM code at build time and needs `typescript` (5.x or 6.x) as a peer.
 
 ## Build plugin
 
@@ -37,7 +37,7 @@ Both plugins compile `.jsx` and `.tsx` files outside `node_modules`. The `includ
 {
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "surgijs",
+    "jsxImportSource": "@surgijs/core",
     "moduleResolution": "bundler",
     "strict": true
   }
@@ -49,7 +49,7 @@ Both plugins compile `.jsx` and `.tsx` files outside `node_modules`. The `includ
 ## First component
 
 ```tsx
-import { defineComponent, useEffect, useState, type ReactiveProps } from 'surgijs';
+import { defineComponent, useEffect, useState, type ReactiveProps } from '@surgijs/core';
 
 export interface CounterProps {
   step?: number;

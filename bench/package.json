@@ -17,7 +17,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "solid-js": "^1.9.19",
-    "surgijs": "workspace:*",
+    "@surgijs/core": "workspace:*",
     "svelte": "^5.57.3",
     "vue": "^3.5.45"
   }

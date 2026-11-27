@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMemo, createRoot, flush, useState, type ReactiveProps } from 'surgijs';
+import { createMemo, createRoot, flush, useState, type ReactiveProps } from '@surgijs/core';
 
 describe('getter reads', () => {
   it('reads signals and memos as values inside JSX', () => {

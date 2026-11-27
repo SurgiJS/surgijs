@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { flush } from 'surgijs';
+import { flush } from '@surgijs/core';
 import '../../../apps/playground/src/dropdown.tsx';
 
 const OPTIONS = '[{"value":"ts","label":"TypeScript"},{"value":"go","label":"Go"}]';

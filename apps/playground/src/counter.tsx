@@ -1,4 +1,4 @@
-import { defineComponent, useEffect, useState, type ReactiveProps } from 'surgijs';
+import { defineComponent, useEffect, useState, type ReactiveProps } from '@surgijs/core';
 
 export interface CounterProps {
   step?: number;

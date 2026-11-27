@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { defineComponent, flush, onCleanup, useEffect, useRef, useState, type FormHost, type ReactiveProps } from 'surgijs';
+import { defineComponent, flush, onCleanup, useEffect, useRef, useState, type FormHost, type ReactiveProps } from '@surgijs/core';
 import { MyCounter } from '../../../apps/playground/src/counter.tsx';
 
 interface FakeInternals {

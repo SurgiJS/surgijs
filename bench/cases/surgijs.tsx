@@ -1,4 +1,4 @@
-import { For, createRoot, createSignal, flush, insert, type Setter } from 'surgijs';
+import { For, createRoot, createSignal, flush, insert, type Setter } from '@surgijs/core';
 
 interface Data {
   id: number;

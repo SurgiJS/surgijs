@@ -8,8 +8,8 @@ export default defineProject({
   plugins: [surgi()],
   resolve: {
     alias: [
-      { find: /^surgijs$/, replacement: `${src}index.ts` },
-      { find: /^surgijs\/(.*)$/, replacement: `${src}$1.ts` },
+      { find: /^@surgijs\/core$/, replacement: `${src}index.ts` },
+      { find: /^@surgijs\/core\/(.*)$/, replacement: `${src}$1.ts` },
     ],
   },
   esbuild: { jsx: 'preserve' },

@@ -41,7 +41,7 @@ importers:
       '@surgijs/compiler':
         specifier: workspace:*
         version: link:../../packages/compiler
-      surgijs:
+      '@surgijs/core':
         specifier: workspace:*
         version: link:../../packages/surgijs
       vitepress:
@@ -56,7 +56,7 @@ importers:
       '@surgijs/compiler':
         specifier: workspace:*
         version: link:../../packages/compiler
-      surgijs:
+      '@surgijs/core':
         specifier: workspace:*
         version: link:../../packages/surgijs
       vite:
@@ -74,6 +74,9 @@ importers:
       '@surgijs/compiler':
         specifier: workspace:*
         version: link:../packages/compiler
+      '@surgijs/core':
+        specifier: workspace:*
+        version: link:../packages/surgijs
       babel-preset-solid:
         specifier: ^1.9.19
         version: 1.9.19(@babel/core@7.29.13)(solid-js@1.9.19)
@@ -98,9 +101,6 @@ importers:
       solid-js:
         specifier: ^1.9.19
         version: 1.9.19
-      surgijs:
-        specifier: workspace:*
-        version: link:../packages/surgijs
       svelte:
         specifier: ^5.57.3
         version: 5.57.3

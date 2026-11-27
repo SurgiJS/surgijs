@@ -12,7 +12,7 @@ import {
   onCleanup,
   untrack,
   useEffect,
-} from 'surgijs';
+} from '@surgijs/core';
 
 describe('signals', () => {
   it('reads and writes with Object.is', () => {

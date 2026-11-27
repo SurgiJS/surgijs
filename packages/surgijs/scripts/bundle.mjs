@@ -6,13 +6,13 @@ import { build } from 'esbuild';
 const src = fileURLToPath(new URL('../src/', import.meta.url));
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 
-/** esbuild plugin: `surgijs` from workspace sources, `.tsx` through the compiler sources. */
+/** esbuild plugin: `@surgijs/core` from workspace sources, `.tsx` through the compiler sources. */
 export function workspace() {
   return {
     name: 'surgijs-workspace',
     setup(b) {
-      b.onResolve({ filter: /^surgijs$/ }, () => ({ path: `${src}index.ts` }));
-      b.onResolve({ filter: /^surgijs\/(.+)$/ }, (args) => ({ path: `${src}${args.path.slice('surgijs/'.length)}.ts` }));
+      b.onResolve({ filter: /^@surgijs\/core$/ }, () => ({ path: `${src}index.ts` }));
+      b.onResolve({ filter: /^@surgijs\/core\/(.+)$/ }, (args) => ({ path: `${src}${args.path.slice('@surgijs/core/'.length)}.ts` }));
       b.onLoad({ filter: /\.[jt]sx$/ }, async (args) => {
         const { compile } = await import(`${root}packages/compiler/src/index.ts`);
         const source = await readFile(args.path, 'utf8');
@@ -53,10 +53,10 @@ export async function bundle(contents) {
 
 /** Size budgets, min+gzip bytes. */
 export const CASES = [
-  { name: 'full runtime (export *)', entry: "export * from 'surgijs';", limit: 6072 },
+  { name: 'full runtime (export *)', entry: "export * from '@surgijs/core';", limit: 6072 },
   {
     name: 'useState only',
-    entry: "import { useState } from 'surgijs'; const [n, setN] = useState(0); setN(1); console.log(n());",
+    entry: "import { useState } from '@surgijs/core'; const [n, setN] = useState(0); setN(1); console.log(n());",
     limit: 720,
   },
   { name: 'counter app (compiled)', entry: "export * from './apps/playground/src/counter.tsx';", limit: 3647 },

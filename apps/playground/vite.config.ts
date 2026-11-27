@@ -8,8 +8,8 @@ export default defineConfig({
   plugins: [surgi()],
   resolve: {
     alias: [
-      { find: /^surgijs$/, replacement: `${runtime}index.ts` },
-      { find: /^surgijs\/(.*)$/, replacement: `${runtime}$1.ts` },
+      { find: /^@surgijs\/core$/, replacement: `${runtime}index.ts` },
+      { find: /^@surgijs\/core\/(.*)$/, replacement: `${runtime}$1.ts` },
     ],
   },
 });

@@ -16,7 +16,7 @@ pnpm install
 | `pnpm typecheck` | `tsc --noEmit` in every package, tests and examples included |
 | `pnpm test` | vitest for the compiler (node) and the runtime (happy-dom) |
 | `pnpm size` | gzip budgets for the runtime and the example apps |
-| `pnpm build` | tsup builds of `surgijs` and `@surgijs/compiler` |
+| `pnpm build` | tsup builds of `@surgijs/core` and `@surgijs/compiler` |
 | `pnpm dev` | playground on Vite |
 | `pnpm docs:dev` | documentation site |
 | `pnpm bench [ids...] [--rows N]` | benchmark in headless Chrome (`CHROME_PATH` overrides the binary) |
@@ -34,7 +34,7 @@ Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit
 
 ## Changesets
 
-Every change to `surgijs`, `@surgijs/compiler`, or `@surgijs/store` comes with a changeset:
+Every change to `@surgijs/core`, `@surgijs/compiler`, or `@surgijs/store` comes with a changeset:
 
 ```bash
 pnpm changeset

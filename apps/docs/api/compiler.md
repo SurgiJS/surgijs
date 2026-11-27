@@ -11,7 +11,7 @@ const { code, changed, map } = compile(source, { filename: 'app.tsx' });
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `filename` | `'input.tsx'` | used for parsing mode and the source map |
-| `moduleName` | `'surgijs'` | runtime module of the generated imports; SSR imports `<moduleName>/server` |
+| `moduleName` | `'@surgijs/core'` | runtime module of the generated imports; SSR imports `<moduleName>/server` |
 | `generate` | `'dom'` | `'ssr'` emits string concatenation |
 | `sourceMap` | `true` | returns a V3 source map as JSON in `map` |
 
