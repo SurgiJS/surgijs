@@ -288,7 +288,7 @@ function commit(root: Root): void {
   }
 }
 
-function onRender(host: HTMLElement, fn: (props: any, host: HTMLElement) => unknown, props: object): unknown {
+function onRender(host: HTMLElement, fn: (props: any, host: HTMLElement, emit: any) => unknown, props: object, emit: unknown): unknown {
   const top = make(HostRoot, null, null, null);
   const root: Root = { current: null, containerInfo: host, pendingChildren: null, tag: 1, memoizedUpdaters: new Set(), inst: top };
   top.root = root;
@@ -298,7 +298,7 @@ function onRender(host: HTMLElement, fn: (props: any, host: HTMLElement) => unkn
   roots.add(root);
   byHost.set(host, root);
   const wrapped = watch(comp, props);
-  return render(comp, () => fn(wrapped, host));
+  return render(comp, () => fn(wrapped, host, emit));
 }
 
 function onComponent<P, R>(fn: (props: P) => R, props: P): R {

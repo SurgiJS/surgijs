@@ -16,7 +16,7 @@ export type ReactiveProps<P> = { readonly [K in keyof P]-?: Accessor<P[K]> } & {
   readonly '~props'?: P;
 };
 
-export interface ComponentOptions {
+export interface ComponentOptions<X = {}> {
   /** `{ mode: 'open' }` by default; `false` renders into light DOM. */
   shadow?: boolean | ShadowRootInit;
   /** Form-associated element with `ElementInternals`. */
@@ -27,6 +27,8 @@ export interface ComponentOptions {
    * `<style>` per root where constructable stylesheets are missing. Ignored in light DOM.
    */
   styles?: string | string[];
+  /** Events the component emits, each built with `defineEvent<T>()`. Their `detail` types make up `X`. */
+  events?: X;
 }
 
 export interface FormHost extends HTMLElement {
@@ -35,8 +37,53 @@ export interface FormHost extends HTMLElement {
   formDisabled: Accessor<boolean>;
 }
 
-export interface ComponentClass<P> {
-  new (): HTMLElement & P;
+export interface EventOptions {
+  /** Default `true`. */
+  bubbles?: boolean;
+  /** Default `true`, so listeners outside the shadow root receive the event. */
+  composed?: boolean;
+  /** Default `false`. */
+  cancelable?: boolean;
+}
+
+/** An event the component emits. `T` is the `detail` type; `void` means no detail. */
+export interface EventDecl<T = void> extends EventOptions {
+  readonly '~detail': T;
+}
+
+export type EventDecls = Record<string, EventDecl<any>>;
+
+type DetailOf<D> = D extends EventDecl<infer T> ? T : never;
+
+type EmitArgs<X> = {
+  [K in keyof X & string]: [name: K, ...detail: [DetailOf<X[K]>] extends [void] ? [] : [detail: DetailOf<X[K]>]];
+}[keyof X & string];
+
+/** `emit(name, detail)` for the events declared in `X`; `void` events take no detail. */
+export type Emit<X> = (...args: EmitArgs<X>) => boolean;
+
+export interface TypedEventTarget<X> {
+  addEventListener<K extends keyof X & string>(
+    type: K,
+    listener: (event: CustomEvent<DetailOf<X[K]>>) => void,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  removeEventListener<K extends keyof X & string>(
+    type: K,
+    listener: (event: CustomEvent<DetailOf<X[K]>>) => void,
+    options?: boolean | EventListenerOptions,
+  ): void;
+}
+
+type EventTargetOf<X> = [keyof X] extends [never] ? {} : TypedEventTarget<X>;
+
+/** Declares an event for `defineComponent`'s `events` option. The type argument is the `detail` type. */
+export function defineEvent<T = void>(options: EventOptions = {}): EventDecl<T> {
+  return options as EventDecl<T>;
+}
+
+export interface ComponentClass<P, X = {}> {
+  new (): EventTargetOf<X> & HTMLElement & P;
   readonly observedAttributes: string[];
 }
 
@@ -88,22 +135,23 @@ interface Host extends HTMLElement {
 }
 
 /**
- * Defines a custom element whose shadow root (or light DOM) renders `render(props, host)`
- * once per connection. `schema` lists observed props and their attribute coercion.
+ * Defines a custom element whose shadow root (or light DOM) renders `render(props, host, emit)`
+ * once per connection. `schema` lists observed props and their attribute coercion; `options.events`
+ * declares the events `emit` may dispatch on the host.
  * Defining an already defined tag swaps its render and re-renders connected instances, which is
  * how hot module replacement updates components; the schema and options stay as first defined.
  */
-export function defineComponent<P extends object = {}>(
+export function defineComponent<P extends object = {}, X extends EventDecls = {}>(
   tag: string,
-  render: (props: ReactiveProps<P>, host: HTMLElement) => JSX.Element,
+  render: (props: ReactiveProps<P>, host: HTMLElement, emit: Emit<X>) => JSX.Element,
   schema: NoInfer<Schema<P>> = {},
-  options: ComponentOptions = {},
-): ComponentClass<P> {
-  if (typeof customElements === 'undefined') return class {} as unknown as ComponentClass<P>;
+  options: ComponentOptions<X> = {},
+): ComponentClass<P, X> {
+  if (typeof customElements === 'undefined') return class {} as unknown as ComponentClass<P, X>;
   const existing = customElements.get(tag);
   if (existing) {
     updates.get(existing)?.(render);
-    return existing as unknown as ComponentClass<P>;
+    return existing as unknown as ComponentClass<P, X>;
   }
 
   const types = schema as Record<string, PropType>;
@@ -116,6 +164,7 @@ export function defineComponent<P extends object = {}>(
   const closed = shadow && shadow.mode === 'closed';
   const form = !!options.form;
   const light = !shadow && !('children' in types);
+  const events = options.events as EventDecls | undefined;
   const css = shadow && options.styles ? ([] as string[]).concat(options.styles) : null;
   // replaceSync drops @import rules, so such CSS keeps a <style> element.
   const adopt = typeof CSSStyleSheet != 'undefined' && 'replaceSync' in CSSStyleSheet.prototype && !css?.some((c) => /@imp/i.test(c));
@@ -127,6 +176,8 @@ export function defineComponent<P extends object = {}>(
     const self = el as unknown as Host;
     self.__o = owner;
     hosts.add(el);
+    const emit = ((name: string, detail?: unknown) =>
+      el.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, ...events?.[name], detail }))) as unknown as Emit<X>;
     createRoot((dispose) => {
       self.__d = dispose;
       deferMount(() => {
@@ -134,7 +185,7 @@ export function defineComponent<P extends object = {}>(
         const shared = css && !adopt;
         insert(
           root,
-          devRender ? devRender(el, current, self.__p) : current(self.__p as ReactiveProps<P>, el),
+          devRender ? devRender(el, current, self.__p, emit) : current(self.__p as ReactiveProps<P>, el, emit),
           shared ? null : undefined,
           shared && hydrated ? Array.from(root.childNodes) : undefined,
         );
@@ -283,5 +334,5 @@ export function defineComponent<P extends object = {}>(
     }
   });
   customElements.define(tag, Element);
-  return Element as unknown as ComponentClass<P>;
+  return Element as unknown as ComponentClass<P, X>;
 }

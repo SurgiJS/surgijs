@@ -1,6 +1,6 @@
 /** React DevTools hooks. Null until `@surgijs/core/devtools` installs them. */
 
-export let devRender: ((host: HTMLElement, render: (props: any, host: HTMLElement) => unknown, props: object) => unknown) | null = null;
+export let devRender: ((host: HTMLElement, render: (props: any, host: HTMLElement, emit: any) => unknown, props: object, emit: unknown) => unknown) | null = null;
 
 export let devUnmount: ((host: Node) => void) | null = null;
 
