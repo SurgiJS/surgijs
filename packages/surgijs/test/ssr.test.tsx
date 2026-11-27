@@ -31,6 +31,9 @@ describe('server helpers', () => {
     expect(attrPart('hidden', true)).toBe(' hidden');
     expect(attrPart('hidden', false)).toBe('');
     expect(shadowHTML('x-a', '<b></b>', { maxItems: 2 })).toBe('<x-a max-items="2"><template shadowrootmode="open"><b></b></template></x-a>');
+    expect(shadowHTML('x-a', '<slot></slot>', {}, { children: 'Save', delegatesFocus: true })).toBe(
+      '<x-a><template shadowrootmode="open" shadowrootdelegatesfocus><slot></slot></template>Save</x-a>',
+    );
   });
 
   it('renders a compiled component into declarative shadow DOM', () => {

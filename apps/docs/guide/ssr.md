@@ -12,7 +12,7 @@ const html = renderToString('my-counter', Counter, { title: 'Clicks', step: 2 })
 // <my-counter title="Clicks" step="2"><template shadowrootmode="open"><div class="card">…</div></template></my-counter>
 ```
 
-The SSR output concatenates strings with `escape` and `attrPart` and never touches a DOM. `shadowHTML(tag, inner, attrs)` builds the declarative shadow DOM wrapper for custom markup.
+The SSR output concatenates strings with `escape` and `attrPart` and never touches a DOM. `shadowHTML(tag, inner, attrs, options)` builds the declarative shadow DOM wrapper for custom markup. Both take `options.children`, light DOM markup placed after the template and projected into slots (it is not escaped), and `options.delegatesFocus`, which renders `shadowrootdelegatesfocus` to match `attachShadow({ delegatesFocus: true })`.
 
 ## Hydration
 

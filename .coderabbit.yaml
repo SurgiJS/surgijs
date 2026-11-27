@@ -37,6 +37,20 @@ reviews:
     - "!apps/docs/.vitepress/cache/**"
 
   path_instructions:
+    - path: "packages/ui/src/**"
+      instructions: |
+        `@surgijs/ui` web components; `@surgijs/core` is the only peer.
+        - Every visual value goes through a `--s-<component>-*` custom property that
+          defaults to a theme token from themes.css with a light fallback.
+        - Component CSS must not contain `<`, `>`, `&` or `"`: the SSR compiler escapes
+          `<style>` text, which would break server-rendered styles.
+        - Views run on the server too (`host` is undefined there); flag DOM access during render.
+        - Check accessibility: native elements first, accessible names, focus handling,
+          `aria-*` states, keyboard support, reduced motion and forced colors.
+    - path: "apps/storybook/e2e/**"
+      instructions: |
+        Playwright suite run in the official image. Screenshots must stay deterministic:
+        flag timing-based waits, animations left running and host-specific assumptions.
     - path: "packages/surgijs/src/**"
       instructions: |
         Runtime package: zero dependencies, `sideEffects: false`, strict gzip budgets

@@ -14,11 +14,14 @@ pnpm install
 | Command | What it does |
 | --- | --- |
 | `pnpm typecheck` | `tsc --noEmit` in every package, tests and examples included |
-| `pnpm test` | vitest for the compiler (node) and the runtime (happy-dom) |
+| `pnpm test` | vitest for the compiler (node), the runtime and `@surgijs/ui` (happy-dom) |
 | `pnpm size` | gzip budgets for the runtime and the example apps |
-| `pnpm build` | tsup builds of `@surgijs/core` and `@surgijs/compiler` |
+| `pnpm build` | tsup builds of every package in `packages/` |
 | `pnpm dev` | playground on Vite |
 | `pnpm docs:dev` | documentation site |
+| `pnpm storybook` | Storybook for `@surgijs/ui` |
+| `pnpm test:e2e` | builds, then runs Playwright in Docker: behavior, axe accessibility audits and SSR in Chromium, Firefox and WebKit, plus visual regression in Chromium |
+| `pnpm test:e2e:update` | the same, rewriting the screenshot baselines |
 | `pnpm bench [ids...] [--rows N]` | benchmark in headless Chrome (`CHROME_PATH` overrides the binary) |
 
 Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit.
@@ -28,6 +31,8 @@ Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit
 - `packages/surgijs`: runtime, zero dependencies, `sideEffects: false`.
 - `packages/compiler`: JSX compiler and the Vite / esbuild plugins; `oxc-parser` is its only runtime dependency.
 - `packages/store`: framework-agnostic `@surgijs/store` (optional React entry); no dependency on the runtime.
+- `packages/ui`: `@surgijs/ui` web components; `@surgijs/core` is its peer.
+- `apps/storybook`: stories for `@surgijs/ui` and the Playwright suite in `e2e/`.
 - `apps/playground`: examples, also used by the runtime tests and the docs.
 - `apps/docs`: VitePress site.
 - `bench`: benchmark against other libraries; its dependencies stay out of the published packages.
@@ -45,6 +50,18 @@ Both packages version together as a fixed group. Below 1.0, breaking changes bum
 ## Size budgets
 
 Budgets live in `packages/surgijs/scripts/bundle.mjs`. Raise a limit only when the behavior is correct and the extra bytes are necessary, and set the new limit tight to the measured size.
+
+## UI components
+
+Each component in `packages/ui/src/<name>/` has a view (`<name>.view.tsx`) shared by the client and the server, its CSS in `<name>.styles.ts`, and registration in `index.ts`; `src/server.ts` renders it with the view imported as `?ssr`. A new component comes with:
+
+- unit and SSR tests in `packages/ui/test`;
+- stories in `apps/storybook/stories`, which the Playwright suite picks up for axe audits and screenshots in both themes;
+- a docs page in `apps/docs/ui`.
+
+Every visual value goes through a `--s-<component>-*` custom property that defaults to a token from `themes.css`. Component CSS avoids `<`, `>`, `&` and `"`, which the SSR compiler escapes inside `<style>`.
+
+Screenshots come from the official Playwright image, so they only match when taken there: run `pnpm test:e2e` (Docker or Podman) rather than Playwright on the host. After an intended visual change, run `pnpm test:e2e:update`, look at the new images in `apps/storybook/e2e/__screenshots__`, and commit them.
 
 ## Code review
 

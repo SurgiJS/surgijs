@@ -3,6 +3,7 @@ import { defineConfig } from 'vitepress';
 import surgi from '../../../packages/compiler/src/vite.ts';
 
 const runtime = fileURLToPath(new URL('../../../packages/surgijs/src/', import.meta.url));
+const ui = fileURLToPath(new URL('../../../packages/ui/src/', import.meta.url));
 
 export default defineConfig({
   title: 'SurgiJS',
@@ -10,20 +11,26 @@ export default defineConfig({
   base: process.env.DOCS_BASE ?? '/',
   cleanUrls: true,
   vue: {
-    template: { compilerOptions: { isCustomElement: (tag) => ['my-counter', 'ui-dropdown', 'ui-virtual-table', 'ui-tile-grid'].includes(tag) } },
+    template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('s-') || ['my-counter', 'ui-dropdown', 'ui-virtual-table', 'ui-tile-grid'].includes(tag) } },
   },
   vite: {
-    plugins: [surgi({ include: /apps\/playground\/src\/.*\.tsx$/ })],
+    plugins: [surgi({ include: /(apps\/playground|packages\/ui)\/src\/.*\.tsx$/ })],
     resolve: {
       alias: [
         { find: /^@surgijs\/core$/, replacement: `${runtime}index.ts` },
         { find: /^@surgijs\/core\/(.*)$/, replacement: `${runtime}$1.ts` },
+        { find: /^@surgijs\/ui$/, replacement: `${ui}index.ts` },
+        { find: /^@surgijs\/ui\/themes\.css$/, replacement: `${ui}themes.css` },
       ],
     },
   },
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'UI', link: '/ui/' },
+      // Built by the docs workflow into /storybook/ and /playground/ next to the site.
+      { text: 'Storybook', link: 'https://surgijs.github.io/surgijs/storybook/' },
+      { text: 'Playground', link: 'https://surgijs.github.io/surgijs/playground/' },
       { text: 'API', link: '/api/' },
       { text: 'Benchmark', link: '/guide/performance' },
     ],
@@ -39,6 +46,13 @@ export default defineConfig({
           { text: 'Control flow', link: '/guide/control-flow' },
           { text: 'SSR and hydration', link: '/guide/ssr' },
           { text: 'Performance', link: '/guide/performance' },
+        ],
+      },
+      {
+        text: 'UI components',
+        items: [
+          { text: 'Overview and theming', link: '/ui/' },
+          { text: 'Button', link: '/ui/button' },
         ],
       },
       {

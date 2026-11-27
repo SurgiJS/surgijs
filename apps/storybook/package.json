@@ -1,0 +1,25 @@
+{
+  "name": "@surgijs/storybook",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "storybook dev -p 6006",
+    "build": "storybook build -o storybook-static --quiet",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "sh e2e/docker.sh",
+    "test:e2e:update": "sh e2e/docker.sh --update-snapshots"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.1",
+    "@playwright/test": "1.65.1",
+    "@storybook/addon-a11y": "^10.6.9",
+    "@storybook/addon-docs": "^10.6.9",
+    "@storybook/web-components-vite": "^10.6.9",
+    "@surgijs/compiler": "workspace:*",
+    "@surgijs/core": "workspace:*",
+    "@surgijs/ui": "workspace:*",
+    "lit": "^3.3.3",
+    "storybook": "^10.6.9",
+    "vite": "^7.3.8"
+  }
+}
