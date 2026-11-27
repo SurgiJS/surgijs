@@ -28,26 +28,32 @@
   "bugs": "https://github.com/SurgiJS/surgijs/issues",
   "exports": {
     ".": {
+      "@surgijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./jsx-runtime": {
+      "@surgijs/source": "./src/jsx-runtime.ts",
       "types": "./dist/jsx-runtime.d.ts",
       "import": "./dist/jsx-runtime.js"
     },
     "./jsx-dev-runtime": {
+      "@surgijs/source": "./src/jsx-dev-runtime.ts",
       "types": "./dist/jsx-dev-runtime.d.ts",
       "import": "./dist/jsx-dev-runtime.js"
     },
     "./hydrate": {
+      "@surgijs/source": "./src/hydrate.ts",
       "types": "./dist/hydrate.d.ts",
       "import": "./dist/hydrate.js"
     },
     "./devtools": {
+      "@surgijs/source": "./src/devtools.ts",
       "types": "./dist/devtools.d.ts",
       "import": "./dist/devtools.js"
     },
     "./server": {
+      "@surgijs/source": "./src/server.ts",
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js"
     },

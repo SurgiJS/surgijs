@@ -3,16 +3,14 @@ import { fileURLToPath } from 'node:url';
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 
-const src = fileURLToPath(new URL('../src/', import.meta.url));
+const pkg = fileURLToPath(new URL('../', import.meta.url));
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 
-/** esbuild plugin: `@surgijs/core` from workspace sources, `.tsx` through the compiler sources. */
+/** esbuild plugin: `.tsx` through the compiler sources. */
 export function workspace() {
   return {
     name: 'surgijs-workspace',
     setup(b) {
-      b.onResolve({ filter: /^@surgijs\/core$/ }, () => ({ path: `${src}index.ts` }));
-      b.onResolve({ filter: /^@surgijs\/core\/(.+)$/ }, (args) => ({ path: `${src}${args.path.slice('@surgijs/core/'.length)}.ts` }));
       b.onLoad({ filter: /\.[jt]sx$/ }, async (args) => {
         const { compile } = await import(`${root}packages/compiler/src/index.ts`);
         const source = await readFile(args.path, 'utf8');
@@ -25,11 +23,13 @@ export function workspace() {
 
 /**
  * Bundles `contents` (an ES module) minified for the browser and reports its sizes.
- * Paths in `contents` resolve from the repository root.
+ * Paths in `contents` resolve from this package; `@surgijs/*` resolve to workspace sources
+ * through the `@surgijs/source` export condition.
  */
 export async function bundle(contents) {
   const result = await build({
-    stdin: { contents, resolveDir: root, loader: 'ts', sourcefile: 'entry.ts' },
+    stdin: { contents, resolveDir: pkg, loader: 'ts', sourcefile: 'entry.ts' },
+    conditions: ['@surgijs/source'],
     bundle: true,
     write: false,
     minify: true,
@@ -59,6 +59,6 @@ export const CASES = [
     entry: "import { useState } from '@surgijs/core'; const [n, setN] = useState(0); setN(1); console.log(n());",
     limit: 720,
   },
-  { name: 'counter app (compiled)', entry: "export * from './apps/playground/src/counter.tsx';", limit: 4113 },
-  { name: 'dropdown app (compiled)', entry: "export * from './apps/playground/src/dropdown.tsx';", limit: 5936 },
+  { name: 'counter app (compiled)', entry: "export * from '../../apps/playground/src/counter.tsx';", limit: 4113 },
+  { name: 'dropdown app (compiled)', entry: "export * from '../../apps/playground/src/dropdown.tsx';", limit: 5936 },
 ];
