@@ -203,6 +203,12 @@ importers:
 
   packages/ui:
     devDependencies:
+      '@angular/compiler':
+        specifier: ^22.3.0
+        version: 22.3.0
+      '@angular/core':
+        specifier: ^22.3.0
+        version: 22.3.0(@angular/compiler@22.3.0)(rxjs@7.8.2)
       '@surgijs/compiler':
         specifier: workspace:*
         version: link:../compiler
@@ -305,6 +311,23 @@ packages:
   '@algolia/requester-node-http@5.65.0':
     resolution: {integrity: sha512-+3RUs4gm83CAuBmQZO3oSSc6dCywiOpb83W7NTKW+Ex6dIAfHp/XtUFMmsPU33OsT+2sZ/SpCNQwvDAOdPBprw==}
     engines: {node: '>= 14.0.0'}
+
+  '@angular/compiler@22.3.0':
+    resolution: {integrity: sha512-a01VbJm4MANutGvsoBIlFl7oej5V67WEmGWhnd6eLZIAat5DyDLFuKD5++l+yHhZx1BaIvOCooyPgAbIEpb64g==}
+    engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
+
+  '@angular/core@22.3.0':
+    resolution: {integrity: sha512-wGXoO1eiBa5xPF7Y+Vm9eVj7W7x7drRv3StF2HubXX6l/osaIxeQc9ewaHaWl/teywr/LlGblu5ClKE65wF0Zw==}
+    engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
+    peerDependencies:
+      '@angular/compiler': 22.3.0
+      rxjs: ^6.5.3 || ^7.4.0
+      zone.js: ~0.15.0 || ~0.16.0
+    peerDependenciesMeta:
+      '@angular/compiler':
+        optional: true
+      zone.js:
+        optional: true
 
   '@axe-core/playwright@4.14.1':
     resolution: {integrity: sha512-cSN1ijrWLnlOof22sPN4RtWGSoPpt7GzOVyOKomyhnPsy1fPNoRdBiJAUziuCRs8KoK50kKufiMUFt7itAuwOg==}
@@ -2825,6 +2848,9 @@ packages:
   run-parallel@1.2.0:
     resolution: {integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==}
 
+  rxjs@7.8.2:
+    resolution: {integrity: sha512-dhKf903U/PQZY6boNNtAGdWbG85WAbjT/1xYoZIC7FAY0yWapOBQVsVrDl58W86//e1VpMNBtRV4MaXfdMySFA==}
+
   safer-buffer@2.1.2:
     resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
 
@@ -3414,6 +3440,17 @@ snapshots:
   '@algolia/requester-node-http@5.65.0':
     dependencies:
       '@algolia/client-common': 5.65.0
+
+  '@angular/compiler@22.3.0':
+    dependencies:
+      tslib: 2.9.1
+
+  '@angular/core@22.3.0(@angular/compiler@22.3.0)(rxjs@7.8.2)':
+    dependencies:
+      rxjs: 7.8.2
+      tslib: 2.9.1
+    optionalDependencies:
+      '@angular/compiler': 22.3.0
 
   '@axe-core/playwright@4.14.1(playwright-core@1.65.1)':
     dependencies:
@@ -5670,6 +5707,10 @@ snapshots:
   run-parallel@1.2.0:
     dependencies:
       queue-microtask: 1.2.3
+
+  rxjs@7.8.2:
+    dependencies:
+      tslib: 2.9.1
 
   safer-buffer@2.1.2: {}
 

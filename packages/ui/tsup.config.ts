@@ -15,6 +15,7 @@ export default defineConfig(async () => {
       server: 'src/server.ts',
       react: 'src/react.ts',
       vue: 'src/vue.ts',
+      angular: 'src/angular.ts',
     },
     format: ['esm'],
     target: 'es2022',

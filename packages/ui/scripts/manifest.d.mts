@@ -54,6 +54,7 @@ export interface ComponentInfo {
   className: string;
   propsName: string;
   propsModule: string;
+  props: { name: string; required: boolean }[];
 }
 
 export interface CustomElementsManifest {
@@ -68,5 +69,6 @@ export interface BuiltManifest extends CustomElementsManifest {
 export function buildManifest(): BuiltManifest;
 export function renderReact(manifest: BuiltManifest): string;
 export function renderVue(manifest: BuiltManifest): string;
+export function renderAngular(manifest: BuiltManifest): string;
 export function generatedFiles(manifest?: BuiltManifest): Record<string, string>;
 export function generate(): void;
