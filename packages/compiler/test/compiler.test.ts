@@ -8,7 +8,7 @@ const ssr = (code: string): string => compile(code, { filename: 'test.tsx', gene
 describe('compile', () => {
   it('returns files without JSX unchanged', () => {
     const code = 'const a = 1 < 2;\nexport default a;\n';
-    expect(compile(code)).toEqual({ code, changed: false });
+    expect(compile(code)).toEqual({ code, changed: false, warnings: [] });
   });
 
   it('hoists a static template', () => {
@@ -204,5 +204,20 @@ describe('compile', () => {
     expect(out).toContain('"<div" + _$attrPart("class", cls()) + "><p>Value: " + _$escape(count()) + "</p><!----><!----><span></span></div>"');
     expect(out).not.toContain('_$template');
     expect(out).not.toContain('onClick');
+  });
+});
+
+describe('shorthand warnings', () => {
+  const warn = (code: string) => compile(code).warnings;
+
+  it('warns where a signal is frozen by a shorthand property', () => {
+    const [w] = warn('const [label] = useState("");\nconst row = { id: 1, label };\nconst el = <i />;');
+    expect(w).toMatchObject({ line: 2, column: 21 });
+    expect(w?.message).toContain('label: () => label()');
+  });
+
+  it('stays quiet for explicit forms and files without JSX', () => {
+    expect(warn('const [label] = useState("");\nconst a = { label: label() }, b = { label: () => label() }; <i />;')).toEqual([]);
+    expect(warn('const [label] = useState(""); const row = { label };')).toEqual([]);
   });
 });

@@ -33,4 +33,11 @@ describe('vite plugin config', () => {
     build.configResolved({ command: 'build' });
     expect(build.transformIndexHtml.handler()).toBeUndefined();
   });
+
+  it('forwards compiler warnings to Vite', () => {
+    const warnings: unknown[] = [];
+    const ctx = { warn: (message: string, position: unknown) => warnings.push([message, position]) };
+    surgi().transform.call(ctx, 'const [a] = useState(1);\nconst o = { a }; <i />;', 'app.tsx');
+    expect(warnings).toEqual([[expect.stringContaining('a: () => a()'), { line: 2, column: 12 }]]);
+  });
 });

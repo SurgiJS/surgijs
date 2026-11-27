@@ -3,7 +3,7 @@ import { forEachChild, parse, type FunctionNode, type Node, type NodeOf } from '
 import { encodeMap, lineCol, lineStarts } from './map.ts';
 import { toOriginal, unwrapGetterReads } from './values.ts';
 
-export { unwrapGetterReads, GETTER_FNS, toOriginal, type Insert, type UnwrapResult } from './values.ts';
+export { unwrapGetterReads, GETTER_FNS, toOriginal, type Insert, type ShorthandRead, type UnwrapResult } from './values.ts';
 
 export interface CompileOptions {
   filename?: string;
@@ -14,10 +14,19 @@ export interface CompileOptions {
   sourceMap?: boolean;
 }
 
+export interface CompileWarning {
+  message: string;
+  /** 1-based line in the original text. */
+  line: number;
+  /** 0-based column in the original text. */
+  column: number;
+}
+
 export interface CompileResult {
   code: string;
   changed: boolean;
   map?: string;
+  warnings: CompileWarning[];
 }
 
 type Jsx = JSXElement | JSXFragment;
@@ -816,11 +825,22 @@ class Compiler {
  * `generate: 'ssr'`, into string concatenation). Code without JSX returns unchanged.
  */
 export function compile(code: string, options: CompileOptions = {}): CompileResult {
-  if (!/<[A-Za-z>]/.test(code)) return { code, changed: false };
+  if (!/<[A-Za-z>]/.test(code)) return { code, changed: false, warnings: [] };
   const filename = options.filename ?? 'input.tsx';
   const ssr = options.generate === 'ssr';
   const moduleName = options.moduleName ?? '@surgijs/core';
   const unwrapped = unwrapGetterReads(code, filename);
+  const origStarts = lineStarts(code);
+  const warnings = unwrapped.shorthand.map(({ name, pos }): CompileWarning => {
+    const [line, column] = lineCol(origStarts, pos);
+    return {
+      message:
+        `Shorthand \`{ ${name} }\` reads the signal once, when the object is created, and compiles to \`${name}: ${name}()\`. ` +
+        `Write \`${name}: () => ${name}()\` to keep it live, or \`${name}: ${name}()\` if the snapshot is intended.`,
+      line: line + 1,
+      column,
+    };
+  });
   const src = unwrapped.code;
   const program = parse(filename, src);
   const c = new Compiler(src, ssr, unwrapped.textual);
@@ -843,7 +863,7 @@ export function compile(code: string, options: CompileOptions = {}): CompileResu
     forEachChild(n, find);
   };
   find(program);
-  if (!chunks.length && !unwrapped.inserts.length) return { code, changed: false };
+  if (!chunks.length && !unwrapped.inserts.length) return { code, changed: false, warnings };
   chunks.push({ text: src.slice(pos), at: pos, copy: true });
 
   if (c.events.size) c.h('delegate');
@@ -858,10 +878,9 @@ export function compile(code: string, options: CompileOptions = {}): CompileResu
   const suffix = c.events.size ? `\n_$delegate(${JSON.stringify([...c.events])});\n` : '';
   const out = prefix + body + suffix;
 
-  const result: CompileResult = { code: out, changed: true };
+  const result: CompileResult = { code: out, changed: true, warnings };
   if (options.sourceMap === false) return result;
 
-  const origStarts = lineStarts(code);
   const lines: ([number, number] | null)[] = [];
   const prefixLines = prefix.split('\n').length - 1;
   for (let i = 0; i < prefixLines; i++) lines.push(null);

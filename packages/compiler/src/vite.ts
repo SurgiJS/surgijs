@@ -28,7 +28,7 @@ export interface SurgiVitePlugin {
   enforce: 'pre';
   config(this: SurgiViteConfigContext | void): { esbuild: { jsx: 'preserve' } };
   configResolved(config: { command: string }): void;
-  transform(code: string, id: string): { code: string; map: SourceMapV3 | null } | null;
+  transform(this: SurgiViteTransformContext | void, code: string, id: string): { code: string; map: SourceMapV3 | null } | null;
   transformIndexHtml: {
     order: 'pre';
     handler(): { tag: string; attrs: { type: string }; children: string; injectTo: 'head-prepend' }[] | undefined;
@@ -37,6 +37,10 @@ export interface SurgiVitePlugin {
 
 interface SurgiViteConfigContext {
   meta?: object;
+}
+
+interface SurgiViteTransformContext {
+  warn(message: string, position: { line: number; column: number }): void;
 }
 
 const DEFAULT = /\.[jt]sx$/;
@@ -89,6 +93,7 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
         ...(options.moduleName ? { moduleName: options.moduleName } : {}),
         ...(generate ? { generate } : {}),
       });
+      for (const w of result.warnings) this?.warn(w.message, { line: w.line, column: w.column });
       if (!result.changed) return null;
       return { code: result.code, map: result.map ? (JSON.parse(result.map) as SourceMapV3) : null };
     },
