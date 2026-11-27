@@ -1,7 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-// The built package, exactly as consumers import it on the server.
-import { renderButton } from '../../../packages/ui/dist/server.js';
+
+// The built package, exactly as consumers import it on the server (`pnpm build` first).
+// Loaded at run time so typecheck does not need the build; the type comes from the source.
+const SERVER = '../../../packages/ui/dist/server.js';
+const { renderButton } = (await import(SERVER)) as typeof import('../../../packages/ui/src/server');
 
 const ORIGIN = 'http://ssr.test';
 const DIST: Record<string, URL> = {

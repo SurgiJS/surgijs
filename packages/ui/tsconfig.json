@@ -3,6 +3,7 @@
   "compilerOptions": {
     "types": ["node"],
     "paths": {
+      "@surgijs/compiler/esbuild": ["../compiler/src/esbuild.ts"],
       "@surgijs/core": ["../surgijs/src/index.ts"],
       "@surgijs/core/*": ["../surgijs/src/*.ts"],
       "@surgijs/ui": ["./src/index.ts"],
