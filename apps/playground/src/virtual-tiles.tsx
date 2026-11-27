@@ -1,4 +1,4 @@
-import { createMemo, defineComponent, For, onCleanup, onMount, useState, type ReactiveProps } from '@surgijs/core';
+import { defineComponent, For, useEffect, useMemo, useState, type ReactiveProps } from '@surgijs/core';
 import { createVirtualWindow } from './virtual';
 
 export interface TileGridProps {
@@ -34,22 +34,22 @@ export const TileGrid = (props: ReactiveProps<TileGridProps>) => {
   const total = () => count() ?? 200_000;
   const viewport = () => height() ?? 480;
   const [width, setWidth] = useState(800);
-  const cols = createMemo(() => Math.max(1, Math.floor((width() - 2 * PAD + GAP) / STEP)));
-  const left = createMemo(() => Math.max(PAD, (width() - (cols() * STEP - GAP)) / 2));
+  const cols = useMemo(() => Math.max(1, Math.floor((width() - 2 * PAD + GAP) / STEP)));
+  const left = useMemo(() => Math.max(PAD, (width() - (cols() * STEP - GAP)) / 2));
   const lines = () => Math.ceil(total() / cols());
   const win = createVirtualWindow({ count: lines, size: STEP, viewport, offset: PAD });
-  const slots = createMemo(() => Array.from({ length: win.slots().length * cols() }, (_, k) => k));
+  const slots = useMemo(() => Array.from({ length: win.slots().length * cols() }, (_, k) => k));
   let scroller: HTMLDivElement | undefined;
 
-  onMount(() => {
+  useEffect(() => {
     const el = scroller!;
     const measure = () => setWidth(el.clientWidth || 800);
     measure();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
     observer.observe(el);
-    onCleanup(() => observer.disconnect());
-  });
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div class="grid">
@@ -63,7 +63,7 @@ export const TileGrid = (props: ReactiveProps<TileGridProps>) => {
         <div class="spacer" style={{ height: `${lines() * STEP - GAP + 2 * PAD}px` }}>
           <For each={slots()}>
             {(k: number) => {
-              const tile = createMemo(() => {
+              const tile = useMemo(() => {
                 const c = cols();
                 return win.at(Math.floor(k / c)) * c + (k % c);
               });

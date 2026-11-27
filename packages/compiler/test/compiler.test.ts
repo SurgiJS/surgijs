@@ -23,6 +23,27 @@ describe('compile', () => {
     expect(compile('const el = <div />;', { moduleName: 'my-runtime', generate: 'ssr' }).code).toContain('from "my-runtime/server"');
   });
 
+  it('turns React-style deps arrays into tracked thunks', () => {
+    const out = dom(`
+      const C = (props: ReactiveProps<{ step: number }>) => {
+        const { step } = props;
+        const [count] = useState(0);
+        const label = 'x';
+        useEffect(() => console.log(count), [count, step, label]);
+        useEffect(() => console.log('mounted'), []);
+        const double = useMemo(() => count * 2, [count]);
+        useEffect(() => {}, () => [count]);
+        other(() => {}, [count]);
+        return <p>{double}</p>;
+      };
+    `);
+    expect(out).toContain('useEffect(() => console.log(count()), () => [count(), step(), label]);');
+    expect(out).toContain("useEffect(() => console.log('mounted'), () => []);");
+    expect(out).toContain('useMemo(() => count() * 2, () => [count()]);');
+    expect(out).toContain('useEffect(() => {}, () => [count()]);');
+    expect(out).toContain('other(() => {}, [count()]);');
+  });
+
   it('resolves every path before the first mutation', () => {
     const out = dom(`
       const [count] = useState(0);

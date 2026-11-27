@@ -6,7 +6,7 @@
 | --- | --- |
 | `createSignal` | `(value?) => [get, set]`; `set(v)` or `set(prev => next)` |
 | `createMemo` | `(fn, init?) => get`; lazy, cached until a source changes |
-| `createRenderEffect` / `effect` | `(fn, init?)`; runs now and on changes, before effects |
+| `createRenderEffect` | `(fn, init?)`; runs now and on changes, before effects |
 | `createEffect` | `(fn, init?)`; runs on the next flush, after render effects |
 | `createRoot` | `(fn: (dispose) => T, owner?) => T` |
 | `onCleanup` | `(fn)`; runs when the current owner reruns or disposes |
@@ -15,17 +15,18 @@
 | `batch` | `(fn) => T`; flushes once at the end |
 | `flush` | `()`; runs queued memos, render effects and effects |
 | `deferMount` | `(fn) => T`; collects effects created inside and starts them after `fn` returns |
-| `bind` | `(node, read, apply, arg?)`; compiled binding, `read(arg)` supplies the value |
 | `getOwner` / `runWithOwner` | access and restore the current owner |
 | `handleError` | `(owner, err)`; forwards to the nearest error boundary or throws |
 
 ## Hooks and context
 
+Use hooks inside components and the `create*` primitives above outside them.
+
 | Export | Signature |
 | --- | --- |
-| `useState` | same as `createSignal` |
-| `useMemo` | same as `createMemo` |
-| `useEffect` | `(fn, deps?)` |
+| `useState` | `(value?) => [get, set]`, as `createSignal` |
+| `useMemo` | `(fn, deps?) => get`; with `deps`, recomputes only when a listed dependency changes |
+| `useEffect` | `(fn, deps?)`; after mount and on changes; `[]` runs once; a returned function is the cleanup |
 | `useRef` | `() => { current: null }` |
 | `useId` | `(prefix = 's') => string` |
 | `createResource` | `(fetcher) => Resource` with `loading()` and `error()` |
@@ -46,12 +47,16 @@
 
 Types: `ReactiveProps<P>`, `Accessor`, `Setter`, `Signal`, `Resource`, `Ref`, `Schema`, `PropType`, `ComponentOptions`, `ComponentClass`, `EventDecl`, `EventOptions`, `Emit`, `FormHost`, `JSX`.
 
-## DOM helpers
+`deps` (type `Deps`) is `[a, b]` in compiled `.tsx`/`.jsx` files, which the compiler turns into `() => [a(), b()]`; elsewhere a function that reads the dependencies or an array of getters.
 
-The compiler emits these; they are public for hand-written integrations.
+## `@surgijs/core/internal`
+
+Helpers that compiled JSX calls. They are not covered by semver; import them from here only for hand-written integrations. The compiler's output imports the same names from `@surgijs/core`, where they are marked deprecated so that editors steer hand-written code here.
 
 | Export | Purpose |
 | --- | --- |
+| `bind(node, read, apply, arg?)` | compiled binding, `read(arg)` supplies the value |
+| `effect(fn, init?)` | render effect used by compiled code |
 | `template(html, flags?)` | cloner for a static template; flag `1` imports the node, `2` parses inside `<svg>` |
 | `insert(parent, value, marker?, current?)` | renders a value at a position |
 | `setText`, `className`, `attr`, `attrNS`, `style`, `setProp`, `spread`, `use` | single DOM writes |
