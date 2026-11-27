@@ -1,5 +1,11 @@
 # @surgijs/core
 
+## 0.3.0
+
+### Patch Changes
+
+- [#12](https://github.com/SurgiJS/surgijs/pull/12) [`8d42848`](https://github.com/SurgiJS/surgijs/commit/8d428485fb77fa17092a88d7302e083d0db3148e) Thanks [@banzalik](https://github.com/banzalik)! - Document that a `For` key renders its row once and how to show changed content (signals in the row, or values in the key).
+
 ## 0.2.1
 
 ### Patch Changes

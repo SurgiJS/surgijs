@@ -1,5 +1,15 @@
 # @surgijs/compiler
 
+## 0.3.0
+
+### Minor Changes
+
+- [#14](https://github.com/SurgiJS/surgijs/pull/14) [`286da21`](https://github.com/SurgiJS/surgijs/commit/286da219ac4496e65a1d3efc4e38876d12d6a73e) Thanks [@banzalik](https://github.com/banzalik)! - The compiler parses with `oxc-parser` instead of the TypeScript compiler API. `typescript` is no longer a peer dependency, so TypeScript 7 (which has no JS API) works without a pin. Output for valid code is unchanged. Input with syntax errors (unclosed JSX or template literals, TypeScript-only syntax in `.jsx` files) is no longer rewritten; the bundler reports the syntax error instead.
+
+### Patch Changes
+
+- [#12](https://github.com/SurgiJS/surgijs/pull/12) [`900c5ad`](https://github.com/SurgiJS/surgijs/commit/900c5adf4b533f7b2e6455625b8a1c370c674b09) Thanks [@banzalik](https://github.com/banzalik)! - The Vite plugin sets `oxc.jsx: 'preserve'` on Vite 8 (Rolldown) instead of the deprecated `esbuild` option.
+
 ## 0.2.1
 
 ### Patch Changes
