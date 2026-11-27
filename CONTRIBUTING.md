@@ -59,6 +59,8 @@ Each component in `packages/ui/src/<name>/` has a view (`<name>.view.tsx`) share
 - stories in `apps/storybook/stories`, which the Playwright suite picks up for axe audits and screenshots in both themes;
 - a docs page in `apps/docs/ui`.
 
+`packages/ui/custom-elements.json`, `src/react.ts` and `src/vue.ts` are generated from the `defineComponent` calls and props interfaces: run `pnpm --filter @surgijs/ui generate` after a change. The `manifest` test fails while they are stale.
+
 Every visual value goes through a `--s-<component>-*` custom property that defaults to a token from `themes.css`. Component CSS avoids `<`, `>`, `&` and `"`, which the SSR compiler escapes inside `<style>`.
 
 Screenshots come from the official Playwright image, so they only match when taken there: run `pnpm test:e2e` (Docker or Podman) rather than Playwright on the host. After an intended visual change, run `pnpm test:e2e:update`, look at the new images in `apps/storybook/e2e/__screenshots__`, and commit them.
