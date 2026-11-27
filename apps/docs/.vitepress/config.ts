@@ -42,6 +42,7 @@ export default defineConfig({
         text: 'UI components',
         items: [
           { text: 'Overview and theming', link: '/ui/' },
+          { text: 'Design tokens', link: '/ui/tokens' },
           { text: 'Button', link: '/ui/button' },
           { text: 'Frameworks', link: '/ui/frameworks' },
         ],

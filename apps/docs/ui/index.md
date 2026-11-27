@@ -41,22 +41,7 @@ Custom properties inherit through shadow roots, so a theme is a set of token val
 
 ### Tokens
 
-| Token | Light | Used for |
-| --- | --- | --- |
-| `--s-font-family` | system UI stack | text in components |
-| `--s-font-size-sm` / `-md` / `-lg` | `0.875rem` / `1rem` / `1.125rem` | sizes `sm` / `md` / `lg` |
-| `--s-font-weight-medium` | `500` | button labels |
-| `--s-radius-sm` / `-md` / `-lg` / `-full` | `4px` / `6px` / `8px` / `999px` | corners |
-| `--s-duration-fast` | `120ms` | hover and press transitions |
-| `--s-color-primary` (`-hover`, `-active`) | `#3451d1` | primary backgrounds |
-| `--s-color-primary-text` | `#3451d1` | primary-colored text on surfaces |
-| `--s-color-on-primary` | `#ffffff` | text on primary |
-| `--s-color-danger` (`-hover`, `-active`) | `#c92a2a` | destructive actions |
-| `--s-color-on-danger` | `#ffffff` | text on danger |
-| `--s-color-surface` (`-hover`, `-active`) | `#ffffff` | neutral backgrounds |
-| `--s-color-text` | `#1c1f26` | text on surfaces |
-| `--s-color-border` | `#c4c9d2` | outlines |
-| `--s-color-focus` | `#4c6ef5` | focus rings |
+Every token, with its light and dark value, is listed on the [design tokens](./tokens) page. The page, `themes.css` and the Figma token files are generated from the same JSON sources.
 
 ## Component custom properties
 

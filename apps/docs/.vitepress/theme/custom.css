@@ -5,3 +5,13 @@
   align-items: center;
   margin: 16px 0;
 }
+
+.token-swatch {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.25em;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 2px;
+  vertical-align: -0.1em;
+}
