@@ -43,6 +43,8 @@ export function setHydrateRoot(fn: HydrateRoot | null): void {
 
 const kebab = (s: string): string => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
 
+const updates = new WeakMap<object, (render: unknown) => void>();
+
 function coerce(type: PropType | undefined, v: string | null): unknown {
   if (type === Boolean) return v !== null && v !== 'false';
   if (v === null) return undefined;
@@ -74,6 +76,8 @@ interface Host extends HTMLElement {
 /**
  * Defines a custom element whose shadow root (or light DOM) renders `render(props, host)`
  * once per connection. `schema` lists observed props and their attribute coercion.
+ * Defining an already defined tag swaps its render and re-renders connected instances, which is
+ * how hot module replacement updates components; the schema and options stay as first defined.
  */
 export function defineComponent<P extends object = {}>(
   tag: string,
@@ -83,7 +87,10 @@ export function defineComponent<P extends object = {}>(
 ): ComponentClass<P> {
   if (typeof customElements === 'undefined') return class {} as unknown as ComponentClass<P>;
   const existing = customElements.get(tag);
-  if (existing) return existing as unknown as ComponentClass<P>;
+  if (existing) {
+    updates.get(existing)?.(render);
+    return existing as unknown as ComponentClass<P>;
+  }
 
   const types = schema as Record<string, PropType>;
   const keys = Object.keys(types);
@@ -95,6 +102,17 @@ export function defineComponent<P extends object = {}>(
   const closed = shadow && shadow.mode === 'closed';
   const form = !!options.form;
   const light = !shadow && !('children' in types);
+  const hosts = new Set<HTMLElement>();
+  let current = render;
+
+  const mount = (el: HTMLElement, root: Node): void => {
+    const self = el as unknown as Host;
+    hosts.add(el);
+    createRoot((dispose) => {
+      self.__d = dispose;
+      deferMount(() => insert(root, current(self.__p as ReactiveProps<P>, el)));
+    });
+  };
 
   class Element extends HTMLElement {
     static observedAttributes = attrs;
@@ -140,10 +158,7 @@ export function defineComponent<P extends object = {}>(
         root.replaceChildren();
       }
       try {
-        createRoot((dispose) => {
-          self.__d = dispose;
-          deferMount(() => insert(root, render(self.__p as ReactiveProps<P>, this)));
-        });
+        mount(this, root);
       } finally {
         if (end) end();
       }
@@ -157,6 +172,7 @@ export function defineComponent<P extends object = {}>(
         if (closed) undelegateRoot(root);
         self.__d();
         self.__d = undefined;
+        hosts.delete(this);
         root.replaceChildren();
       });
     }
@@ -202,6 +218,15 @@ export function defineComponent<P extends object = {}>(
     });
   }
 
+  updates.set(Element, (next) => {
+    current = next as typeof render;
+    for (const el of [...hosts]) {
+      const self = el as unknown as Host;
+      self.__d!();
+      self.__r!.replaceChildren();
+      mount(el, self.__r!);
+    }
+  });
   customElements.define(tag, Element);
   return Element as unknown as ComponentClass<P>;
 }
