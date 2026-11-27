@@ -1,5 +1,6 @@
 import { cleanup, createMemo, createSignal, getOwner, onCleanup, runOwned, untrack, type Accessor, type OwnerNode, type Setter } from './reactivity';
 import type { JSX } from './jsx-runtime';
+import { warn } from './warn';
 
 export interface ForProps<T> {
   each: readonly T[] | null | undefined | Accessor<readonly T[] | null | undefined>;
@@ -17,6 +18,8 @@ interface Row extends OwnerNode {
   v: JSX.Element;
   i: Setter<number> | undefined;
 }
+
+const identity = /* @__PURE__ */ new WeakSet<object>();
 
 /**
  * Keyed list. Each key renders once; rows move with few DOM operations and dispose
@@ -59,6 +62,16 @@ export function For<T>(props: ForProps<T>): JSX.Element {
     const next = new Map<unknown, Row>();
     const out: JSX.Element[] = new Array(items.length);
     const owner = getOwner();
+    if (process.env.NODE_ENV !== 'production' && !by && !identity.has(props)) {
+      const first = items[0];
+      if (first && (typeof first === 'object' || typeof first === 'function')) {
+        identity.add(props);
+        warn(
+          '<For> keys rows by object identity, so replacing an item with a copy re-creates its row and loses its state. ' +
+            'Pass `by`, for example by={(item) => item.id}, or by={(item) => item} when identity is intended.',
+        );
+      }
+    }
     untrack(() => {
       try {
         for (let i = 0; i < items.length; i++) {

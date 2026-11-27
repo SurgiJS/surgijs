@@ -8,3 +8,4 @@ coverage
 packages/store/bench/results.json
 .astro
 .next
+.min-core

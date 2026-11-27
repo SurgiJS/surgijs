@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   batch,
-  bind,
   createEffect,
   createMemo,
   createRenderEffect,
@@ -12,7 +11,9 @@ import {
   onCleanup,
   untrack,
   useEffect,
+  useMemo,
 } from '@surgijs/core';
+import { bind } from '@surgijs/core/internal';
 
 describe('signals', () => {
   it('reads and writes with Object.is', () => {
@@ -208,6 +209,41 @@ describe('computations', () => {
     setA(1);
     flush();
     expect(log).toEqual(['run 0 0', 'cleanup', 'run 1 1']);
+  });
+
+  it('useEffect takes an array of getters and runs [] once', () => {
+    const [a, setA] = createSignal(0);
+    const [b, setB] = createSignal(0);
+    const log: string[] = [];
+    createRoot(() => {
+      useEffect(() => void log.push(`deps ${a()} ${b()}`), [a]);
+      useEffect(() => void log.push(`once ${a()}`), []);
+    });
+    flush();
+    setB(1);
+    flush();
+    setA(1);
+    flush();
+    expect(log).toEqual(['deps 0 0', 'once 0', 'deps 1 1']);
+  });
+
+  it('useMemo recomputes only when its deps change', () => {
+    const [a, setA] = createSignal(1);
+    const [b, setB] = createSignal(10);
+    let runs = 0;
+    let sum!: () => number;
+    let tracked!: () => number;
+    createRoot(() => {
+      sum = useMemo(() => (runs++, a() + b()), [a]);
+      tracked = useMemo(() => a() + b());
+    });
+    expect([sum(), tracked(), runs]).toEqual([11, 11, 1]);
+    setB(20);
+    flush();
+    expect([sum(), tracked(), runs]).toEqual([11, 21, 1]);
+    setA(2);
+    flush();
+    expect([sum(), tracked(), runs]).toEqual([22, 22, 2]);
   });
 });
 

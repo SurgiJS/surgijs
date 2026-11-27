@@ -1,7 +1,8 @@
 import { devRender, devUnmount } from './dev';
 import { delegateRoot, insert, undelegateRoot } from './dom';
-import { createRoot, createSignal, deferMount, getOwner, type Accessor, type OwnerNode, type Setter } from './reactivity';
+import { createRoot, createSignal, deferMount, getOwner, isDeliberate, swapUntracked, type Accessor, type OwnerNode, type Setter } from './reactivity';
 import type { JSX } from './jsx-runtime';
+import { warn } from './warn';
 
 export type PropType = StringConstructor | NumberConstructor | BooleanConstructor | ObjectConstructor | ArrayConstructor;
 
@@ -127,11 +128,39 @@ interface Host extends HTMLElement {
   __r: ShadowRoot | HTMLElement | undefined;
   __c: Node[] | undefined;
   __u: boolean;
+  __b: boolean | undefined;
   __i: ElementInternals | undefined;
   __f: Setter<boolean> | undefined;
   $def: string | null;
   formDisabled: Accessor<boolean>;
   [key: string]: unknown;
+}
+
+/** Runs a component body with `__b` set, which makes prop getters warn about reads that never update. */
+function inBody<T>(self: Host, draw: () => T): T {
+  self.__b = true;
+  const outer = swapUntracked(0);
+  try {
+    return draw();
+  } finally {
+    swapUntracked(outer);
+    self.__b = false;
+  }
+}
+
+/** Wraps a prop getter to warn once per mount when the component body reads it outside a reactive context. */
+function guardProp(self: Host, tag: string, k: string): Accessor<unknown> {
+  const read = self.__p[k]!;
+  return () => {
+    if (self.__b && !isDeliberate()) {
+      self.__b = false;
+      warn(
+        `Prop "${k}" of <${tag}> was read in the component body, outside JSX, createMemo and createEffect, so it never updates. ` +
+          'Read it where it is used, or wrap the read in untrack() when the first value is intended.',
+      );
+    }
+    return read();
+  };
 }
 
 /**
@@ -140,6 +169,8 @@ interface Host extends HTMLElement {
  * declares the events `emit` may dispatch on the host.
  * Defining an already defined tag swaps its render and re-renders connected instances, which is
  * how hot module replacement updates components; the schema and options stay as first defined.
+ * A tag defined by another copy of this library or by plain `customElements.define` keeps that
+ * definition, and development builds warn about it.
  */
 export function defineComponent<P extends object = {}, X extends EventDecls = {}>(
   tag: string,
@@ -150,6 +181,12 @@ export function defineComponent<P extends object = {}, X extends EventDecls = {}
   if (typeof customElements === 'undefined') return class { static $surgi = { tag, render, schema, options }; } as unknown as ComponentClass<P, X>;
   const existing = customElements.get(tag);
   if (existing) {
+    if (process.env.NODE_ENV !== 'production' && !updates.has(existing)) {
+      warn(
+        `<${tag}> is already defined by another copy of @surgijs/core or by a non-Surgi element, so this definition is ignored. ` +
+          'Two versions of the library on one page share no component registry: load a single copy.',
+      );
+    }
     updates.get(existing)?.(render);
     return existing as unknown as ComponentClass<P, X>;
   }
@@ -183,9 +220,10 @@ export function defineComponent<P extends object = {}, X extends EventDecls = {}
       deferMount(() => {
         // Fallback <style> elements share the root, so the render must not own all of it.
         const shared = css && !adopt;
+        const draw = () => (devRender ? devRender(el, current, self.__p, emit) : current(self.__p as ReactiveProps<P>, el, emit));
         insert(
           root,
-          devRender ? devRender(el, current, self.__p, emit) : current(self.__p as ReactiveProps<P>, el, emit),
+          process.env.NODE_ENV !== 'production' ? inBody(self, draw) : draw(),
           shared ? null : undefined,
           shared && hydrated ? Array.from(root.childNodes) : undefined,
         );
@@ -221,6 +259,7 @@ export function defineComponent<P extends object = {}, X extends EventDecls = {}
       self.__s = {};
       self.__p = {};
       for (const k of keys) self.__p[k] = (self.__s[k] = createSignal<unknown>())[0];
+      if (process.env.NODE_ENV !== 'production') for (const k of keys) self.__p[k] = guardProp(self, tag, k);
       if (light) self.__p.children = () => self.__c;
       if (form) {
         self.__i = this.attachInternals();

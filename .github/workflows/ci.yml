@@ -35,6 +35,25 @@ jobs:
           pnpm --filter @surgijs/next-example build
           grep -q 'shadowrootmode="open"' apps/next/.next/server/app/index.html
 
+  min-core:
+    # The peer range of @surgijs/ui and @surgijs/store admits releases of @surgijs/core older than the
+    # workspace one. Build and test each against the lowest published release the range allows.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [ui, store]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @surgijs/compiler build
+      - run: node tools/check-min-core.mjs ${{ matrix.package }}
+
   e2e:
     # The image pins browsers and fonts, so screenshots match the baselines made with
     # apps/storybook/e2e/docker.sh. Keep the tag in step with @playwright/test.

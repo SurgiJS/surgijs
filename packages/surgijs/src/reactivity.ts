@@ -1,3 +1,5 @@
+import { warn } from './warn';
+
 export type Accessor<T> = () => T;
 export type Setter<T> = <U extends T>(value: U | ((prev: T) => U)) => U;
 export type Signal<T> = [get: Accessor<T>, set: Setter<T>];
@@ -153,6 +155,23 @@ function overflow(): never {
   throw new Error('Infinite update loop');
 }
 
+/** Warns once when one computation runs `LOOP` times in a single flush: it keeps scheduling itself. */
+const LOOP = 100;
+
+const runs = /* @__PURE__ */ new Map<Observer, number>();
+
+function countRun(o: Observer): void {
+  const n = (runs.get(o) || 0) + 1;
+  runs.set(o, n);
+  if (n === LOOP) {
+    const kind = o.t === 0 ? 'A memo' : o.t === 1 ? 'A render effect or binding' : 'An effect';
+    warn(
+      `${kind} ran ${LOOP} times in one update. It probably writes a signal that it also reads, so every run schedules the next. ` +
+        'Read the signal with untrack(), or move the write out of the computation.',
+    );
+  }
+}
+
 /** Runs every queued computation now: memos first, then render effects, then effects. */
 export function flush(): void {
   if (running) return;
@@ -160,6 +179,7 @@ export function flush(): void {
   scheduled = false;
   let error: [unknown] | undefined;
   let rounds = 0;
+  if (process.env.NODE_ENV !== 'production') runs.clear();
   try {
     for (let i = 0; i < 3; ) {
       const q = Queues[i]!;
@@ -171,6 +191,7 @@ export function flush(): void {
       Queues[i] = [];
       for (const o of q) {
         if (o.st > 0) {
+          if (process.env.NODE_ENV !== 'production') countRun(o);
           try {
             o.run();
           } catch (err) {
@@ -350,20 +371,35 @@ export function createSignal<T>(): Signal<T | undefined>;
 export function createSignal<T>(value: T): Signal<T>;
 export function createSignal<T>(value?: T): Signal<T | undefined> {
   const s: Source = { v: value, o: null };
+  const set = ((next: unknown) => {
+    if (process.env.NODE_ENV !== 'production') checkWrite(set);
+    if (typeof next === 'function') next = (next as (prev: unknown) => unknown)(s.v);
+    if (!Object.is(s.v, next)) {
+      s.v = next;
+      notify(s);
+    }
+    return next;
+  }) as Setter<T | undefined>;
   return [
     () => {
       if (Listener || Collect) track(s);
       return s.v as T;
     },
-    ((next: unknown) => {
-      if (typeof next === 'function') next = (next as (prev: unknown) => unknown)(s.v);
-      if (!Object.is(s.v, next)) {
-        s.v = next;
-        notify(s);
-      }
-      return next;
-    }) as Setter<T | undefined>,
+    set,
   ];
+}
+
+const misused = /* @__PURE__ */ new WeakSet<object>();
+
+/** Warns once per signal about a write while a memo or a binding computes its value. */
+function checkWrite(set: object): void {
+  if ((Collect || (Listener && Listener.t === 0)) && !misused.has(set)) {
+    misused.add(set);
+    warn(
+      'A signal was written inside createMemo or a binding. These only compute a value, and a write there can show stale or inconsistent state. ' +
+        'Move the write to createEffect or an event handler.',
+    );
+  }
 }
 
 export function createMemo<T>(fn: (prev: T | undefined) => T, init?: T): Accessor<T> {
@@ -439,12 +475,28 @@ export function untrack<T>(fn: () => T): T {
   const prevListener = Listener;
   const prevCollect = Collect;
   Listener = Collect = null;
+  if (process.env.NODE_ENV !== 'production') untracked++;
   try {
     return fn();
   } finally {
+    if (process.env.NODE_ENV !== 'production') untracked--;
     Listener = prevListener;
     Collect = prevCollect;
   }
+}
+
+let untracked = 0;
+
+/** Sets the `untrack` depth and returns the previous one; a component body starts at 0. */
+export function swapUntracked(depth: number): number {
+  const prev = untracked;
+  untracked = depth;
+  return prev;
+}
+
+/** Whether a read here subscribes, or happens inside `untrack`, which states that it does not need to. */
+export function isDeliberate(): boolean {
+  return untracked > 0 || !!(Listener || Collect);
 }
 
 /** Groups writes and flushes once when the outermost batch ends. */

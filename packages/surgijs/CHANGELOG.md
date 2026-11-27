@@ -1,5 +1,22 @@
 # @surgijs/core
 
+## 0.7.0
+
+### Minor Changes
+
+- [#32](https://github.com/SurgiJS/surgijs/pull/32) [`1a19349`](https://github.com/SurgiJS/surgijs/commit/1a193495a304818652511e229c107c2ab72b0ad9) Thanks [@banzalik](https://github.com/banzalik)! - Hooks take React-style dependency lists. `useEffect(fn, [a, b])` reruns only when `a` or `b` changes and `[]` runs it once after mount; `useMemo(fn, [a])` recomputes only when `a` changes. In `.tsx`/`.jsx` files the compiler turns the array into `() => [a(), b()]` so the getters are tracked; outside compiled files pass that function or an array of getters (new `Deps` type).
+
+  **Breaking:**
+
+  - The second argument of `useMemo` is the dependency list instead of the initial value; use `createMemo(fn, init)` for an initial value.
+  - Helpers that compiled JSX calls (`template`, `insert`, `bind`, `effect`, `attr`, `className`, `delegate`, `spread`, …) moved from `@surgijs/core` to `@surgijs/core/internal`, and the compiler imports them from there. `@surgijs/core` keeps only the application API. Update `@surgijs/compiler` and `@surgijs/core` together.
+
+## 0.6.0
+
+### Minor Changes
+
+- [#22](https://github.com/SurgiJS/surgijs/pull/22) [`2ea1a7d`](https://github.com/SurgiJS/surgijs/commit/2ea1a7db0049c1a36eaee711a927d7978dadd31c) Thanks [@banzalik](https://github.com/banzalik)! - `defineEvent<T>(flags?)` declares an event and its `detail` type, and `defineComponent<P, X>(tag, render, schema, { events })` takes those declarations. The render function receives a typed `emit(name, detail)` as its third argument, and the element's `addEventListener` types each declared event's `detail`. Events bubble and are composed by default; `bubbles`, `composed` and `cancelable` change the flags.
+
 ## 0.5.0
 
 ### Minor Changes

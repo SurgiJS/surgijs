@@ -1,4 +1,4 @@
-import { createMemo, defineComponent, defineEvent, For, Show, useId, useState, type Emit, type ReactiveProps } from '@surgijs/core';
+import { defineComponent, defineEvent, For, Show, useId, useMemo, useState, type Emit, type ReactiveProps } from '@surgijs/core';
 
 export interface DropdownOption {
   value: string;
@@ -33,7 +33,7 @@ export const Dropdown = (props: ReactiveProps<DropdownProps>, host: HTMLElement,
   const [active, setActive] = useState(-1);
   const id = useId('listbox');
   const list = () => options() ?? [];
-  const selected = createMemo(() => list().find((o) => o.value === value()));
+  const selected = useMemo(() => list().find((o) => o.value === value()));
 
   const choose = (option: DropdownOption) => {
     (host as HTMLElement & DropdownProps).value = option.value;
