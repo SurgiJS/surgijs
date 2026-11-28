@@ -22,6 +22,7 @@ pnpm install
 | `pnpm storybook` | Storybook for `@surgijs/ui` |
 | `pnpm test:e2e` | builds, then runs Playwright in Docker: behavior, axe accessibility audits and SSR in Chromium, Firefox and WebKit, plus visual regression in Chromium |
 | `pnpm test:e2e:update` | the same, rewriting the screenshot baselines |
+| `node tools/check-min-core.mjs <ui\|store>` | builds and tests the package against the lowest published `@surgijs/core` its peer range allows (CI job `min-core`) |
 | `pnpm bench [ids...] [--rows N]` | benchmark in headless Chrome (`CHROME_PATH` overrides the binary) |
 
 Run `pnpm typecheck && pnpm test && pnpm size && pnpm build` before every commit.
@@ -60,12 +61,12 @@ Budgets live in `packages/surgijs/scripts/bundle.mjs`. Raise a limit only when t
 Each component in `packages/ui/src/<name>/` has a view (`<name>.view.tsx`) shared by the client and the server, its CSS in `<name>.styles.ts`, and registration in `index.ts`; `src/server.ts` renders it with the view imported as `?ssr`. A new component comes with:
 
 - unit and SSR tests in `packages/ui/test`;
-- stories in `apps/storybook/stories`, which the Playwright suite picks up for axe audits and screenshots in both themes;
+- stories in `apps/storybook/stories`, which the Playwright suite picks up for axe audits and screenshots in both themes, plus RTL screenshots for the stories listed in `visual.spec.ts`;
 - a docs page in `apps/docs/ui`.
 
 `packages/ui/custom-elements.json`, `src/react.ts` and `src/vue.ts` are generated from the `defineComponent` calls and props interfaces: run `pnpm --filter @surgijs/ui generate` after a change. The `manifest` test fails while they are stale.
 
-Every visual value goes through a `--s-<component>-*` custom property that defaults to a token from `themes.css`. Component CSS avoids `<`, `>`, `&` and `"`, which the SSR compiler escapes inside `<style>`.
+Every visual value goes through a `--s-<component>-*` custom property that defaults to a token from `themes.css`. Component CSS uses logical properties (`padding-inline`, `inset-inline-start`, `text-align: start`, `border-inline-end`) instead of `left`/`right`, so `dir="rtl"` works without overrides; the Storybook toolbar has a direction switch, and the Playwright suite checks RTL screenshots and layout. Component CSS avoids `<`, `>`, `&` and `"`, which the SSR compiler escapes inside `<style>`.
 
 Screenshots come from the official Playwright image, so they only match when taken there: run `pnpm test:e2e` (Docker or Podman) rather than Playwright on the host. After an intended visual change, run `pnpm test:e2e:update`, look at the new images in `apps/storybook/e2e/__screenshots__`, and commit them.
 
@@ -88,3 +89,7 @@ Commit the generated files with the token change. The `tokens` test fails while 
 ## Writing style
 
 README, docs, comments and commit messages state what the code does, in affirmative sentences. Keep commits small, one feature each.
+
+## Peer dependencies on workspace packages
+
+Declare a peer on another workspace package as a plain range with an upper bound, for example `"@surgijs/core": ">=0.5.0 <1.0.0"`, and keep `workspace:*` in `devDependencies` only. A `workspace:^` peer is published as `^0.x`, which pins the minor version of a 0.x package, so every core minor release makes changesets bump dependents to a new major. Raise the lower bound by hand when a package needs a newer core.

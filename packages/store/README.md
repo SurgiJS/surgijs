@@ -1,6 +1,6 @@
 # @surgijs/store
 
-Framework-agnostic store: **one object**, lazy remotes (`deps` / `staleTime` / retry / focus refetch), mutations with optimistic `setData`, deep-equality subscriptions, GC with TTL. Use from React, Angular, SurgiJS, or plain JS.
+Framework-agnostic store: **one object**, lazy remotes (`deps` / `staleTime` / retry / focus refetch), mutations with optimistic `setData`, deep-equality subscriptions, GC with TTL. Use from React, Vue, Svelte, Angular, SurgiJS, or plain JS.
 
 ```bash
 npm i @surgijs/store
@@ -37,7 +37,7 @@ const st = store.status('results');
 // st.isStale | isFetching | httpStatus | code | age | source
 ```
 
-`createStore(def, options)` options are the defaults for every `remote()`; an option on the remote wins. When `deps` change, `data` resets (or stays with `keepPreviousData: true`; see `status().isPreviousData` / `dataDeps`). Also available: `debounce`, `createRemote<State>()` for typed `get`, `persist`, `syncLocation`, and `@surgijs/store/core` (`fromStore`, `fromStatus`) for SurgiJS signals. Details in the [guide](../../apps/docs/guide/store.md).
+`createStore(def, options)` options are the defaults for every `remote()`; an option on the remote wins. When `deps` change, `data` resets (or stays with `keepPreviousData: true`; see `status().isPreviousData` / `dataDeps`). Also available: `debounce`, `createRemote<State>()` for typed `get`, `persist`, `syncLocation`, and `@surgijs/store/core` (`fromStore`, `fromStatus`) for SurgiJS signals; `/vue`, `/svelte` and `/angular` have the same pair for their frameworks. Details in the [guide](../../apps/docs/guide/store.md).
 
 **Remotes are top-level only.** No `remote()` inside nested objects and no `status('a.b.c')`.
 For catalogs / details use sync route fields + flat remotes (`catalogProducts`, `productDetail`) linked by `deps` — see [guide: Complex stores](../../apps/docs/guide/store.md#complex-stores-important).
@@ -80,6 +80,15 @@ function Profile() {
 }
 ```
 
+## Vue, Svelte, Angular
+
+```ts
+import { fromStore } from '@surgijs/store/vue'; // Ref; also '@surgijs/store/svelte' (store contract) and '@surgijs/store/angular' (Signal)
+const city = fromStore(store, (s) => s.city);
+```
+
+`fromStatus(store, key)` returns the remote's status in the same shape. Each entry ends its subscription with the framework's owner (component scope, Svelte unsubscribe, Angular `DestroyRef`). Vue and Angular are optional peer dependencies; the Svelte entry imports nothing.
+
 ## Benchmarks
 
 `pnpm bench:store` vs zustand, jotai, valtio, nanostores, redux (+ stale/prefetch suites). Results: `packages/store/bench/results.json`.
@@ -102,3 +111,5 @@ function Profile() {
 With the Redux DevTools extension installed, each store shows up as **SurgiJS**. No import and no `connect()` call.
 
 Docs: [guide](../../apps/docs/guide/store.md).
+
+Docs for AI coding agents: [llms.txt](https://surgijs.github.io/surgijs/llms.txt) (index) and [llms-full.txt](https://surgijs.github.io/surgijs/llms-full.txt) (all pages in one file).

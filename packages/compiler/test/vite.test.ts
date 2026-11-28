@@ -42,6 +42,23 @@ describe('vite plugin config', () => {
   });
 });
 
+describe('vite plugin generate: auto', () => {
+  const transform = (generate: 'dom' | 'ssr' | 'auto' | undefined, id: string, ssr?: boolean) =>
+    surgi(generate ? { generate } : {}).transform.call(undefined, 'export const A = () => <b>{x}</b>;', id, { ssr })?.code ?? '';
+
+  it('compiles for the server only inside the SSR graph', () => {
+    expect(transform('auto', '/src/a.tsx', true)).toContain('@surgijs/core/server');
+    expect(transform('auto', '/src/a.tsx', false)).not.toContain('@surgijs/core/server');
+    expect(transform('auto', '/src/a.tsx')).not.toContain('@surgijs/core/server');
+  });
+
+  it('keeps the other modes independent of the graph', () => {
+    expect(transform(undefined, '/src/a.tsx', true)).not.toContain('@surgijs/core/server');
+    expect(transform('ssr', '/src/a.tsx', false)).toContain('@surgijs/core/server');
+    expect(transform('auto', '/src/a.tsx?ssr', false)).toContain('@surgijs/core/server');
+  });
+});
+
 describe('vite plugin HMR', () => {
   const plugin = surgi();
   const transform = (code: string, id: string, options?: { ssr?: boolean }) => plugin.transform.call(undefined, code, id, options);

@@ -1,4 +1,5 @@
-import { For, createRoot, createSignal, insert, type Accessor, type Setter } from '@surgijs/core';
+import { For, createRoot, createSignal, type Accessor, type Setter } from '@surgijs/core';
+import { insert } from '@surgijs/core/internal';
 
 const adjectives = [
   'pretty', 'large', 'big', 'small', 'tall', 'short', 'long', 'handsome', 'plain', 'quaint', 'clean', 'elegant', 'easy',

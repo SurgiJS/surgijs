@@ -10,6 +10,12 @@ describe('unwrapGetterReads', () => {
     );
   });
 
+  it('reads the state of useReducer as a getter, not dispatch', () => {
+    expect(unwrap('const [s, dispatch] = useReducer(r, 0); f(s, dispatch);')).toBe(
+      'const [s, dispatch] = useReducer(r, 0); f(s(), dispatch);',
+    );
+  });
+
   it('keeps explicit calls and declarations', () => {
     expect(unwrap('const [a] = createSignal(1); a(); const o = { a: 1 }; o.a;')).toBe(
       'const [a] = createSignal(1); a(); const o = { a: 1 }; o.a;',

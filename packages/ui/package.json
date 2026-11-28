@@ -1,6 +1,6 @@
 {
   "name": "@surgijs/ui",
-  "version": "2.0.0",
+  "version": "0.3.0",
   "description": "Accessible SurgiJS web components, themed with CSS custom properties and ready for SSR.",
   "license": "MIT",
   "type": "module",
@@ -69,7 +69,7 @@
     "generate": "node scripts/manifest.mjs && node scripts/tokens.mjs"
   },
   "peerDependencies": {
-    "@surgijs/core": "workspace:^",
+    "@surgijs/core": ">=0.7.0 <1.0.0",
     "react": ">=19",
     "vue": ">=3.4"
   },

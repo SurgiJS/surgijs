@@ -1,4 +1,4 @@
-import { createMemo, defineComponent, For, useState, type ReactiveProps } from '@surgijs/core';
+import { defineComponent, For, useMemo, useState, type ReactiveProps } from '@surgijs/core';
 import { createVirtualWindow } from './virtual';
 
 export interface VirtualTableProps {
@@ -139,8 +139,8 @@ export const VirtualTable = (props: ReactiveProps<VirtualTableProps>) => {
         <div class="spacer" style={{ height: `${count() * ROW}px` }}>
           <For each={win.slots()}>
             {(k: number) => {
-              const index = createMemo(() => win.at(k));
-              const person = createMemo(() => personAt(index()));
+              const index = useMemo(() => win.at(k));
+              const person = useMemo(() => personAt(index()));
               return (
                 <div
                   class={selected() === index() ? 'row body selected' : 'row body'}

@@ -24,6 +24,14 @@ describe('bundle', () => {
     expect(code).not.toContain('installDevtools');
   });
 
+  it('strips dev warnings from production bundles', async () => {
+    for (const name of ['full runtime', 'counter', 'dropdown']) {
+      const { code } = await bundle(entry(name));
+      expect(code).not.toContain('[surgijs]');
+      expect(code).not.toContain('console.warn');
+    }
+  });
+
   it('compiled counter detects events without startsWith', async () => {
     const { code } = await bundle(entry('counter'));
     expect(code).not.toContain('startsWith("on")');
@@ -31,6 +39,15 @@ describe('bundle', () => {
 
   it('useState alone tree-shakes the DOM and component layers', async () => {
     const { code } = await bundle(entry('useState'));
+    for (const word of ['customElements', 'attachShadow', 'observedAttributes', 'createElement', 'addEventListener']) {
+      expect(code).not.toContain(word);
+    }
+  });
+
+  it('useReducer alone tree-shakes the DOM and component layers', async () => {
+    const { code } = await bundle(
+      "import { useReducer } from '@surgijs/core'; const [n, dispatch] = useReducer((s: number) => s + 1, 0); dispatch(); console.log(n());",
+    );
     for (const word of ['customElements', 'attachShadow', 'observedAttributes', 'createElement', 'addEventListener']) {
       expect(code).not.toContain(word);
     }
