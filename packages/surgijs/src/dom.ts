@@ -16,6 +16,31 @@ export function setHydrating(on: boolean): boolean {
   return prev;
 }
 
+const POLICY = Symbol.for('surgijs.trustedTypes');
+let policy: { createHTML(h: string): string } | null | undefined;
+
+/**
+ * Parses compiler-emitted template markup. Under `require-trusted-types-for 'script'` the
+ * markup goes through a `surgijs` Trusted Types policy; add it to the `trusted-types` list.
+ * Runtime copies in one document share that policy, since a second `createPolicy('surgijs')`
+ * would be rejected. Without Trusted Types, or when the CSP refuses the policy, it is assigned as a plain string.
+ */
+export function parseTemplate(html: string, flags: number): Node {
+  if (policy === undefined) {
+    try {
+      const g = globalThis as any;
+      policy = g[POLICY] ??= g.trustedTypes?.createPolicy('surgijs', { createHTML: (h: string) => h }) ?? null;
+    } catch {
+      policy = null;
+    }
+  }
+  const t = document.createElement('template');
+  const markup = flags & 2 ? `<svg>${html}</svg>` : html;
+  t.innerHTML = (policy ? policy.createHTML(markup) : markup) as string;
+  const node = t.content.firstChild!;
+  return flags & 2 ? node.firstChild! : node;
+}
+
 /**
  * Parses `html` once and returns a clone factory. Flag `1`: the template holds custom
  * elements and clones through `document.importNode` so they upgrade synchronously.
@@ -32,10 +57,7 @@ export function template(html: string, flags = 0): () => Node {
       }
     }
     if (!node) {
-      const t = document.createElement('template');
-      t.innerHTML = flags & 2 ? `<svg>${html}</svg>` : html;
-      node = t.content.firstChild!;
-      if (flags & 2) node = node.firstChild!;
+      node = parseTemplate(html, flags);
     }
     const clone = flags & 1 ? document.importNode(node, true) : node.cloneNode(true);
     devNode?.(clone);
