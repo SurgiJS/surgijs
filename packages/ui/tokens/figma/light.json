@@ -1,0 +1,139 @@
+{
+  "font": {
+    "family": {
+      "$type": "fontFamily",
+      "$value": "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+      "$description": "Text in components."
+    },
+    "size": {
+      "sm": {
+        "$type": "dimension",
+        "$value": "0.875rem",
+        "$description": "Small text: the `sm` size of components."
+      },
+      "md": {
+        "$type": "dimension",
+        "$value": "1rem",
+        "$description": "Default text size of components."
+      },
+      "lg": {
+        "$type": "dimension",
+        "$value": "1.125rem",
+        "$description": "Large text: the `lg` size of components."
+      }
+    },
+    "weight": {
+      "medium": {
+        "$type": "fontWeight",
+        "$value": 500,
+        "$description": "Button labels."
+      }
+    }
+  },
+  "radius": {
+    "sm": {
+      "$type": "dimension",
+      "$value": "4px",
+      "$description": "Small corners."
+    },
+    "md": {
+      "$type": "dimension",
+      "$value": "6px",
+      "$description": "Default corners of components."
+    },
+    "lg": {
+      "$type": "dimension",
+      "$value": "8px",
+      "$description": "Large corners."
+    },
+    "full": {
+      "$type": "dimension",
+      "$value": "999px",
+      "$description": "Pill-shaped corners."
+    }
+  },
+  "duration": {
+    "fast": {
+      "$type": "duration",
+      "$value": "120ms",
+      "$description": "Hover and press transitions."
+    }
+  },
+  "color": {
+    "primary": {
+      "$type": "color",
+      "$value": "#3451d1",
+      "$description": "Primary backgrounds."
+    },
+    "primary-hover": {
+      "$type": "color",
+      "$value": "#2a43b3",
+      "$description": "Primary backgrounds on hover."
+    },
+    "primary-active": {
+      "$type": "color",
+      "$value": "#223896",
+      "$description": "Primary backgrounds while pressed."
+    },
+    "primary-text": {
+      "$type": "color",
+      "$value": "#3451d1",
+      "$description": "Primary-colored text on surfaces."
+    },
+    "on-primary": {
+      "$type": "color",
+      "$value": "#ffffff",
+      "$description": "Text on primary backgrounds."
+    },
+    "danger": {
+      "$type": "color",
+      "$value": "#c92a2a",
+      "$description": "Destructive action backgrounds."
+    },
+    "danger-hover": {
+      "$type": "color",
+      "$value": "#a51f1f",
+      "$description": "Destructive action backgrounds on hover."
+    },
+    "danger-active": {
+      "$type": "color",
+      "$value": "#861818",
+      "$description": "Destructive action backgrounds while pressed."
+    },
+    "on-danger": {
+      "$type": "color",
+      "$value": "#ffffff",
+      "$description": "Text on danger backgrounds."
+    },
+    "surface": {
+      "$type": "color",
+      "$value": "#ffffff",
+      "$description": "Neutral backgrounds."
+    },
+    "surface-hover": {
+      "$type": "color",
+      "$value": "#f1f3f5",
+      "$description": "Neutral backgrounds on hover."
+    },
+    "surface-active": {
+      "$type": "color",
+      "$value": "#e3e7eb",
+      "$description": "Neutral backgrounds while pressed."
+    },
+    "text": {
+      "$type": "color",
+      "$value": "#1c1f26",
+      "$description": "Text on surfaces."
+    },
+    "border": {
+      "$type": "color",
+      "$value": "#c4c9d2",
+      "$description": "Outlines."
+    },
+    "focus": {
+      "$type": "color",
+      "$value": "#4c6ef5",
+      "$description": "Focus rings."
+    }
+  }
+}

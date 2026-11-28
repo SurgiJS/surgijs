@@ -71,7 +71,7 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "generate": "node scripts/manifest.mjs"
+    "generate": "node scripts/manifest.mjs && node scripts/tokens.mjs"
   },
   "peerDependencies": {
     "@surgijs/core": ">=0.7.0 <1.0.0",
@@ -98,6 +98,7 @@
     "@types/react": "^19.2.2",
     "happy-dom": "^20.0.10",
     "react": "^19.2.0",
+    "style-dictionary": "^5.8.0",
     "typescript": "~6.0.3",
     "vue": "^3.5.45"
   }
