@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  delete (globalThis as any)[Symbol.for('surgijs.trustedTypes')];
   vi.resetModules();
 });
 
@@ -38,5 +39,16 @@ describe('Trusted Types', () => {
     });
     const { parseTemplate } = await load();
     expect((parseTemplate('<i>x</i>', 0) as Element).outerHTML).toBe('<i>x</i>');
+  });
+
+  it('shares one policy between runtime copies', async () => {
+    const createHTML = vi.fn((h: string) => h);
+    const createPolicy = vi.fn((_name: string) => ({ createHTML }));
+    vi.stubGlobal('trustedTypes', { createPolicy });
+    (await load()).parseTemplate('<p/>', 0);
+    vi.resetModules();
+    (await load()).parseTemplate('<p/>', 0);
+    expect(createPolicy).toHaveBeenCalledTimes(1);
+    expect(createHTML).toHaveBeenCalledTimes(2);
   });
 });

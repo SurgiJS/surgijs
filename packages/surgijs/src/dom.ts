@@ -16,17 +16,20 @@ export function setHydrating(on: boolean): boolean {
   return prev;
 }
 
+const POLICY = Symbol.for('surgijs.trustedTypes');
 let policy: { createHTML(h: string): string } | null | undefined;
 
 /**
  * Parses compiler-emitted template markup. Under `require-trusted-types-for 'script'` the
  * markup goes through a `surgijs` Trusted Types policy; add it to the `trusted-types` list.
- * Without Trusted Types, or when the CSP refuses the policy, it is assigned as a plain string.
+ * Runtime copies in one document share that policy, since a second `createPolicy('surgijs')`
+ * would be rejected. Without Trusted Types, or when the CSP refuses the policy, it is assigned as a plain string.
  */
 export function parseTemplate(html: string, flags: number): Node {
   if (policy === undefined) {
     try {
-      policy = (globalThis as any).trustedTypes?.createPolicy('surgijs', { createHTML: (h: string) => h }) ?? null;
+      const g = globalThis as any;
+      policy = g[POLICY] ??= g.trustedTypes?.createPolicy('surgijs', { createHTML: (h: string) => h }) ?? null;
     } catch {
       policy = null;
     }
