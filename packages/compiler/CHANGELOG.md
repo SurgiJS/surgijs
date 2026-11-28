@@ -1,5 +1,13 @@
 # @surgijs/compiler
 
+## 0.8.0
+
+### Minor Changes
+
+- [#45](https://github.com/SurgiJS/surgijs/pull/45) [`6664578`](https://github.com/SurgiJS/surgijs/commit/6664578cb4cc1411408ae93ef7557e97a72da01a) Thanks [@banzalik](https://github.com/banzalik)! - `@surgijs/astro` is an Astro integration that renders `defineComponent` components to declarative shadow DOM and hydrates them in islands. To support it, the Vite plugin takes `generate: 'auto'` (server output in Vite's SSR graph, DOM output elsewhere), and `defineComponent` without a DOM returns a class that carries its tag, render function, schema and options.
+
+- [#38](https://github.com/SurgiJS/surgijs/pull/38) [`84325cb`](https://github.com/SurgiJS/surgijs/commit/84325cb77e8ee8a1c35b37b25a359f29de2db1b3) Thanks [@banzalik](https://github.com/banzalik)! - `useReducer(reducer, init)` returns `[state, dispatch]`: each `dispatch(action)` stores `reducer(state, action)`. The compiler reads `state` as a value inside JSX, like `useState`. The hook is built on `useState`, so an app that does not call it leaves it out of the bundle.
+
 ## 0.7.0
 
 ### Minor Changes

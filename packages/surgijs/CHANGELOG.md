@@ -1,5 +1,19 @@
 # @surgijs/core
 
+## 0.8.0
+
+### Minor Changes
+
+- [#45](https://github.com/SurgiJS/surgijs/pull/45) [`6664578`](https://github.com/SurgiJS/surgijs/commit/6664578cb4cc1411408ae93ef7557e97a72da01a) Thanks [@banzalik](https://github.com/banzalik)! - `@surgijs/astro` is an Astro integration that renders `defineComponent` components to declarative shadow DOM and hydrates them in islands. To support it, the Vite plugin takes `generate: 'auto'` (server output in Vite's SSR graph, DOM output elsewhere), and `defineComponent` without a DOM returns a class that carries its tag, render function, schema and options.
+
+- [#42](https://github.com/SurgiJS/surgijs/pull/42) [`e312701`](https://github.com/SurgiJS/surgijs/commit/e312701a04a6e3569883c32d8457fe25c28e4a28) Thanks [@banzalik](https://github.com/banzalik)! - Development builds print `console.warn` messages for five silent mistakes: a tag already defined by another copy of the library, a signal written inside `createMemo` or a binding, `For` over objects without `by`, a prop read in the component body outside a reactive context, and an effect that keeps rescheduling itself. The checks ship in a separate development build that the `development` export condition selects (Vite and webpack set it in development). The default build has no checks and no reference to `process`, so it still runs unbundled from a CDN, an import map, Node or Deno.
+
+- [#38](https://github.com/SurgiJS/surgijs/pull/38) [`84325cb`](https://github.com/SurgiJS/surgijs/commit/84325cb77e8ee8a1c35b37b25a359f29de2db1b3) Thanks [@banzalik](https://github.com/banzalik)! - `useReducer(reducer, init)` returns `[state, dispatch]`: each `dispatch(action)` stores `reducer(state, action)`. The compiler reads `state` as a value inside JSX, like `useState`. The hook is built on `useState`, so an app that does not call it leaves it out of the bundle.
+
+### Patch Changes
+
+- [#36](https://github.com/SurgiJS/surgijs/pull/36) [`1d196b6`](https://github.com/SurgiJS/surgijs/commit/1d196b6eb87a8f2f76c8dc76fff7b2c16e8dc042) Thanks [@banzalik](https://github.com/banzalik)! - Template markup is now parsed through a `surgijs` Trusted Types policy, so SurgiJS works under `require-trusted-types-for 'script'`. Add `surgijs` to the CSP `trusted-types` directive. Without Trusted Types, or if the policy is refused, nothing changes.
+
 ## 0.7.0
 
 ### Minor Changes
