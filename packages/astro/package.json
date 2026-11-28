@@ -56,8 +56,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "peerDependencies": {
-    "@surgijs/compiler": ">=0.6.0",
-    "@surgijs/core": ">=0.6.0",
+    "@surgijs/compiler": ">=0.8.0 <1.0.0",
+    "@surgijs/core": ">=0.8.0 <1.0.0",
     "astro": ">=5"
   },
   "devDependencies": {

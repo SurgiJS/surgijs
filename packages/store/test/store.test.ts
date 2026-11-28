@@ -378,4 +378,13 @@ describe('remote', () => {
     await store.refetch('list');
     expect(store.status('list')).toMatchObject({ status: 'success', code: undefined, httpStatus: 200 });
   });
+
+  it('notifies a subscriber of changes made while its remotes start loading', () => {
+    const store = createStore({ city: remote({ deps: () => [], fetch: () => new Promise<never>(() => {}) }) });
+    const read = () => store.status('city').isPending;
+    const seen: boolean[] = [];
+    const stop = store.subscribe(read, (v) => seen.push(v));
+    expect(seen).toEqual([true]);
+    stop();
+  });
 });

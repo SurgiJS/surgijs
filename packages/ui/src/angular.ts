@@ -17,10 +17,12 @@ export class SButtonDirective {
     this.host.nativeElement.type = value;
   }
 
+  declare static ngAcceptInputType_disabled: unknown;
   set disabled(value: ButtonProps['disabled']) {
     this.host.nativeElement.disabled = value;
   }
 
+  declare static ngAcceptInputType_loading: unknown;
   set loading(value: ButtonProps['loading']) {
     this.host.nativeElement.loading = value;
   }
@@ -56,8 +58,8 @@ export class SButtonDirective {
       variant: { classPropertyName: 'variant', publicName: 'variant', isSignal: false, isRequired: false, transformFunction: null },
       size: { classPropertyName: 'size', publicName: 'size', isSignal: false, isRequired: false, transformFunction: null },
       type: { classPropertyName: 'type', publicName: 'type', isSignal: false, isRequired: false, transformFunction: null },
-      disabled: { classPropertyName: 'disabled', publicName: 'disabled', isSignal: false, isRequired: false, transformFunction: null },
-      loading: { classPropertyName: 'loading', publicName: 'loading', isSignal: false, isRequired: false, transformFunction: null },
+      disabled: { classPropertyName: 'disabled', publicName: 'disabled', isSignal: false, isRequired: false, transformFunction: i0.booleanAttribute },
+      loading: { classPropertyName: 'loading', publicName: 'loading', isSignal: false, isRequired: false, transformFunction: i0.booleanAttribute },
       label: { classPropertyName: 'label', publicName: 'label', isSignal: false, isRequired: false, transformFunction: null },
     },
   } as Parameters<typeof i0.ɵɵngDeclareDirective>[0]);

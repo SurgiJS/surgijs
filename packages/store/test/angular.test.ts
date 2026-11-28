@@ -85,4 +85,15 @@ describe('angular adapter', () => {
     expect(() => run(() => fromStatus(store, 'list'))).toThrow();
     expect(store.status('list').isActive).toBe(false);
   });
+
+  it('starts from the value a remote reaches while the subscription opens', () => {
+    const { run } = context();
+    const sync = createStore({ city: remote({ deps: () => [], fetch: () => ({ name: 'sync' }), retry: 0 }) });
+    const city = run(() => fromStore(sync, (s) => s.city));
+    expect(city()).toEqual({ name: 'sync' });
+
+    const pending = createStore({ city: remote({ deps: () => [], fetch: () => new Promise<never>(() => {}) }) });
+    const status = run(() => fromStatus(pending, 'city'));
+    expect(status().isPending).toBe(true);
+  });
 });

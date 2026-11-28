@@ -816,7 +816,6 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
     subscribe(selector, listener, options) {
       const equals = (options?.equals ?? deepEqual) as Equals<unknown>;
       const { value, keys } = trackSelect(selector);
-      for (const name of keys) if (remotes.has(name)) retain(name);
       const sub: Sub<D> = {
         selector: selector as Selector<D, unknown>,
         listener: listener as Listener<unknown>,
@@ -824,9 +823,12 @@ export function createStore<D extends Record<string, unknown>>(def: D, options?:
         value,
         keys,
       };
+      // Index before retaining: retain can start a load that changes state synchronously
+      // (status goes pending, a sync fetch settles), and that change must reach this sub.
       subs.add(sub);
       indexSub(sub);
-      if (options?.fireImmediately) listener(value as never, value as never);
+      for (const name of keys) if (remotes.has(name)) retain(name);
+      if (options?.fireImmediately) listener(sub.value as never, sub.value as never);
 
       return () => {
         if (!subs.delete(sub)) return;
