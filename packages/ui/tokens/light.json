@@ -1,0 +1,20 @@
+{
+  "color": {
+    "$type": "color",
+    "primary": { "$value": "#3451d1", "$description": "Primary backgrounds." },
+    "primary-hover": { "$value": "#2a43b3", "$description": "Primary backgrounds on hover." },
+    "primary-active": { "$value": "#223896", "$description": "Primary backgrounds while pressed." },
+    "primary-text": { "$value": "#3451d1", "$description": "Primary-colored text on surfaces." },
+    "on-primary": { "$value": "#ffffff", "$description": "Text on primary backgrounds." },
+    "danger": { "$value": "#c92a2a", "$description": "Destructive action backgrounds." },
+    "danger-hover": { "$value": "#a51f1f", "$description": "Destructive action backgrounds on hover." },
+    "danger-active": { "$value": "#861818", "$description": "Destructive action backgrounds while pressed." },
+    "on-danger": { "$value": "#ffffff", "$description": "Text on danger backgrounds." },
+    "surface": { "$value": "#ffffff", "$description": "Neutral backgrounds." },
+    "surface-hover": { "$value": "#f1f3f5", "$description": "Neutral backgrounds on hover." },
+    "surface-active": { "$value": "#e3e7eb", "$description": "Neutral backgrounds while pressed." },
+    "text": { "$value": "#1c1f26", "$description": "Text on surfaces." },
+    "border": { "$value": "#c4c9d2", "$description": "Outlines." },
+    "focus": { "$value": "#4c6ef5", "$description": "Focus rings." }
+  }
+}

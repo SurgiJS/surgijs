@@ -3,6 +3,9 @@
  * defaults come from the theme tokens in themes.css with built-in light fallbacks, so the
  * button renders without any stylesheet. Variants and sizes only change the `--_*` defaults,
  * which keeps a `--s-button-*` override working for every variant.
+ *
+ * Only logical properties are used (`padding-inline`, `border-inline-end-color`, flex order),
+ * so the button follows `dir` without an RTL stylesheet. The `rtl` test rejects physical ones.
  */
 export const buttonStyles = `
 :host {
@@ -67,7 +70,8 @@ export const buttonStyles = `
   gap: var(--s-button-gap, 0.5rem);
   min-height: var(--s-button-height, var(--_height));
   margin: 0;
-  padding: 0 var(--s-button-padding-x, var(--_padding-x));
+  padding-block: 0;
+  padding-inline: var(--s-button-padding-x, var(--_padding-x));
   font-family: var(--s-button-font-family, var(--s-font-family, inherit));
   font-size: var(--s-button-font-size, var(--_font-size));
   font-weight: var(--s-button-font-weight, var(--s-font-weight-medium, 500));
@@ -109,7 +113,7 @@ export const buttonStyles = `
   width: 1em;
   height: 1em;
   border: 2px solid currentColor;
-  border-right-color: transparent;
+  border-inline-end-color: transparent;
   border-radius: 50%;
   animation: s-button-spin 0.7s linear infinite;
 }

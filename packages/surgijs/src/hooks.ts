@@ -16,14 +16,40 @@ export function useState<T>(value?: T): Signal<T | undefined> {
 }
 
 /**
- * Runs after mount and again when a dependency changes. Without `deps` every signal read in
- * `fn` is tracked; with `deps` only the signals read by `deps()` are. A returned function
- * runs as cleanup before the next run and on unmount.
+ * `[state, dispatch]`: each `dispatch(action)` stores `reducer(state, action)`. Like `useState`,
+ * the compiler reads `state` as a value inside JSX and component bodies.
  */
-export function useEffect(fn: () => void | (() => void), deps?: () => unknown): void {
+export function useReducer<S, A>(reducer: (state: S, action: A) => S, init: S): [Accessor<S>, (action: A) => void] {
+  const [state, setState] = useState(init);
+  return [state, (action) => setState((prev) => reducer(prev, action))];
+}
+
+/**
+ * Dependencies of `useEffect` and `useMemo`. In compiled `.tsx`/`.jsx` files write them as in
+ * React, `[count, step]`: the compiler turns the array into `() => [count(), step()]`, so the
+ * listed signals are tracked. Elsewhere pass that function, or an array of getters.
+ */
+export type Deps = (() => unknown) | readonly unknown[];
+
+/**
+ * Runs `fn` for a computation. Without `deps` it tracks what `fn` reads; with `deps` it
+ * tracks only the listed signals and runs `fn` untracked.
+ */
+function withDeps<T>(deps: Deps | undefined, fn: () => T): T {
+  if (!deps) return fn();
+  if (typeof deps === 'function') deps();
+  else for (const d of deps) if (typeof d === 'function') d();
+  return untrack(fn);
+}
+
+/**
+ * Runs after mount and again when a dependency changes. Without `deps` every signal read in
+ * `fn` is tracked; with `deps` only the listed signals are, and `[]` runs once. A returned
+ * function runs as cleanup before the next run and on unmount.
+ */
+export function useEffect(fn: () => void | (() => void), deps?: Deps): void {
   createEffect(() => {
-    if (deps) deps();
-    const dispose = deps ? untrack(fn) : fn();
+    const dispose = withDeps(deps, fn);
     if (typeof dispose === 'function') onCleanup(dispose);
   });
 }
@@ -38,8 +64,13 @@ export function useRef<T = Element>(): Ref<T> {
   return ref;
 }
 
-export function useMemo<T>(fn: (prev: T | undefined) => T, init?: T): Accessor<T> {
-  const get = createMemo(fn, init);
+/**
+ * Cached value, returned as a getter. Without `deps` it recomputes when a signal read in `fn`
+ * changes; with `deps` only when a listed signal does. For an initial `prev` value use
+ * `createMemo(fn, init)`.
+ */
+export function useMemo<T>(fn: (prev: T | undefined) => T, deps?: Deps): Accessor<T> {
+  const get = createMemo<T>((prev) => withDeps(deps, () => fn(prev)));
   if (devHook) devHook('useMemo', get);
   return get;
 }

@@ -1,6 +1,6 @@
 {
   "name": "@surgijs/ui",
-  "version": "2.0.0",
+  "version": "0.3.0",
   "description": "Accessible SurgiJS web components, themed with CSS custom properties and ready for SSR.",
   "license": "MIT",
   "type": "module",
@@ -52,6 +52,11 @@
       "types": "./dist/vue.d.ts",
       "import": "./dist/vue.js"
     },
+    "./angular": {
+      "@surgijs/source": "./src/angular.ts",
+      "types": "./dist/angular.d.ts",
+      "import": "./dist/angular.js"
+    },
     "./themes.css": {
       "@surgijs/source": "./src/themes.css",
       "default": "./dist/themes.css"
@@ -66,14 +71,18 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "generate": "node scripts/manifest.mjs"
+    "generate": "node scripts/manifest.mjs && node scripts/tokens.mjs"
   },
   "peerDependencies": {
-    "@surgijs/core": "workspace:^",
+    "@surgijs/core": ">=0.7.0 <1.0.0",
+    "@angular/core": ">=19.0.0",
     "react": ">=19",
     "vue": ">=3.4"
   },
   "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": true
+    },
     "react": {
       "optional": true
     },
@@ -82,11 +91,14 @@
     }
   },
   "devDependencies": {
+    "@angular/compiler": "^22.3.0",
+    "@angular/core": "^22.3.0",
     "@surgijs/compiler": "workspace:*",
     "@surgijs/core": "workspace:*",
     "@types/react": "^19.2.2",
     "happy-dom": "^20.0.10",
     "react": "^19.2.0",
+    "style-dictionary": "^5.8.0",
     "typescript": "~6.0.3",
     "vue": "^3.5.45"
   }

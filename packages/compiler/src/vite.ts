@@ -12,8 +12,12 @@ export interface SurgiVitePluginOptions {
   devtools?: boolean;
   /** Files to compile. Default: `.jsx`/`.tsx` outside `node_modules`. */
   include?: RegExp | ((id: string) => boolean);
-  /** Output mode. Imports with a `?ssr` query always compile for the server. */
-  generate?: 'dom' | 'ssr';
+  /**
+   * Output mode. Imports with a `?ssr` query always compile for the server. `'auto'` also compiles
+   * for the server whatever Vite transforms for its SSR graph (frameworks such as Astro), and for
+   * the DOM otherwise.
+   */
+  generate?: 'dom' | 'ssr' | 'auto';
 }
 
 export interface SourceMapV3 {
@@ -119,7 +123,8 @@ export default function surgi(options: SurgiVitePluginOptions = {}): SurgiVitePl
     },
     transform(code, id, transformOptions) {
       const [file, query = ''] = id.split('?') as [string, string?];
-      const generate = /(^|&)ssr(&|=|$)/.test(query) ? 'ssr' : options.generate;
+      const forced = /(^|&)ssr(&|=|$)/.test(query) ? 'ssr' : options.generate;
+      const generate = forced === 'auto' ? (transformOptions?.ssr ? 'ssr' : 'dom') : forced;
       const result = matches(id)
         ? compile(code, {
             filename: file,

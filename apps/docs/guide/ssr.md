@@ -68,3 +68,5 @@ enableHydration();
 With hydration enabled, a component that connects with an existing shadow root adopts its nodes: templates claim the server elements, text bindings take over server text nodes (splitting merged text where needed), and event delegation attaches to the adopted elements. Updates after hydration write into the same nodes.
 
 `disableHydration()` restores client rendering. Without hydration a component replaces any prefilled root content.
+
+In Astro, `@surgijs/astro` does this wiring: see [Astro](/guide/astro).
