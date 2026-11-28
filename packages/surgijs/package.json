@@ -30,36 +30,43 @@
     ".": {
       "@surgijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
+      "development": "./dist/development/index.js",
       "import": "./dist/index.js"
     },
     "./internal": {
       "@surgijs/source": "./src/internal.ts",
       "types": "./dist/internal.d.ts",
+      "development": "./dist/development/internal.js",
       "import": "./dist/internal.js"
     },
     "./jsx-runtime": {
       "@surgijs/source": "./src/jsx-runtime.ts",
       "types": "./dist/jsx-runtime.d.ts",
+      "development": "./dist/development/jsx-runtime.js",
       "import": "./dist/jsx-runtime.js"
     },
     "./jsx-dev-runtime": {
       "@surgijs/source": "./src/jsx-dev-runtime.ts",
       "types": "./dist/jsx-dev-runtime.d.ts",
+      "development": "./dist/development/jsx-dev-runtime.js",
       "import": "./dist/jsx-dev-runtime.js"
     },
     "./hydrate": {
       "@surgijs/source": "./src/hydrate.ts",
       "types": "./dist/hydrate.d.ts",
+      "development": "./dist/development/hydrate.js",
       "import": "./dist/hydrate.js"
     },
     "./devtools": {
       "@surgijs/source": "./src/devtools.ts",
       "types": "./dist/devtools.d.ts",
+      "development": "./dist/development/devtools.js",
       "import": "./dist/devtools.js"
     },
     "./server": {
       "@surgijs/source": "./src/server.ts",
       "types": "./dist/server.d.ts",
+      "development": "./dist/development/server.js",
       "import": "./dist/server.js"
     },
     "./package.json": "./package.json"
@@ -68,7 +75,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "size": "node scripts/size.mjs"
   },

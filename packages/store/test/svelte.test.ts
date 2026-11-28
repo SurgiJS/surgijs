@@ -71,4 +71,12 @@ describe('svelte adapter', () => {
     ).toThrow('boom');
     expect(store.status('list').isActive).toBe(false);
   });
+
+  it('starts from the value a remote reaches while the subscription opens', () => {
+    const sync = createStore({ city: remote({ deps: () => [], fetch: () => ({ name: 'sync' }), retry: 0 }) });
+    const seen: unknown[] = [];
+    const stop = fromStore(sync, (s) => s.city).subscribe((v) => seen.push(v));
+    expect(seen.at(-1)).toEqual({ name: 'sync' });
+    stop();
+  });
 });

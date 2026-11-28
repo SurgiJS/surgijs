@@ -144,7 +144,7 @@ function describeComponent(checker, entry, call) {
   for (const { name, ctor } of parseSchema(checker, call.arguments[2])) {
     const prop = propsType.getProperty(name);
     if (!prop) throw new Error(`${entry}: ${tag} declares "${name}" in its schema but not in ${propsSymbol.name}`);
-    props.push({ name, required: !(prop.flags & ts.SymbolFlags.Optional) });
+    props.push({ name, ctor, required: !(prop.flags & ts.SymbolFlags.Optional) });
     const doc = prop.getDocumentationComment(checker);
     const defaultTag = prop.getJsDocTags(checker).find((t) => t.name === 'default');
     const attribute = kebab(name);
@@ -268,15 +268,20 @@ export function renderVue(manifest) {
 // as a partial declaration: the Angular CLI linker turns it into a directive when the app is built.
 function renderDirective(c) {
   const name = `${c.className}Directive`;
+  // A static attribute reaches an input as a string (`<s-button disabled>` sets ''), so
+  // Boolean props go through booleanAttribute, and the template type checker accepts any
+  // value for them (ngAcceptInputType_*), as for Angular's own boolean inputs.
+  const isBoolean = (p) => p.ctor === 'Boolean';
   const setters = c.props.flatMap((p) => [
     '',
+    ...(isBoolean(p) ? [`  declare static ngAcceptInputType_${p.name}: unknown;`] : []),
     `  set ${p.name}(value: ${c.propsName}['${p.name}']) {`,
     `    this.host.nativeElement.${p.name} = value;`,
     `  }`,
   ]);
   const typeInputs = c.props.map((p) => `    ${p.name}: { alias: '${p.name}'; required: ${p.required}; isSignal: false };`);
   const declInputs = c.props.map(
-    (p) => `      ${p.name}: { classPropertyName: '${p.name}', publicName: '${p.name}', isSignal: false, isRequired: ${p.required}, transformFunction: null },`,
+    (p) => `      ${p.name}: { classPropertyName: '${p.name}', publicName: '${p.name}', isSignal: false, isRequired: ${p.required}, transformFunction: ${isBoolean(p) ? 'i0.booleanAttribute' : 'null'} },`,
   );
   const header = [`    minVersion: '${ANGULAR.minVersion}',`, `    version: '${ANGULAR.version}',`, `    ngImport: i0,`, `    type: ${name},`];
   return [
