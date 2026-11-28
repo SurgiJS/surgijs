@@ -1,5 +1,15 @@
 # @surgijs/store
 
+## 0.4.0
+
+### Minor Changes
+
+- [#40](https://github.com/SurgiJS/surgijs/pull/40) [`eb102fe`](https://github.com/SurgiJS/surgijs/commit/eb102fe4e1d799e11b4eed400704efd7e124e5af) Thanks [@banzalik](https://github.com/banzalik)! - Adds `fromStore` and `fromStatus` adapters for Vue (`@surgijs/store/vue`, refs), Svelte (`@surgijs/store/svelte`, store contract without importing `svelte`) and Angular (`@surgijs/store/angular`, signals that end with `DestroyRef`), alongside the existing React and SurgiJS entries.
+
+### Patch Changes
+
+- [#49](https://github.com/SurgiJS/surgijs/pull/49) [`24003d0`](https://github.com/SurgiJS/surgijs/commit/24003d07d685c7b2829f5aa44c10fefff44c95da) Thanks [@banzalik](https://github.com/banzalik)! - `store.subscribe` registers the subscription before it starts loading the remotes the selector reads. A load that changes state right away (status turns pending, a synchronous fetch settles) now reaches the new subscriber. Before, the Vue and Angular adapters started from the stale value: `fromStatus` showed `isPending: false` during the first load, and `fromStore` stayed `undefined` after a synchronous fetch.
+
 ## 0.3.0
 
 ### Minor Changes

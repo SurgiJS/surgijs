@@ -1,6 +1,6 @@
 {
   "name": "@surgijs/astro",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Astro integration for SurgiJS: renders web components to declarative shadow DOM on the server and hydrates them in islands.",
   "license": "MIT",
   "type": "module",
