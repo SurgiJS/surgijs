@@ -215,7 +215,7 @@ importers:
     devDependencies:
       '@angular/core':
         specifier: ^22.3.0
-        version: 22.3.0(rxjs@7.8.2)
+        version: 22.3.0(@angular/compiler@22.3.0)(rxjs@7.8.2)
       '@surgijs/core':
         specifier: workspace:*
         version: link:../surgijs
@@ -267,6 +267,12 @@ importers:
 
   packages/ui:
     devDependencies:
+      '@angular/compiler':
+        specifier: ^22.3.0
+        version: 22.3.0
+      '@angular/core':
+        specifier: ^22.3.0
+        version: 22.3.0(@angular/compiler@22.3.0)(rxjs@7.8.2)
       '@surgijs/compiler':
         specifier: workspace:*
         version: link:../compiler
@@ -373,6 +379,10 @@ packages:
   '@algolia/requester-node-http@5.65.0':
     resolution: {integrity: sha512-+3RUs4gm83CAuBmQZO3oSSc6dCywiOpb83W7NTKW+Ex6dIAfHp/XtUFMmsPU33OsT+2sZ/SpCNQwvDAOdPBprw==}
     engines: {node: '>= 14.0.0'}
+
+  '@angular/compiler@22.3.0':
+    resolution: {integrity: sha512-a01VbJm4MANutGvsoBIlFl7oej5V67WEmGWhnd6eLZIAat5DyDLFuKD5++l+yHhZx1BaIvOCooyPgAbIEpb64g==}
+    engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
 
   '@angular/core@22.3.0':
     resolution: {integrity: sha512-wGXoO1eiBa5xPF7Y+Vm9eVj7W7x7drRv3StF2HubXX6l/osaIxeQc9ewaHaWl/teywr/LlGblu5ClKE65wF0Zw==}
@@ -4984,10 +4994,16 @@ snapshots:
     dependencies:
       '@algolia/client-common': 5.65.0
 
-  '@angular/core@22.3.0(rxjs@7.8.2)':
+  '@angular/compiler@22.3.0':
+    dependencies:
+      tslib: 2.9.1
+
+  '@angular/core@22.3.0(@angular/compiler@22.3.0)(rxjs@7.8.2)':
     dependencies:
       rxjs: 7.8.2
       tslib: 2.9.1
+    optionalDependencies:
+      '@angular/compiler': 22.3.0
 
   '@astrojs/compiler-binding-android-arm64@0.5.3':
     optional: true
