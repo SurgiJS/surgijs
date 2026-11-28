@@ -1,0 +1,68 @@
+{
+  "name": "@surgijs/astro",
+  "version": "0.0.0",
+  "description": "Astro integration for SurgiJS: renders web components to declarative shadow DOM on the server and hydrates them in islands.",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "astro",
+    "astro-integration",
+    "astro-renderer",
+    "withastro",
+    "surgijs",
+    "web-components",
+    "ssr"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SurgiJS/surgijs.git",
+    "directory": "packages/astro"
+  },
+  "homepage": "https://surgijs.github.io/surgijs/guide/astro",
+  "publishConfig": {
+    "access": "public"
+  },
+  "bugs": "https://github.com/SurgiJS/surgijs/issues",
+  "exports": {
+    ".": {
+      "@surgijs/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "@surgijs/source": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./client": {
+      "@surgijs/source": "./src/client.ts",
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./hydrate": {
+      "@surgijs/source": "./src/hydrate.ts",
+      "types": "./dist/hydrate.d.ts",
+      "import": "./dist/hydrate.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@surgijs/compiler": ">=0.6.0",
+    "@surgijs/core": ">=0.6.0",
+    "astro": ">=5"
+  },
+  "devDependencies": {
+    "@surgijs/compiler": "workspace:*",
+    "@surgijs/core": "workspace:*",
+    "astro": "^7.4.13"
+  }
+}

@@ -6,7 +6,7 @@ Compiled Web Components on JSX/TSX. The compiler hoists static HTML into templat
 - `defineComponent` creates standard custom elements: typed attributes, property reflection, shadow or light DOM, form association.
 - `For`, `Show`, `Switch`, `Portal`, `ErrorBoundary`, `createResource`.
 - SSR to declarative shadow DOM with nested components, control flow, streaming (`renderToStream`) and hydration that adopts server nodes.
-- Vite / Rollup and esbuild plugins with source maps.
+- Vite / Rollup and esbuild plugins with source maps, and an [Astro integration](https://surgijs.github.io/surgijs/guide/astro).
 
 ## Install
 
@@ -86,12 +86,15 @@ Run it locally with `pnpm bench` (`pnpm bench surgijs solid --rows 10000` for a 
 | --- | --- |
 | [`@surgijs/core`](packages/surgijs) | runtime: `@surgijs/core`, `@surgijs/core/server`, `@surgijs/core/hydrate`, `@surgijs/core/jsx-runtime` |
 | [`@surgijs/compiler`](packages/compiler) | `compile()`, `@surgijs/compiler/vite`, `@surgijs/compiler/esbuild` |
+| [`@surgijs/astro`](packages/astro) | Astro integration: server rendering to declarative shadow DOM and hydration in islands |
 | [`@surgijs/store`](packages/store) | framework-agnostic store: one object, lazy remotes, deep-equal watches |
 | [`@surgijs/ui`](packages/ui) | accessible web components themed with CSS custom properties, with SSR |
 
 ## Links
 
 - Documentation: https://surgijs.github.io/surgijs/
+- Coming from React: https://surgijs.github.io/surgijs/guide/from-react
+- For AI coding agents: https://surgijs.github.io/surgijs/llms.txt, https://surgijs.github.io/surgijs/llms-full.txt
 - Playground: https://surgijs.github.io/surgijs/playground/ ([`apps/playground`](apps/playground))
 - Storybook: https://surgijs.github.io/surgijs/storybook/ ([`apps/storybook`](apps/storybook))
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)

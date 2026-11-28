@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flush } from '@surgijs/core';
-import { SButton, type SButtonElement } from '@surgijs/ui/button';
+import { SButton, buttonStyles, type SButtonElement } from '@surgijs/ui/button';
 
 afterEach(() => document.body.replaceChildren());
 
@@ -89,5 +89,10 @@ describe('<s-button>', () => {
     inner(2).click();
     expect(submit).toHaveBeenCalledTimes(1);
     expect(reset).toHaveBeenCalledTimes(1);
+  });
+
+  it('styles with logical properties only, so dir="rtl" needs no overrides', () => {
+    const physical = buttonStyles.match(/(?:margin|padding|border)-(?:left|right)|(?:^|[\s;{])(?:left|right)\s*:|text-align:\s*(?:left|right)/m);
+    expect(physical).toBeNull();
   });
 });

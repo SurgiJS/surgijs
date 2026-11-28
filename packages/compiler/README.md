@@ -27,3 +27,5 @@ const { code, map } = compile(source, { filename: 'app.tsx', generate: 'dom' });
 ```
 
 Documentation: https://surgijs.github.io/surgijs/api/compiler
+
+Docs for AI coding agents: [llms.txt](https://surgijs.github.io/surgijs/llms.txt) (index) and [llms-full.txt](https://surgijs.github.io/surgijs/llms-full.txt) (all pages in one file).

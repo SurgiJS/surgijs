@@ -21,3 +21,5 @@ defineComponent('my-counter', Counter);
 Entry points: `@surgijs/core`, `@surgijs/core/server` (SSR to declarative shadow DOM), `@surgijs/core/hydrate`, `@surgijs/core/jsx-runtime`.
 
 Documentation: https://surgijs.github.io/surgijs/
+
+Docs for AI coding agents: [llms.txt](https://surgijs.github.io/surgijs/llms.txt) (index) and [llms-full.txt](https://surgijs.github.io/surgijs/llms-full.txt) (all pages in one file).
